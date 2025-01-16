@@ -27,7 +27,7 @@ fi
 
 # Send SIGINT to the monitoring process (equivalent to Ctrl+C)
 echo "Stopping CPU monitoring..."
-kill -SIGINT $MONITOR_PID
+kill -INT $MONITOR_PID
 wait $MONITOR_PID 2>/dev/null
 
 echo "CPU monitoring stopped. Logs saved in cpu_monitor.log. CPU usage data saved in $CSV_FILE."
