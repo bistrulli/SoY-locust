@@ -7,12 +7,8 @@ def get_cpu_delta(stats):
     cpu_delta = stats['cpu_stats']['cpu_usage']['total_usage'] - stats['precpu_stats']['cpu_usage']['total_usage']
     system_cpu_delta = stats['cpu_stats']['system_cpu_usage'] - stats['precpu_stats']['system_cpu_usage']
 
-    # Safely get the number of CPUs or default to 1
-    percpu_usage = stats['cpu_stats']['cpu_usage'].get('percpu_usage', None)
-    num_cpus = len(percpu_usage) if percpu_usage else 1
-
     if system_cpu_delta > 0 and cpu_delta > 0:
-        return (cpu_delta / system_cpu_delta) * 100.0 * num_cpus
+        return (cpu_delta / system_cpu_delta) * 100.0
     return 0.0
 
 def get_cpu_utilization(container_name, interval):
@@ -30,7 +26,8 @@ def get_cpu_utilization(container_name, interval):
         start_cpu = get_cpu_delta(start_stats)
         end_cpu = get_cpu_delta(end_stats)
 
-        cpu_utilization = (start_cpu + end_cpu) / 2
+        num_cpus = len(end_stats['cpu_stats']['cpu_usage'].get('percpu_usage', [1]))
+        cpu_utilization = ((start_cpu + end_cpu) / 2) * num_cpus
         return cpu_utilization
 
     except docker.errors.NotFound:
