@@ -3,12 +3,13 @@
 # Variables
 CONTAINER_NAME="445bdc29863b"  # Replace with your container name
 MONITOR_SCRIPT="getSystemUtil.py"      # Replace with the name of the Python script
-INTERVAL=60                           # Interval in seconds for monitoring CPU
-LOCUST_COMMAND="locust --headless --users 1 --spawn-rate 10 --run-time 1m --host http://127.0.0.1:5001 --csv results.csv -f SoyMonoShorterIfLogin.py"
+INTERVAL=1                           # Interval in seconds for monitoring CPU
+CSV_FILE="cpu_utilization.csv"       # Output CSV file for CPU utilization
+LOCUST_COMMAND="locust --headless --users 10 --spawn-rate 10 --run-time 10m --host http://127.0.0.1:5001 --csv results.csv -f SoyMonoShorterIfLogin.py"
 
 # Start CPU monitoring in the background
 echo "Starting CPU monitoring for container: $CONTAINER_NAME"
-python3 $MONITOR_SCRIPT $CONTAINER_NAME $INTERVAL > cpu_monitor.log 2>&1 &
+python3 $MONITOR_SCRIPT $CONTAINER_NAME $INTERVAL $CSV_FILE > cpu_monitor.log 2>&1 &
 MONITOR_PID=$!
 echo "CPU monitoring process started with PID: $MONITOR_PID"
 
@@ -24,9 +25,9 @@ else
     echo "Locust encountered an error with exit code $LOCUST_EXIT_CODE."
 fi
 
-# Stop CPU monitoring
+# Send SIGINT to the monitoring process (equivalent to Ctrl+C)
 echo "Stopping CPU monitoring..."
-kill $MONITOR_PID
+kill -SIGINT $MONITOR_PID
 wait $MONITOR_PID 2>/dev/null
 
-echo "CPU monitoring stopped. Logs saved in cpu_monitor.log."
+echo "CPU monitoring stopped. Logs saved in cpu_monitor.log. CPU usage data saved in $CSV_FILE."
