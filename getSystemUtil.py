@@ -12,20 +12,8 @@ def get_cpu_delta(stats):
     num_cpus = len(percpu_usage) if percpu_usage else 1
 
     if system_cpu_delta > 0 and cpu_delta > 0:
-        return (cpu_delta / system_cpu_delta) * num_cpus * 100.0
+        return (cpu_delta / system_cpu_delta) * 100.0 * num_cpus
     return 0.0
-
-def get_per_cpu_utilization(stats):
-    """Calculate per-CPU utilization from Docker stats."""
-    percpu_usage = stats['cpu_stats']['cpu_usage'].get('percpu_usage', [])
-    total_system_delta = stats['cpu_stats']['system_cpu_usage'] - stats['precpu_stats']['system_cpu_usage']
-    utilization = []
-
-    if total_system_delta > 0:
-        for usage in percpu_usage:
-            utilization.append((usage / total_system_delta) * 100.0)
-
-    return utilization
 
 def get_cpu_utilization(container_name, interval):
     """Get the CPU utilization of a Docker container over a specified time window."""
@@ -41,12 +29,6 @@ def get_cpu_utilization(container_name, interval):
 
         start_cpu = get_cpu_delta(start_stats)
         end_cpu = get_cpu_delta(end_stats)
-
-        per_cpu_start = get_per_cpu_utilization(start_stats)
-        per_cpu_end = get_per_cpu_utilization(end_stats)
-
-        print(f"Per-CPU utilization at start: {per_cpu_start}")
-        print(f"Per-CPU utilization at end: {per_cpu_end}")
 
         cpu_utilization = (start_cpu + end_cpu) / 2
         return cpu_utilization
