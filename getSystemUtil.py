@@ -3,6 +3,8 @@ import time
 import argparse
 import csv
 from datetime import datetime
+import signal
+import sys
 
 def get_cpu_delta(stats):
     """Calculate the CPU delta based on Docker stats."""
@@ -12,6 +14,11 @@ def get_cpu_delta(stats):
     if system_cpu_delta > 0 and cpu_delta > 0:
         return (cpu_delta / system_cpu_delta) * 100.0
     return 0.0
+
+def signal_handler(sig, frame):
+    """Handle SIGINT signal to gracefully terminate the script."""
+    print("\nMonitoring stopped by SIGINT signal.")
+    sys.exit(0)
 
 def get_cpu_utilization(container_name, interval, csv_file):
     """Get the CPU utilization of a Docker container over a specified time window and save to a CSV file."""
@@ -42,8 +49,6 @@ def get_cpu_utilization(container_name, interval, csv_file):
 
         except docker.errors.NotFound:
             print(f"Container {container_name} not found.")
-        except KeyboardInterrupt:
-            print("Monitoring stopped by user.")
         except Exception as e:
             print(f"An error occurred: {e}")
 
@@ -58,5 +63,8 @@ if __name__ == "__main__":
     container_name = args.container_name
     interval = args.interval
     csv_file = args.csv_file
+
+    # Register the SIGINT handler
+    signal.signal(signal.SIGINT, signal_handler)
 
     get_cpu_utilization(container_name, interval, csv_file)
