@@ -62,21 +62,21 @@ class SoyMonoUser(HttpUser):
                     headers={"Authorization": f"Bearer {access_token}"},
                 )
 
-class CustomLoadShape(LoadTestShape):
-    max_users = 200
-    phase_duration = 60
-    rest_duration = 240
+# class CustomLoadShape(LoadTestShape):
+#     max_users = 200
+#     phase_duration = 60
+#     rest_duration = 240
     
-    stages = [
-        {"duration": phase_duration, "users": max_users, "spawn_rate": 10},
-        {"duration": phase_duration + rest_duration, "users": 0, "spawn_rate": 0},
-    ] * 5
+#     stages = [
+#         {"duration": phase_duration, "users": max_users, "spawn_rate": 10},
+#         {"duration": phase_duration + rest_duration, "users": 0, "spawn_rate": 0},
+#     ] * 5
 
-    def tick(self):
-        run_time = self.get_run_time()
+#     def tick(self):
+#         run_time = self.get_run_time()
 
-        for stage in self.stages:
-            if run_time < stage["duration"]:
-                return stage["users"], stage["spawn_rate"]
+#         for stage in self.stages:
+#             if run_time < stage["duration"]:
+#                 return stage["users"], stage["spawn_rate"]
 
-        return None
+#         return None
