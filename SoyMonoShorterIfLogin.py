@@ -5,7 +5,7 @@ import csv
 resourceDir="./resources"
 
 class SoyMonoUser(HttpUser):
-    wait_time = between(5, 10)
+    wait_time = between(1, 1.0001)
     user_index = 0  # Static variable to keep track of user index
 
     def on_start(self):
