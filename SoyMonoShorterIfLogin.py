@@ -10,7 +10,7 @@ class SoyMonoUser(HttpUser):
     @task
     def login_and_actions(self):
         # Carica gli utenti dal file CSV
-        with open('soymono2/users.csv') as csv_file:
+        with open('./resources/soymono2/users.csv') as csv_file:
             reader = csv.DictReader(csv_file)
             users = [row for row in reader]
 
