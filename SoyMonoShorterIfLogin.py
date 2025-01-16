@@ -2,7 +2,7 @@ from locust import HttpUser, task, between, LoadTestShape
 import json
 import csv
 
-
+resourceDir="./resources"
 
 class SoyMonoUser(HttpUser):
     wait_time = between(5, 10)
@@ -10,7 +10,7 @@ class SoyMonoUser(HttpUser):
     @task
     def login_and_actions(self):
         # Carica gli utenti dal file CSV
-        with open('./resources/soymono2/users.csv') as csv_file:
+        with open(f'{resourceDir}/soymono2/users.csv') as csv_file:
             reader = csv.DictReader(csv_file)
             users = [row for row in reader]
 
@@ -39,7 +39,7 @@ class SoyMonoUser(HttpUser):
                     )
 
                     # Exercise production
-                    with open('soymono2/0046_request.json') as json_file:
+                    with open(f'{resourceDir}/soymono2/0046_request.json') as json_file:
                         exercise_data = json.load(json_file)
                     self.client.post(
                         "/api/exercise-production",
