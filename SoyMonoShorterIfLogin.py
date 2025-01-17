@@ -24,6 +24,9 @@ class SoyMonoUser(HttpUser):
         email = self.user_data['email']
         password = self.user_data['password']
 
+        # OPTIONS before login
+        self.client.request("OPTIONS", "/api/user/login")
+        
         # Login
         login_response = self.client.post(
             "/api/user/login",
@@ -38,11 +41,17 @@ class SoyMonoUser(HttpUser):
             refresh_token = login_response.cookies.get("refresh_token")
 
             if access_token:
+                # OPTIONS before auth verify
+                self.client.request("OPTIONS", "/api/auth/verify")
+
                 # Auth verify
                 self.client.get(
                     "/api/auth/verify",
                     headers={"Authorization": f"Bearer {access_token}"},
                 )
+
+                # OPTIONS before exercise production
+                self.client.request("OPTIONS", "/api/exercise-production")
 
                 # Exercise production
                 with open(f'{resourceDir}/soymono2/0046_request.json') as json_file:
@@ -55,6 +64,9 @@ class SoyMonoUser(HttpUser):
                     },
                     json=exercise_data,
                 )
+
+                # OPTIONS before logout
+                self.client.request("OPTIONS", "/api/user/logout")
 
                 # Logout
                 self.client.delete(
