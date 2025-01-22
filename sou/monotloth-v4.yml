@@ -8,7 +8,7 @@ services:
     env_file:
       - variables.env
     deploy:
-      replicas: 2 # Puoi cambiare questo valore per il numero iniziale di repliche
+      replicas: 1 # Puoi cambiare questo valore per il numero iniziale di repliche
       update_config:
         parallelism: 1
         delay: 10s
@@ -16,10 +16,10 @@ services:
         condition: any
       resources:
         limits:
-          cpus: "0.50" # Limita le risorse
-          memory: 512M
+          cpus: "1" # Limita le risorse
+          memory: 2G
         reservations:
-          cpus: "0.25"
+          cpus: "1"
           memory: 256M
 
   postgres:
@@ -37,11 +37,11 @@ services:
         condition: any
       resources:
         limits:
-          cpus: "0.50"
-          memory: 1G
+          cpus: "3"
+          memory: 2G
         reservations:
-          cpus: "0.25"
-          memory: 512M
+          cpus: "3"
+          memory: 2G
 
 volumes:
   postgres_data:
