@@ -5,6 +5,8 @@ import csv
 from datetime import datetime
 import signal
 import sys
+import subprocess
+import json
 
 def get_cpu_delta(stats):
     """Calculate the CPU delta based on Docker stats."""
@@ -12,8 +14,33 @@ def get_cpu_delta(stats):
     system_cpu_delta = stats['cpu_stats']['system_cpu_usage'] - stats['precpu_stats']['system_cpu_usage']
 
     if system_cpu_delta > 0 and cpu_delta > 0:
-        return (cpu_delta / system_cpu_delta) * 100.0
+        num_cpus = len(stats['cpu_stats']['cpu_usage'].get('percpu_usage', [1]))
+        return (cpu_delta / system_cpu_delta) * num_cpus * 100.0
     return 0.0
+
+def get_docker_cpu_usage_cli(container_name):
+    try:
+        # Command as a list to avoid shell=True
+        command = [
+            "docker", 
+            "stats", 
+            container_name, 
+            "--no-stream", 
+            "--format", 
+            "{{json .}}"
+        ]
+        # Run the command and capture the output
+        result = subprocess.check_output(command, text=True).strip()
+        
+        # Parse the result as JSON
+        stats = json.loads(result)
+        cpu_usage = stats.get("CPUPerc", "0%").strip('%')
+        return float(cpu_usage)
+    except subprocess.CalledProcessError as e:
+        print(f"Error while running docker stats: {e}")
+    except json.JSONDecodeError as e:
+        print(f"Error parsing JSON output: {e}")
+    return None
 
 def signal_handler(sig, frame):
     """Handle SIGINT signal to gracefully terminate the script."""
@@ -29,23 +56,21 @@ def get_cpu_utilization(container_name, interval, csv_file):
 
     with open(csv_file, mode='a', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(["Timestamp", "CPU Utilization (%)"])
+        writer.writerow(["Timestamp", "CPU Utilization (%)", "Num Cpus"])
 
         try:
             while True:
-                start_stats = container.stats(stream=False)
-                time.sleep(interval)
-                end_stats = container.stats(stream=False)
-
-                start_cpu = get_cpu_delta(start_stats)
-                end_cpu = get_cpu_delta(end_stats)
-
-                num_cpus = len(end_stats['cpu_stats']['cpu_usage'].get('percpu_usage', [1]))
-                cpu_utilization = ((start_cpu + end_cpu) / 2) * num_cpus
+                stats = container.stats(stream=False)
+                #cpu_utilization = get_cpu_delta(stats)
 
                 timestamp = datetime.now().isoformat()
-                writer.writerow([timestamp, cpu_utilization])
+                num_cpus = len(stats['cpu_stats']['cpu_usage'].get('percpu_usage', [1]))
+                cpu_utilization=get_docker_cpu_usage_cli(container_name)
+
+                writer.writerow([timestamp, cpu_utilization, num_cpus])
                 print(f"{timestamp} - CPU Utilization: {cpu_utilization:.2f}%")
+
+                time.sleep(interval)
 
         except docker.errors.NotFound:
             print(f"Container {container_name} not found.")
