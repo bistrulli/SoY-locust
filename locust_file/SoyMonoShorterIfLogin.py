@@ -2,7 +2,7 @@ from locust import HttpUser, task, between, LoadTestShape
 import json
 import csv
 
-resourceDir="./resources"
+resourceDir="../resources"
 
 class SoyMonoUser(HttpUser):
     wait_time = between(1, 1.0001)

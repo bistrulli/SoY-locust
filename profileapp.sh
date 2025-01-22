@@ -6,8 +6,9 @@ MONITOR_SCRIPT="getSystemUtil.py"      # Replace with the name of the Python scr
 INTERVAL=1                           # Interval in seconds for monitoring CPU
 LOCUST_TIME=$1
 LOCUST_USERS=$2
+LOCUST_FILE=$3
 CSV_FILE="cpu_utilization.csv"       # Output CSV file for CPU utilization
-LOCUST_COMMAND="locust --headless --users $LOCUST_USERS --spawn-rate 100 --run-time $LOCUST_TIME --host http://127.0.0.1:80 --csv results.csv -f simple_user.py"
+LOCUST_COMMAND="locust --headless --users $LOCUST_USERS --spawn-rate 100 --run-time $LOCUST_TIME --host http://127.0.0.1:80 --csv results.csv -f $LOCUST_FILE"
 
 # Start CPU monitoring in the background
 echo "Starting CPU monitoring for container: $CONTAINER_NAME"
