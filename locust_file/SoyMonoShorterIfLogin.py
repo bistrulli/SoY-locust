@@ -1,8 +1,9 @@
 from locust import HttpUser, task, between, LoadTestShape
 import json
 import csv
+from pathlib import Path
 
-resourceDir="../resources"
+resourceDir=Path(__file__).parent/Path("resources")
 
 class SoyMonoUser(HttpUser):
     wait_time = between(1, 1.0001)
@@ -11,7 +12,7 @@ class SoyMonoUser(HttpUser):
     def on_start(self):
         # Carica gli utenti dal file CSV e assegna un utente al processo
         if not hasattr(self, 'users'):
-            with open(f'{resourceDir}/soymono2/users.csv') as csv_file:
+            with open(f'{resourceDir.absolute()}/soymono2/users.csv') as csv_file:
                 reader = csv.DictReader(csv_file)
                 SoyMonoUser.users = [row for row in reader]
 
@@ -54,7 +55,7 @@ class SoyMonoUser(HttpUser):
                 self.client.request("OPTIONS", "/api/exercise-production")
 
                 # Exercise production
-                with open(f'{resourceDir}/soymono2/0046_request.json') as json_file:
+                with open(f'{resourceDir.absolute()}/soymono2/0046_request.json') as json_file:
                     exercise_data = json.load(json_file)
                 self.client.post(
                     "/api/exercise-production",
