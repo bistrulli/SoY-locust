@@ -6,7 +6,7 @@ from pathlib import Path
 resourceDir=Path(__file__).parent.parent/Path("resources")
 
 class SoyMonoUser(HttpUser):
-    wait_time = between(1, 1.0001)
+    wait_time = between(1, 1)
     user_index = 0  # Static variable to keep track of user index
 
     def on_start(self):
@@ -52,7 +52,7 @@ class SoyMonoUser(HttpUser):
                 )
 
                 # OPTIONS before exercise production
-                self.client.request("OPTIONS", "/api/exercise-production")
+                #self.client.request("OPTIONS", "/api/exercise-production")
 
                 # Exercise production
                 with open(f'{resourceDir.absolute()}/soymono2/0046_request.json') as json_file:
