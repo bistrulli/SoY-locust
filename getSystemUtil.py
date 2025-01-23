@@ -1,4 +1,4 @@
-import docker
+#import docker
 import time
 import argparse
 import csv
@@ -60,14 +60,14 @@ def get_cpu_utilization(container_name, interval, csv_file):
 
         try:
             while True:
-                stats = container.stats(stream=False)
+                #stats = container.stats(stream=False)
                 #cpu_utilization = get_cpu_delta(stats)
 
                 timestamp = datetime.now().isoformat()
-                num_cpus = len(stats['cpu_stats']['cpu_usage'].get('percpu_usage', [1]))
+                #num_cpus = len(stats['cpu_stats']['cpu_usage'].get('percpu_usage', [1]))
                 cpu_utilization=get_docker_cpu_usage_cli(container_name)
 
-                writer.writerow([timestamp, cpu_utilization, num_cpus])
+                writer.writerow([timestamp, cpu_utilization])
                 print(f"{timestamp} - CPU Utilization: {cpu_utilization:.2f}%")
 
                 time.sleep(interval)

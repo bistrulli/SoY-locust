@@ -57,14 +57,14 @@ class SoyMonoUser(HttpUser):
                 # Exercise production
                 with open(f'{resourceDir.absolute()}/soymono2/0046_request.json') as json_file:
                     exercise_data = json.load(json_file)
-                self.client.post(
-                    "/api/exercise-production",
-                    headers={
-                        "Authorization": f"Bearer {access_token}",
-                        "Content-Type": "application/json",
-                    },
-                    json=exercise_data,
-                )
+                    self.client.post(
+                        "/api/exercise-production",
+                        headers={
+                            "Authorization": f"Bearer {access_token}",
+                            "Content-Type": "application/json",
+                        },
+                        json=exercise_data,
+                    )
 
                 # OPTIONS before logout
                 #self.client.request("OPTIONS", "/api/user/logout")
