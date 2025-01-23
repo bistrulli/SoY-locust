@@ -64,7 +64,7 @@ class SoyMonoUser(HttpUser):
                         "/api/user/logout",
                         headers={"Authorization": f"Bearer {access_token}"},
                     )
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print("An exception occurred:")
             print(f"Type: {type(e)}")
             print(f"Details: {e}")
