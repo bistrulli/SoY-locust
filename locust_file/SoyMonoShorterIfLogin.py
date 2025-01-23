@@ -2,27 +2,30 @@ from locust import HttpUser, task, between, LoadTestShape
 import json
 import csv
 from pathlib import Path
-import requests
+import logging
 
-resourceDir=Path(__file__).parent.parent/Path("resources")
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+logger = logging.getLogger(__name__)
+
+resourceDir = Path(__file__).parent.parent / Path("resources")
 
 class SoyMonoUser(HttpUser):
     wait_time = between(1, 1.0001)
     user_index = 0  # Static variable to keep track of user index
 
     def on_start(self):
-        # Carica gli utenti dal file CSV e assegna un utente al processo
+        # Load users from the CSV file and assign a user to the process
         if not hasattr(self, 'users'):
             with open(f'{resourceDir}/soymono2/users.csv') as csv_file:
                 reader = csv.DictReader(csv_file)
                 SoyMonoUser.users = [row for row in reader]
 
-        # Assegna un ID univoco incrementale per ogni utente
+        # Assign a unique incremental ID for each user
         self.user_data = SoyMonoUser.users[SoyMonoUser.user_index % len(SoyMonoUser.users)]
         SoyMonoUser.user_index += 1
 
     @task
-    #add optinal query before eachcall
     def login_and_actions(self):
         email = self.user_data['email']
         password = self.user_data['password']
@@ -64,30 +67,16 @@ class SoyMonoUser(HttpUser):
                         "/api/user/logout",
                         headers={"Authorization": f"Bearer {access_token}"},
                     )
+            else:
+                logger.error(f"Login failed with status code {login_response.status_code}: {login_response.text}")
         except Exception as e:
-            print("An exception occurred:")
-            print(f"Type: {type(e)}")
-            print(f"Details: {e}")
+            # Log exception details
+            logger.error("An exception occurred during login and actions:")
+            logger.error(f"Type: {type(e)}")
+            logger.error(f"Details: {e}")
             if hasattr(e, 'request'):
-                print(f"Request: {e.request}")
+                logger.error(f"Request: {e.request}")
             if hasattr(e, 'response') and e.response is not None:
-                print(f"Response: {e.response.status_code} - {e.response.text}")
-
-# class CustomLoadShape(LoadTestShape):
-#     max_users = 200
-#     phase_duration = 60
-#     rest_duration = 240
-    
-#     stages = [
-#         {"duration": phase_duration, "users": max_users, "spawn_rate": 10},
-#         {"duration": phase_duration + rest_duration, "users": 0, "spawn_rate": 0},
-#     ] * 5
-
-#     def tick(self):
-#         run_time = self.get_run_time()
-
-#         for stage in self.stages:
-#             if run_time < stage["duration"]:
-#                 return stage["users"], stage["spawn_rate"]
-
-#         return None
+                logger.error(f"Response: {e.response.status_code} - {e.response.text}")
+            # Optionally re-raise the exception to stop the task
+            raise
