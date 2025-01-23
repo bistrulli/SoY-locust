@@ -108,17 +108,25 @@ class SoyMonoUser(HttpUser):
                     # )
                     self.client.get("/api/auth/verify", headers=SoyMonoUser.headers_34)
 
-                    # Exercise production
-                    with open(f'{resourceDir}/soymono2/0046_request.json') as json_file:
-                        exercise_data = json.load(json_file)
-                        self.client.post(
-                            "/api/exercise-production",
-                            headers={
-                                "Authorization": f"Bearer {access_token}",
-                                "Content-Type": "application/json",
-                            },
-                            json=exercise_data
-                        )
+                    # # Exercise production
+                    # with open(f'{resourceDir}/soymono2/0046_request.json') as json_file:
+                    #     exercise_data = json.load(json_file)
+                    #     self.client.post(
+                    #         "/api/exercise-production",
+                    #         headers={
+                    #             "Authorization": f"Bearer {access_token}",
+                    #             "Content-Type": "application/json",
+                    #         },
+                    #         json=exercise_data
+                    #     )
+                    
+                
+                    json_data = json.load(open(f'{resourceDir}/soymono2/0046_request.json'))
+                    self.client.post(
+                        "/api/exercise-production",
+                        headers=SoyMonoUser.headers_16,
+                        json=json_data
+                    )
 
                     # Logout
                     self.client.delete(
