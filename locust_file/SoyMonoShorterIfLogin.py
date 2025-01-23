@@ -14,6 +14,55 @@ class SoyMonoUser(HttpUser):
     wait_time = between(1, 1.0001)
     user_index = 0  # Static variable to keep track of user index
 
+    headers_15 = {
+            "Access-Control-Request-Headers": "cache-control,content-type",
+            "Access-Control-Request-Method": "POST",
+            "Origin": "http://192.168.3.136:3001",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-site",
+        }
+
+    headers_16 = {
+        "Accept": "application/json, text/plain, */*",
+        "Cache-Control": "no-cache",
+        "Content-Language": "en",
+        "Content-Type": "application/json",
+        "Origin": "http://192.168.3.136:3001",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-site",
+    }
+
+    headers_6 = {
+        "Access-Control-Request-Headers": "cache-control",
+        "Access-Control-Request-Method": "GET",
+        "Origin": "http://192.168.3.136:3001",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-site",
+    }
+
+    headers_34 = {
+        "Accept": "application/json, text/plain, */*",
+        "Cache-Control": "no-cache",
+        "Content-Language": "en",
+        "If-None-Match": "W/\"6c-2eI3aulyU1sMMO4jADRTZot5SA4\"",
+        "Origin": "http://192.168.3.136:3001",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-site",
+    }
+
+    headers_55 = {
+        "Access-Control-Request-Headers": "cache-control",
+        "Access-Control-Request-Method": "DELETE",
+        "Origin": "http://192.168.3.136:3001",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-site",
+    }
+
     def on_start(self):
         # Load users from the CSV file and assign a user to the process
         if not hasattr(self, 'users'):
@@ -31,12 +80,20 @@ class SoyMonoUser(HttpUser):
         password = self.user_data['password']
         try:
             # Login
+            # login_response = self.client.post(
+            #     "/api/user/login",
+            #     headers={
+            #         "Content-Type": "application/json",
+            #     },
+            #     json={"email": email, "password": password},
+            # )
             login_response = self.client.post(
                 "/api/user/login",
-                headers={
-                    "Content-Type": "application/json",
+                headers=SoyMonoUser.headers_16,
+                json={
+                    "email": email,
+                    "password": password,
                 },
-                json={"email": email, "password": password},
             )
 
             if login_response.status_code == 200:
@@ -45,10 +102,11 @@ class SoyMonoUser(HttpUser):
 
                 if access_token:
                     # Auth verify
-                    self.client.get(
-                        "/api/auth/verify",
-                        headers={"Authorization": f"Bearer {access_token}"},
-                    )
+                    # self.client.get(
+                    #     "/api/auth/verify",
+                    #     headers={"Authorization": f"Bearer {access_token}"},
+                    # )
+                    self.client.get("/api/auth/verify", headers=SoyMonoUser.headers_34)
 
                     # Exercise production
                     with open(f'{resourceDir}/soymono2/0046_request.json') as json_file:
