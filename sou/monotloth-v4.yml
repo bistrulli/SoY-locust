@@ -6,7 +6,7 @@ services:
       - 5001:5001
     restart: always
     env_file:
-      - /home/ubuntu/SoY-locust/sou/variables.env
+      - /home/ubuntu/ShellOnYou/sou/monotloth-v4/variables.env
     deploy:
       replicas: 1 # Puoi cambiare questo valore per il numero iniziale di repliche
       update_config:
@@ -28,7 +28,7 @@ services:
     container_name: postgres
     restart: always
     env_file:
-      - /home/ubuntu/SoY-locust/sou/variables.env
+      - /home/ubuntu/ShellOnYou/sou/monotloth-v4/variables.env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     deploy:
