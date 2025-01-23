@@ -6,14 +6,14 @@ services:
       - 5001:5001
     restart: always
     env_file:
-      - variables.env
+      - /home/ubuntu/SoY-locust/sou/variables.env
     deploy:
       replicas: 1 # Puoi cambiare questo valore per il numero iniziale di repliche
       update_config:
         parallelism: 1
         delay: 10s
       restart_policy:
-        condition: any
+        condition: none
       resources:
         limits:
           cpus: "1" # Limita le risorse
@@ -28,13 +28,13 @@ services:
     container_name: postgres
     restart: always
     env_file:
-      - variables.env
+      - /home/ubuntu/SoY-locust/sou/variables.env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     deploy:
       replicas: 1 # Di solito i database non vengono scalati su Swarm
       restart_policy:
-        condition: any
+        condition: none
       resources:
         limits:
           cpus: "3"
