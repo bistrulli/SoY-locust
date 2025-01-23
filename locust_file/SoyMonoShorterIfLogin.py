@@ -3,6 +3,7 @@ import json
 import csv
 from pathlib import Path
 import logging
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -127,6 +128,8 @@ class SoyMonoUser(HttpUser):
                         headers=SoyMonoUser.headers_16,
                         json=json_data
                     )
+
+                    time.sleep(5)
 
                     # Logout
                     self.client.delete(
