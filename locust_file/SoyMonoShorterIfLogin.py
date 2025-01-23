@@ -55,7 +55,7 @@ class SoyMonoUser(HttpUser):
                         "Authorization": f"Bearer {access_token}",
                         "Content-Type": "application/json",
                     },
-                    json=exercise_data,
+                    json=exercise_data
                 )
 
                 # Logout
