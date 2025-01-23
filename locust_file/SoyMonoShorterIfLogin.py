@@ -57,6 +57,8 @@ class SoyMonoUser(HttpUser):
                 # Exercise production
                 with open(f'{resourceDir.absolute()}/soymono2/0046_request.json') as json_file:
                     exercise_data = json.load(json_file)
+                    print(access_token)
+                    print(exercise_data)
                     self.client.post(
                         "/api/exercise-production",
                         headers={
