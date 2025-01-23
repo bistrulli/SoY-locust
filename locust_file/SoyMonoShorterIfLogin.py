@@ -6,13 +6,13 @@ from pathlib import Path
 resourceDir=Path(__file__).parent.parent/Path("resources")
 
 class SoyMonoUser(HttpUser):
-    wait_time = between(1, 1.0001)
+    wait_time = between(1, 1)
     user_index = 0  # Static variable to keep track of user index
 
     def on_start(self):
         # Carica gli utenti dal file CSV e assegna un utente al processo
         if not hasattr(self, 'users'):
-            with open(f'{resourceDir}/soymono2/users.csv') as csv_file:
+            with open(f'{resourceDir.absolute()}/soymono2/users.csv') as csv_file:
                 reader = csv.DictReader(csv_file)
                 SoyMonoUser.users = [row for row in reader]
 
@@ -21,11 +21,13 @@ class SoyMonoUser(HttpUser):
         SoyMonoUser.user_index += 1
 
     @task
-    #add optinal query before eachcall
     def login_and_actions(self):
         email = self.user_data['email']
         password = self.user_data['password']
 
+        # OPTIONS before login
+        self.client.request("OPTIONS", "/api/user/login")
+        
         # Login
         login_response = self.client.post(
             "/api/user/login",
@@ -40,23 +42,32 @@ class SoyMonoUser(HttpUser):
             refresh_token = login_response.cookies.get("refresh_token")
 
             if access_token:
+                # OPTIONS before auth verify
+                self.client.request("OPTIONS", "/api/auth/verify")
+
                 # Auth verify
                 self.client.get(
                     "/api/auth/verify",
                     headers={"Authorization": f"Bearer {access_token}"},
                 )
 
+                # OPTIONS before exercise production
+                self.client.request("OPTIONS", "/api/exercise-production")
+
                 # Exercise production
-                with open(f'{resourceDir}/soymono2/0046_request.json') as json_file:
+                with open(f'{resourceDir.absolute()}/soymono2/0046_request.json') as json_file:
                     exercise_data = json.load(json_file)
-                self.client.post(
-                    "/api/exercise-production",
-                    headers={
-                        "Authorization": f"Bearer {access_token}",
-                        "Content-Type": "application/json",
-                    },
-                    json=exercise_data,
-                )
+                    self.client.post(
+                        "/api/exercise-production",
+                        headers={
+                            "Authorization": f"Bearer {access_token}",
+                            "Content-Type": "application/json",
+                        },
+                        json=exercise_data,
+                    )
+
+                # OPTIONS before logout
+                self.client.request("OPTIONS", "/api/user/logout")
 
                 # Logout
                 self.client.delete(
