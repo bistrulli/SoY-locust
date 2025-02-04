@@ -13,7 +13,6 @@ def extract_throughput_from_csv():
 
 	# Trova tutti i file CSV che corrispondono al pattern
 	csv_files = glob.glob(csv_directory + "/results_*.csv_stats.csv")
-	print(csv_files)
 
 	# Dizionario per memorizzare i throughput
 	throughput_data = []
@@ -54,5 +53,5 @@ if __name__ == '__main__':
 	#pt=[calculate_steady_state_throughput(users=u, service_time=1.0/26.638775, k=1) for idx,u in enumerate(troughput_data["Users"].values)]
 	for idx,u in enumerate(troughput_data["Users"].values):
 		pt=calculate_steady_state_throughput(users=u, service_time=1.0/26.638775, k=1)
-		mt+=[troughput_data.iloc[idx,1]]
+		mt=troughput_data.iloc[idx,1]
 		print(f"User={u},Model={pt:.3f},Measured={mt:.3f},error={(pt-mt)*100/mt:.2f}%")
