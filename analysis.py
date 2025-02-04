@@ -5,7 +5,7 @@ import glob
 import re
 import matplotlib.pyplot as plt
 
-profileDir=Path("./profiled_data")
+profileDir=Path("./profiled_data_1")
 
 def extract_throughput_from_csv():
 	# Directory dei file CSV
