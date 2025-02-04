@@ -1,4 +1,4 @@
-#import docker
+import docker
 import time
 import argparse
 import csv
