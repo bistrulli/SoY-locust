@@ -1,15 +1,15 @@
 #!/bin/bash
 
 # Variables
-CONTAINER_NAME="aa3819696c7f"  # Replace with your container name
+CONTAINER_NAME="monotloth-v4-node-1"  # Replace with your container name
 MONITOR_SCRIPT="getSystemUtil.py"      # Replace with the name of the Python script
 INTERVAL=1                           # Interval in seconds for monitoring CPU
 LOCUST_TIME=$1
 LOCUST_USERS=$2
 LOCUST_FILE=$3
 HOST=http://localhost:5001
-CSV_FILE="cpu_utilization.csv"       # Output CSV file for CPU utilization
-LOCUST_COMMAND="locust --headless --users $LOCUST_USERS --spawn-rate 100 --run-time $LOCUST_TIME --host $HOST --csv results.csv -f $LOCUST_FILE"
+CSV_FILE="../profiled_data/cpu_utilization_$LOCUST_USERS.csv"       # Output CSV file for CPU utilization
+LOCUST_COMMAND="locust --headless --users $LOCUST_USERS --spawn-rate 100 --run-time $LOCUST_TIME --host $HOST --csv ../profiled_data/results_$LOCUST_USERS.csv -f $LOCUST_FILE"
 
 # Start CPU monitoring in the background
 echo "Starting CPU monitoring for container: $CONTAINER_NAME"
