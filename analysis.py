@@ -12,6 +12,8 @@ def extract_throughput_from_csv():
 	# Directory dei file CSV
 	csv_directory = str(profileDir)
 
+	print(csv_directory + "results_*.csv_stats.csv")
+
 	# Trova tutti i file CSV che corrispondono al pattern
 	csv_files = glob.glob(csv_directory + "results_*.csv_stats.csv")
 
