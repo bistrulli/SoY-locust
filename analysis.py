@@ -41,7 +41,7 @@ def calibrateQN():
 def calculate_steady_state_throughput(users, service_time, k):
 	think_time = 1  # Think time della think station
 	# Calcolo del throughput steady state
-	throughput=min(users/(1/(think_time+service_time)),k/(1/(think_time+service_time)))
+	throughput=min(users/(1/(think_time+service_time)),k/(service_time))
 	return throughput
 
 
