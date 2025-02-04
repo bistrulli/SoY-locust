@@ -8,8 +8,8 @@ LOCUST_TIME=$1
 LOCUST_USERS=$2
 LOCUST_FILE=$3
 HOST=http://localhost:5001
-CSV_FILE="../profiled_data/cpu_utilization_$LOCUST_USERS.csv"       # Output CSV file for CPU utilization
-LOCUST_COMMAND="locust --headless --users $LOCUST_USERS --spawn-rate 100 --run-time $LOCUST_TIME --host $HOST --csv ../profiled_data/results_$LOCUST_USERS.csv -f $LOCUST_FILE"
+CSV_FILE="./profiled_data/cpu_utilization_$LOCUST_USERS.csv"       # Output CSV file for CPU utilization
+LOCUST_COMMAND="locust --headless --users $LOCUST_USERS --spawn-rate 100 --run-time $LOCUST_TIME --host $HOST --csv ./profiled_data/results_$LOCUST_USERS.csv -f $LOCUST_FILE"
 
 # Start CPU monitoring in the background
 echo "Starting CPU monitoring for container: $CONTAINER_NAME"
