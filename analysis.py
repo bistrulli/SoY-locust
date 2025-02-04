@@ -15,8 +15,6 @@ def extract_throughput_from_csv():
 	# Trova tutti i file CSV che corrispondono al pattern
 	csv_files = glob.glob(csv_directory + "results_*.csv_stats.csv")
 
-	print(csv_files)
-
 	# Dizionario per memorizzare i throughput
 	throughput_data = []
 
@@ -26,6 +24,8 @@ def extract_throughput_from_csv():
 		user_count=int(re.findall(r"[0-9]+",file)[0])
 		throughput = locustres["Requests/s"].values[0]
 		throughput_data+=[[user_count,throughput]]
+
+		print(user_count,throughput)
 
 	return pd.DataFrame(throughput_data,columns=["Users","Throughput"])
 
