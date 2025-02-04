@@ -14,8 +14,8 @@ def calibrateQN():
 
 	stime=(util)/troughput
 	stimelct=np.sum(locustres["Average Response Time"].values[0:-1])
-	print(troughput*(stimelct)/1000.0,(util)/(troughput*100))
-	print(stime,troughput,util)
+	print(stimelct/1000.0,(util)/(troughput*100))
+	#print(stime,troughput,util)
 
 
 if __name__ == '__main__':
