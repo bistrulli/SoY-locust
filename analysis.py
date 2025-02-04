@@ -38,8 +38,19 @@ def calibrateQN():
 	print(stimelct/1000.0,(util)/(troughput*100))
 	#print(stime,troughput,util)
 
+def calculate_steady_state_throughput(users, service_time, k):
+    think_time = 1  # Think time della think station
+    rho = service_time / k  # Utilizzazione per server
+
+    # Calcolo del throughput steady state
+    throughput = users / (think_time + (service_time / (1 - rho)))
+    return throughput
+
 
 if __name__ == '__main__':
 	#calibrateQN()
     troughput_data=extract_throughput_from_csv()
-    print(troughput_data.sort_values(by="Users",ascending=True))
+    troughput_data=troughput_data.sort_values(by="Users",ascending=True)
+    for idx,u in enumerate(troughput_data["Users"].values):
+        pt=calculate_steady_state_throughput(users=u, service_time=1.0/26.638775, k=1)
+        print(f"User={u},Model={pt},Measured={troughput_data.iloc[idx,1]}")
