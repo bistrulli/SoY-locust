@@ -58,6 +58,8 @@ def getCli():
 
 if __name__ == '__main__':
 	getCli()
+
+	print(profileDir)
 	#calibrateQN()
 		
 	troughput_data=extract_throughput_from_csv()
