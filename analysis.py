@@ -7,6 +7,9 @@ profileDir=Path(".")
 def calibrateQN():
 	locustres=pd.read_csv(profileDir/Path("results.csv_stats.csv"))
 	cpudata=pd.read_csv(profileDir/Path("cpu_utilization.csv"))
+
+	print(locustres)
+	print(cpudata)
 	
 	troughput=locustres[locustres["Name"]=="/"]["Requests/s"].values
 	util=cpudata["CPU Utilization (%)"].mean()
