@@ -42,4 +42,4 @@ def calibrateQN():
 if __name__ == '__main__':
 	#calibrateQN()
     troughput_data=extract_throughput_from_csv()
-    print(troughput_data)
+    print(troughput_data.sort_values(by="Users",ascending=True))
