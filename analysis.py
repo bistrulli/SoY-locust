@@ -1,62 +1,64 @@
+import numpy as np
 import pandas as pd
+from pathlib import Path
 import glob
 import re
-import numpy as np
-import argparse
-from pathlib import Path
 import matplotlib.pyplot as plt
+import argparse
 
-def extract_throughput_from_csv(profile_dir):
-    # Directory dei file CSV
-    csv_directory = profile_dir / "profiled_data"
+profileDir=None
 
-    # Trova tutti i file CSV che corrispondono al pattern
-    csv_files = glob.glob(str(csv_directory / "results_*.csv"))
+def extract_throughput_from_csv():
+	# Directory dei file CSV
+	csv_directory = str(profileDir)
 
-    throughput_data = []
+	# Trova tutti i file CSV che corrispondono al pattern
+	csv_files = glob.glob(csv_directory + "results_*.csv_stats.csv")
 
-    # Carica ciascun file CSV e estrai il throughput
-    for file in csv_files:
-        locustres = pd.read_csv(file + "_stats.csv")
-        user_count = int(re.findall(r"[0-9]+", file)[0])
-        throughput = locustres["Requests/s"].values[0]
-        throughput_data.append([user_count, throughput])
+	# Dizionario per memorizzare i throughput
+	throughput_data = []
 
-    return pd.DataFrame(throughput_data, columns=["Users", "Throughput"])
+	# Carica ciascun file CSV e estrai il throughput
+	for file in csv_files:
+		locustres = pd.read_csv(file)
+		user_count=int(re.findall(r"[0-9]+",file)[0])
+		throughput = locustres["Requests/s"].values[0]
+		throughput_data+=[[user_count,throughput]]
 
-def calibrateQN(profile_dir):
-    locustres = pd.read_csv(profile_dir / "results.csv_stats.csv")
-    cpudata = pd.read_csv(profile_dir / "cpu_utilization.csv")
+	return pd.DataFrame(throughput_data,columns=["Users","Throughput"])
 
-    throughput = locustres["Requests/s"].values[0]
-    util = cpudata["CPU Utilization (%)"].mean()
+def calibrateQN():
+	locustres=pd.read_csv(profileDir/Path("results.csv_stats.csv"))
+	cpudata=pd.read_csv(profileDir/Path("cpu_utilization.csv"))
+	
+	troughput=locustres["Requests/s"].values[0]
+	util=cpudata["CPU Utilization (%)"].mean()
 
-    stime = (util) / throughput
-    stimelct = np.sum(locustres["Average Response Time"].values[0:-1])
-    print(stimelct / 1000.0, (util) / (throughput * 100))
-    # print(stime,troughput,util)
+
+	stime=(util)/troughput
+	stimelct=np.sum(locustres["Average Response Time"].values[0:-1])
+	print(stimelct/1000.0,(util)/(troughput*100))
+	#print(stime,troughput,util)
 
 def calculate_steady_state_throughput(users, service_time, k):
-    think_time = 1  # Think time della think station
-    rho = service_time / k  # Utilizzazione per server
+	think_time = 1  # Think time della think station
+	# Calcolo del throughput steady state
+	throughput=min(users/(1/(think_time+service_time)),k/(service_time))
+	return throughput
 
-    # Calcolo del throughput steady state
-    throughput = users / (think_time + (service_time / (1 - rho)))
-    return throughput
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Analisi dei risultati di Locust")
-    parser.add_argument('profileDir', type=Path, help='Directory dei file di profilo')
-    args = parser.parse_args()
-
-    profile_dir = args.profileDir
-
-    throughput_data = extract_throughput_from_csv(profile_dir)
-    print(throughput_data.sort_values(by="Users", ascending=True))
-
-    # Esempio di utilizzo della funzione calculate_steady_state_throughput
-    users = 10
-    service_time = 0.5
-    k = 2
-    steady_state_throughput = calculate_steady_state_throughput(users, service_time, k)
-    print(f"Steady state throughput per {users} utenti, service time {service_time}, {k} core: {steady_state_throughput}")
+	#calibrateQN()
+	parser = argparse.ArgumentParser(description="Analisi dei risultati di Locust")
+	parser.add_argument('profileDir', type=Path, help='Directory dei file di profilo')
+	args = parser.parse_args()
+	
+	profileDir=Path(args.profileDir)
+		
+	troughput_data=extract_throughput_from_csv()
+	troughput_data=troughput_data.sort_values(by="Users",ascending=True)
+	pt=[calculate_steady_state_throughput(users=u, service_time=1.0/26.638775, k=1) for idx,u in enumerate(troughput_data["Users"].values)]
+	for idx,u in enumerate(troughput_data["Users"].values):
+		pt=calculate_steady_state_throughput(users=u, service_time=1.0/26.638775, k=1)
+		mt+=[troughput_data.iloc[idx,1]]
+		print(f"User={u},Model={pt:.3f},Measured={mt:.3f},error={(pt-mt)*100/mt:.2f}%")
