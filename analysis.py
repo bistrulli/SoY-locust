@@ -46,21 +46,23 @@ def calculate_steady_state_throughput(users, service_time, k):
 	throughput=min(users/(1/(think_time+service_time)),k/(service_time))
 	return throughput
 
+def getCli():
+	global profileDir
 
-if __name__ == '__main__':
-	#calibrateQN()
 	parser = argparse.ArgumentParser(description="Analisi dei risultati di Locust")
 	parser.add_argument('profileDir', type=Path, help='Directory dei file di profilo')
 	args = parser.parse_args()
-	
-	global profileDir
+
 	profileDir = Path(args.profileDir)
 
-	print(profileDir)
+
+if __name__ == '__main__':
+	getCli()
+	#calibrateQN()
 		
 	troughput_data=extract_throughput_from_csv()
 	troughput_data=troughput_data.sort_values(by="Users",ascending=True)
-	pt=[calculate_steady_state_throughput(users=u, service_time=1.0/26.638775, k=1) for idx,u in enumerate(troughput_data["Users"].values)]
+	#pt=[calculate_steady_state_throughput(users=u, service_time=1.0/26.638775, k=1) for idx,u in enumerate(troughput_data["Users"].values)]
 	for idx,u in enumerate(troughput_data["Users"].values):
 		pt=calculate_steady_state_throughput(users=u, service_time=1.0/26.638775, k=1)
 		mt+=[troughput_data.iloc[idx,1]]
