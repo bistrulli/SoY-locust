@@ -53,7 +53,10 @@ if __name__ == '__main__':
 	parser.add_argument('profileDir', type=Path, help='Directory dei file di profilo')
 	args = parser.parse_args()
 	
-	profileDir=Path(args.profileDir)
+	global profileDir
+	profileDir = Path(args.profileDir)
+
+	print(profileDir)
 		
 	troughput_data=extract_throughput_from_csv()
 	troughput_data=troughput_data.sort_values(by="Users",ascending=True)
