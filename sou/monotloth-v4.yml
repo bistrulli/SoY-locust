@@ -1,7 +1,7 @@
 version: '3.7' # Migliorata per supportare Swarm
 services:
   node:
-    image: gitlab.polytech.umontpellier.fr:5050/dream-team/plage/soy-v4/nodedock:dswarm
+    image: gitlab.polytech.umontpellier.fr:5050/dream-team/plage/soy-v4/nodedock
     ports:
       - 5001:5001
     restart: always
@@ -23,7 +23,7 @@ services:
           memory: 256M
 
   postgres:
-    image: icws24submission/postgres_monolith:dswarm
+    image: icws24submission/postgres_monolith:latest
     shm_size: 1g
     container_name: postgres
     restart: always
