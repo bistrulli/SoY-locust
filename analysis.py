@@ -41,4 +41,5 @@ def calibrateQN():
 
 if __name__ == '__main__':
 	#calibrateQN()
-    extract_throughput_from_csv()
+    troughput_data=extract_throughput_from_csv()
+    print(troughput_data)
