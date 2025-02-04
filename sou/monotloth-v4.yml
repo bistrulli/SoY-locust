@@ -8,7 +8,7 @@ services:
     env_file:
       - /home/ubuntu/ShellOnYou/sou/monotloth-v4/variables.env
     deploy:
-      replicas: 1 # Puoi cambiare questo valore per il numero iniziale di repliche
+      replicas: 2 # Puoi cambiare questo valore per il numero iniziale di repliche
       update_config:
         parallelism: 1
         delay: 10s
@@ -20,7 +20,7 @@ services:
           memory: 2G
         reservations:
           cpus: "1"
-          memory: 256M
+          memory: 512M
 
   postgres:
     image: icws24submission/postgres_monolith:latest

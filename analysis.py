@@ -3,6 +3,7 @@ import pandas as pd
 from pathlib import Path
 import glob
 import re
+import matplotlib.pyplot as plt
 
 profileDir=Path(".")
 
@@ -49,7 +50,9 @@ if __name__ == '__main__':
 	#calibrateQN()
 	troughput_data=extract_throughput_from_csv()
 	troughput_data=troughput_data.sort_values(by="Users",ascending=True)
+	mt=[]
 	for idx,u in enumerate(troughput_data["Users"].values):
 		pt=calculate_steady_state_throughput(users=u, service_time=1.0/26.638775, k=1)
 		mt=troughput_data.iloc[idx,1]
-		print(f"User={u},Model={pt:.3f},Measured={mt:.3f},error={(pt-mt)*100/mt:.2f}%")
+
+	print(f"User={u},Model={pt:.3f},Measured={mt:.3f},error={(pt-mt)*100/mt:.2f}%")
