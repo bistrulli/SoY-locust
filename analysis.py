@@ -20,7 +20,7 @@ def extract_throughput_from_csv():
 
 	# Carica ciascun file CSV e estrai il throughput
 	for file in csv_files:
-		locustres = pd.read_csv(profileDir/file)
+		locustres = pd.read_csv(csv_directory+file)
 		user_count=int(re.findall(r"[0-9]+",file)[0])
 		throughput = locustres["Requests/s"].values[0]
 		throughput_data+=[[user_count,throughput]]
