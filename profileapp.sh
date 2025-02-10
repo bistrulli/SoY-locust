@@ -2,7 +2,7 @@
 
 #get name of running container
 # Get container IDs excluding 'monotlothv4_postgres' and store them in an array
-container_ids=($(docker ps --format "{{.ID}} {{.Names}}" | grep -v "monotlothv4_postgres" | awk '{print $1}'))
+ container_ids=($(docker ps --format "{{.ID}} {{.Names}}" | grep -v "monotlothv4_postgres" | awk '{print $1}'))
 
 # Variables
 #CONTAINER_NAME="monotloth-v4-node-1"  # Replace with your container name
