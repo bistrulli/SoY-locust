@@ -1,2 +1,2 @@
-from monitoring import Monitoring
-from qnestimator import QNEstimator
+from estimator.monitoring import Monitoring
+from estimator.qnestimator import QNEstimaator
