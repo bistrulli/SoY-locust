@@ -22,7 +22,7 @@ echo "python3 $MONITOR_SCRIPT $CONTAINER_NAME $INTERVAL $CSV_FILE > cpu_monitor.
 
 # Start CPU monitoring in the background
 echo "Starting CPU monitoring for container: $CONTAINER_NAME"
-python3 $MONITOR_SCRIPT --container_name $CONTAINER_NAME --interval $INTERVAL --csv_file $CSV_FILE > cpu_monitor.log 2>&1 &
+python3 $MONITOR_SCRIPT $CONTAINER_NAME  $INTERVAL $CSV_FILE > cpu_monitor.log 2>&1 &
 MONITOR_PID=$!
 echo "CPU monitoring process started with PID: $MONITOR_PID"
 
