@@ -8,7 +8,7 @@ echo "Container IDs: ${container_ids[@]}"
 
 # Variables
 #CONTAINER_NAME="monotloth-v4-node-1"  # Replace with your container name
-CONTAINER_NAME=${container_ids[0]}
+CONTAINER_NAME=${container_ids[@]}
 MONITOR_SCRIPT="getSystemUtil.py"      # Replace with the name of the Python script
 INTERVAL=1                           # Interval in seconds for monitoring CPU
 LOCUST_TIME=$1
