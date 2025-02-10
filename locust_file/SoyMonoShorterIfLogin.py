@@ -8,6 +8,11 @@ from pathlib import Path
 import time
 
 end=None
+setCores=1
+quotaCores=0
+estimator=None
+controller=None
+monitor=None
 
 @events.test_start.add_listener
 def on_locust_start(environment, **_kwargs):
@@ -26,7 +31,10 @@ def on_locust_stop(environment, **_kwargs):
 
 def controller_loop(environment): 
     import time  # Necessario per time.time()
-    global setCores, quotaCores
+    global setCores, quotaCores, estimator, controller
+    estimator=QNEstimaator()
+    controller=OPTCTRL(init_cores=setCores, min_cores=0.1, max_cores=16, st=1)
+    monitor=Monitoring(window=30, sla=0.2)
     while not end:
         # Ottieni il tempo corrente.
         # Se environment.runner non ha start_time, usa il valore salvato in environment.start_time
@@ -35,6 +43,7 @@ def controller_loop(environment):
         else:
             t = time.time() - (getattr(environment.runner, "start_time", environment.start_time))
         print(f"###tick={t}###")
+        monitor.tick(t)
         time.sleep(1)
 
 resourceDir=Path(__file__).parent.parent/Path("resources")
