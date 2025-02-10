@@ -1,7 +1,12 @@
 #!/bin/bash
 
+#get name of running container
+# Get container IDs excluding 'monotlothv4_postgres' and store them in an array
+container_ids=($(docker ps --format "{{.ID}} {{.Names}}" | grep -v "monotlothv4_postgres" | awk '{print $1}'))
+
 # Variables
-CONTAINER_NAME="monotloth-v4-node-1"  # Replace with your container name
+#CONTAINER_NAME="monotloth-v4-node-1"  # Replace with your container name
+CONTAINER_NAME=${container_ids[0]}
 MONITOR_SCRIPT="getSystemUtil.py"      # Replace with the name of the Python script
 INTERVAL=1                           # Interval in seconds for monitoring CPU
 LOCUST_TIME=$1
