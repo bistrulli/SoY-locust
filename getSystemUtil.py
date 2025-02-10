@@ -47,28 +47,22 @@ def signal_handler(sig, frame):
     print("\nMonitoring stopped by SIGINT signal.")
     sys.exit(0)
 
-def get_cpu_utilization(container_name, interval, csv_file):
+def get_cpu_utilization(container_names, interval, csv_file):
     """Get the CPU utilization of a Docker container over a specified time window and save to a CSV file."""
-    client = docker.from_env()
-    container = client.containers.get(container_name)
-
-    print(f"Monitoring CPU usage for container: {container_name}")
-
     with open(csv_file, mode='a', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(["Timestamp", "CPU Utilization (%)", "Num Cpus"])
 
         try:
             while True:
-                #stats = container.stats(stream=False)
-                #cpu_utilization = get_cpu_delta(stats)
-
                 timestamp = datetime.now().isoformat()
                 #num_cpus = len(stats['cpu_stats']['cpu_usage'].get('percpu_usage', [1]))
-                cpu_utilization=get_docker_cpu_usage_cli(container_name)
+                total_cpu_utilization = 0.0
+                for container_name in container_names:
+                    total_cpu_utilization +=get_docker_cpu_usage_cli(container_name)
 
-                writer.writerow([timestamp, cpu_utilization])
-                print(f"{timestamp} - CPU Utilization: {cpu_utilization:.2f}%")
+                writer.writerow([timestamp, total_cpu_utilization])
+                print(f"{timestamp} - CPU Utilization: {total_cpu_utilization:.2f}%")
 
                 time.sleep(interval)
 
@@ -79,17 +73,17 @@ def get_cpu_utilization(container_name, interval, csv_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Monitor CPU utilization of a Docker container and save to CSV.")
-    parser.add_argument("container_name", type=str, help="Name or ID of the Docker container.")
+    parser.add_argument("container_names", nargs='+', help="Name or ID of the Docker container.")
     parser.add_argument("interval", type=float, help="Time interval (in seconds) to measure CPU utilization.")
     parser.add_argument("csv_file", type=str, help="Path to the CSV file for saving results.")
 
     args = parser.parse_args()
 
-    container_name = args.container_name
+    container_names = args.container_names
     interval = args.interval
     csv_file = args.csv_file
 
     # Register the SIGINT handler
     signal.signal(signal.SIGINT, signal_handler)
 
-    get_cpu_utilization(container_name, interval, csv_file)
+    get_cpu_utilization(container_names, interval, csv_file)
