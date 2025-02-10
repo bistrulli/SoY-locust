@@ -18,7 +18,7 @@ HOST=http://localhost:5001
 CSV_FILE="./profiled_data/cpu_utilization_$LOCUST_USERS.csv"       # Output CSV file for CPU utilization
 LOCUST_COMMAND="locust --headless --users $LOCUST_USERS --spawn-rate 100 --run-time $LOCUST_TIME --host $HOST --csv ./profiled_data/results_$LOCUST_USERS.csv -f $LOCUST_FILE"
 
-echo "python3 $MONITOR_SCRIPT --container_name $CONTAINER_NAME --interval $INTERVAL --csv_file $CSV_FILE > cpu_monitor.log 2>&1 &"
+echo "python3 $MONITOR_SCRIPT $CONTAINER_NAME $INTERVAL $CSV_FILE > cpu_monitor.log 2>&1 &"
 
 # Start CPU monitoring in the background
 echo "Starting CPU monitoring for container: $CONTAINER_NAME"
