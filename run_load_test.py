@@ -16,11 +16,6 @@ def parse_args():
 
 def main():
     args = parse_args()
-    
-    # Istanziazioni con parametri di esempio
-    #ctrl = OPTCTRL(init_cores=1, min_cores=0.1, max_cores=300, st=1)
-    #monitor = Monitoring(window=60, sla=500)
-    #estimator = QNEstimaator()
 
     # Costruzione del comando Locust in base ai parametri
     cmd = [
@@ -31,6 +26,8 @@ def main():
         "--run-time", args.run_time,
         "--host", args.host,
         "--csv", args.csv,
+        "--enable-prometheus",
+        "--web-port=","8089",
         "-f", args.locust_file
     ]
     subprocess.call(cmd)
