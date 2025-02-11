@@ -31,6 +31,9 @@ class Monitoring:
         if not len(self.users): return 0
         return self.reducer(self.users)
 
+    def getCores(self):
+        return 0.0
+
     def getRT(self):
         #logica per misurare il tempo di risposta dal file di locust
         if not len(self.rts): return 0
