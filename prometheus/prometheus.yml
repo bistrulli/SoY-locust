@@ -1,5 +1,5 @@
 global:
-  scrape_interval: 5s  # Frequenza di raccolta metriche
+  scrape_interval: 1s  # Frequenza di raccolta metriche
 
 scrape_configs:
   - job_name: 'locust'

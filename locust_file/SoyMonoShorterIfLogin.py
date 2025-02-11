@@ -26,15 +26,6 @@ start_http_server(9646)
 REQUEST_COUNT = Counter('locust_requests_total', 'Total number of Locust requests')
 REQUEST_LATENCY = Summary('locust_request_latency_seconds', 'Request latency in seconds')
 
-class MyUser(HttpUser):
-    wait_time = between(1, 3)
-
-    @task
-    def test_endpoint(self):
-        with REQUEST_LATENCY.time():  # Misura la latenza della richiesta
-            self.client.get("/")  # Effettua la richiesta HTTP
-        REQUEST_COUNT.inc()  # Incrementa il numero totale di richieste
-
 @events.test_start.add_listener
 def on_locust_start(environment, **_kwargs):
     global end
