@@ -1,4 +1,5 @@
-version: '3.7' # Migliorata per supportare Swarm
+version: '3.7' # Supporto Swarm
+
 services:
   node:
     image: gitlab.polytech.umontpellier.fr:5050/dream-team/plage/soy-v4/nodedock
@@ -7,8 +8,10 @@ services:
     restart: always
     env_file:
       - /home/ubuntu/ShellOnYou/sou/monotloth-v4/variables.env
+    networks:
+      - monitoring
     deploy:
-      replicas: 2 # Puoi cambiare questo valore per il numero iniziale di repliche
+      replicas: 1 # Numero iniziale di repliche
       update_config:
         parallelism: 1
         delay: 10s
@@ -31,6 +34,8 @@ services:
       - /home/ubuntu/ShellOnYou/sou/monotloth-v4/variables.env
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - monitoring
     deploy:
       replicas: 1 # Di solito i database non vengono scalati su Swarm
       restart_policy:
@@ -43,5 +48,32 @@ services:
           cpus: "3"
           memory: 2G
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - monitoring
+    ports:
+      - "9090:9090"
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+networks:
+  monitoring:
+    driver: overlay
+
 volumes:
   postgres_data:
+  prometheus_data:
