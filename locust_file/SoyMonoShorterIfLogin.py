@@ -9,7 +9,7 @@ import time
 from estimator import QNEstimaator
 from controller import OPTCTRL
 from estimator import Monitoring
-from locust_plugins.listeners import PrometheusListener
+from prometheus_client import start_http_server, Counter
 
 
 end=None
@@ -19,8 +19,11 @@ estimator=None
 controller=None
 monitor=None
 
-# Abilita Prometheus su porta 9646
-PrometheusListener()  
+# Avvia il server Prometheus su porta 9646
+start_http_server(9646)
+
+# Definisci una metrica personalizzata per il conteggio delle richieste
+REQUEST_COUNT = Counter('locust_requests_total', 'Total number of Locust requests')
 
 @events.test_start.add_listener
 def on_locust_start(environment, **_kwargs):
