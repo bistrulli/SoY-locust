@@ -6,6 +6,9 @@ import gevent
 import csv
 from pathlib import Path
 import time
+from estimator import QNEstimaator
+from controller import OPTCTRL
+from estimator import Monitoring
 
 end=None
 setCores=1
