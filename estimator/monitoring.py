@@ -1,6 +1,6 @@
 from pathlib import Path
 from config import locustDataDir,serviceName
-import pasndas as pd
+import pandas as pd
 import numpy as np
 import docker
 
