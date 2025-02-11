@@ -9,6 +9,8 @@ import time
 from estimator import QNEstimaator
 from controller import OPTCTRL
 from estimator import Monitoring
+from locust_plugins.listeners import PrometheusListener
+
 
 end=None
 setCores=1
@@ -16,6 +18,9 @@ quotaCores=0
 estimator=None
 controller=None
 monitor=None
+
+# Abilita Prometheus su porta 9646
+PrometheusListener()  
 
 @events.test_start.add_listener
 def on_locust_start(environment, **_kwargs):
