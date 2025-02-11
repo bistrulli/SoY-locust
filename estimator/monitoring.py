@@ -80,9 +80,7 @@ class Monitoring:
         
     def reset(self):
         self.client = docker.from_env()
-        self.allRts = []
-        self.allUsers = []
-        self.allCores = []
+        self.cores=[]
         self.rts = []
         self.tr = []
         self.users = []
