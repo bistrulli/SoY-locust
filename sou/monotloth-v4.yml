@@ -71,7 +71,8 @@ services:
           memory: 512M
 
 networks:
-  monitoring
+  monitoring:
+    driver: overlay
 
 volumes:
   postgres_data:
