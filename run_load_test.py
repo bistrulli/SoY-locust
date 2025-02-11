@@ -27,7 +27,7 @@ def main():
         "--host", args.host,
         "--csv", args.csv,
         "--enable-prometheus",
-        "--web-port=","8089",
+        "--web-port","8089",
         "-f", args.locust_file
     ]
     subprocess.call(cmd)
