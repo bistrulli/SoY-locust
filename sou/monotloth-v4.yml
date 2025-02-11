@@ -70,6 +70,9 @@ services:
           cpus: "0.5"
           memory: 512M
 
+networks:
+  monitoring
+
 volumes:
   postgres_data:
   prometheus_data:
