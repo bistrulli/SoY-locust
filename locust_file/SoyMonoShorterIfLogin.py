@@ -22,8 +22,18 @@ monitor=None
 # Avvia il server Prometheus su porta 9646
 start_http_server(9646)
 
-# Definisci una metrica personalizzata per il conteggio delle richieste
+# Metriche Prometheus
 REQUEST_COUNT = Counter('locust_requests_total', 'Total number of Locust requests')
+REQUEST_LATENCY = Summary('locust_request_latency_seconds', 'Request latency in seconds')
+
+class MyUser(HttpUser):
+    wait_time = between(1, 3)
+
+    @task
+    def test_endpoint(self):
+        with REQUEST_LATENCY.time():  # Misura la latenza della richiesta
+            self.client.get("/")  # Effettua la richiesta HTTP
+        REQUEST_COUNT.inc()  # Incrementa il numero totale di richieste
 
 @events.test_start.add_listener
 def on_locust_start(environment, **_kwargs):
@@ -76,58 +86,60 @@ class SoyMonoUser(HttpUser):
 
     @task
     def login_and_actions(self):
-        email = self.user_data['email']
-        password = self.user_data['password']
+        with REQUEST_LATENCY.time():  # Misura la latenza della richiesta
+            email = self.user_data['email']
+            password = self.user_data['password']
 
-        # OPTIONS before login
-        self.client.request("OPTIONS", "/api/user/login")
-        
-        # Login
-        login_response = self.client.post(
-            "/api/user/login",
-            headers={
-                "Content-Type": "application/json",
-            },
-            json={"email": email, "password": password},
-        )
+            # OPTIONS before login
+            self.client.request("OPTIONS", "/api/user/login")
+            
+            # Login
+            login_response = self.client.post(
+                "/api/user/login",
+                headers={
+                    "Content-Type": "application/json",
+                },
+                json={"email": email, "password": password},
+            )
 
-        if login_response.status_code == 200:
-            access_token = login_response.cookies.get("access_token")
-            refresh_token = login_response.cookies.get("refresh_token")
+            if login_response.status_code == 200:
+                access_token = login_response.cookies.get("access_token")
+                refresh_token = login_response.cookies.get("refresh_token")
 
-            if access_token:
-                # OPTIONS before auth verify
-                self.client.request("OPTIONS", "/api/auth/verify")
+                if access_token:
+                    # OPTIONS before auth verify
+                    self.client.request("OPTIONS", "/api/auth/verify")
 
-                # Auth verify
-                self.client.get(
-                    "/api/auth/verify",
-                    headers={"Authorization": f"Bearer {access_token}"},
-                )
-
-                # OPTIONS before exercise production
-                self.client.request("OPTIONS", "/api/exercise-production")
-
-                # Exercise production
-                with open(f'{resourceDir.absolute()}/soymono2/0046_request.json') as json_file:
-                    exercise_data = json.load(json_file)
-                    self.client.post(
-                        "/api/exercise-production",
-                        headers={
-                            "Authorization": f"Bearer {access_token}",
-                            "Content-Type": "application/json",
-                        },
-                        json=exercise_data,
+                    # Auth verify
+                    self.client.get(
+                        "/api/auth/verify",
+                        headers={"Authorization": f"Bearer {access_token}"},
                     )
 
-                # OPTIONS before logout
-                self.client.request("OPTIONS", "/api/user/logout")
+                    # OPTIONS before exercise production
+                    self.client.request("OPTIONS", "/api/exercise-production")
 
-                # Logout
-                self.client.delete(
-                    "/api/user/logout",
-                    headers={"Authorization": f"Bearer {access_token}"},
-                )
+                    # Exercise production
+                    with open(f'{resourceDir.absolute()}/soymono2/0046_request.json') as json_file:
+                        exercise_data = json.load(json_file)
+                        self.client.post(
+                            "/api/exercise-production",
+                            headers={
+                                "Authorization": f"Bearer {access_token}",
+                                "Content-Type": "application/json",
+                            },
+                            json=exercise_data,
+                        )
+
+                    # OPTIONS before logout
+                    self.client.request("OPTIONS", "/api/user/logout")
+
+                    # Logout
+                    self.client.delete(
+                        "/api/user/logout",
+                        headers={"Authorization": f"Bearer {access_token}"},
+                    )
+        REQUEST_COUNT.inc()  # Incrementa il numero totale di richieste
 
 # class CustomLoadShape(LoadTestShape):
 #     max_users = 200
