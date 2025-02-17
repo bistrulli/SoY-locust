@@ -59,21 +59,21 @@ def on_locust_stop(environment, **_kwargs):
     global end
     end=True
 
-class BaseExp(HttpUser):
+class BaseExp(HttpUser, ABC):
     wait_time = between(1, 1)
     user_index = 0  # Static variable to keep track of user index
 
     def on_start(self):
-        # Carica gli utenti dal file CSV e assegna un utente al processo
-        if not hasattr(self, 'users'):
+        # Carica gli utenti dal file CSV solo se non sono già stati caricati
+        if not hasattr(self.__class__, "users"):
             with open(f'{resourceDir.absolute()}/soymono2/users.csv') as csv_file:
                 reader = csv.DictReader(csv_file)
-                SoyMonoUser.users = [row for row in reader]
-
+                self.__class__.users = [row for row in reader]
         # Assegna un ID univoco incrementale per ogni utente
-        self.user_data = SoyMonoUser.users[SoyMonoUser.user_index % len(SoyMonoUser.users)]
-        SoyMonoUser.user_index += 1
+        self.user_data = self.__class__.users[self.__class__.user_index % len(self.__class__.users)]
+        self.__class__.user_index += 1
 
+    @abstractmethod
     def userLogic(self):
         """
         Metodo astratto che deve essere implementato dalle classi specializzate.
@@ -82,7 +82,7 @@ class BaseExp(HttpUser):
 
     @task
     def login_and_actions(self):
-        with REQUEST_LATENCY.time():  # Misura la latenza della richiesta
+        with REQUEST_LATENCY.time():
             self.userLogic()
-        REQUEST_COUNT.inc()  # Incrementa il numero totale di richieste
+        REQUEST_COUNT.inc()
 
