@@ -5,10 +5,9 @@ import time
 
 class ControlLoop():
 
-    toStop=None
-
-    def __init__(self, controller,monitor,estimator):
+    def __init__(self,config=None):
         self.toStop=False
+        self.config=config
 
     def loop(environment):
         global initCore, estimator, controller
