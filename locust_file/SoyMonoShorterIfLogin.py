@@ -9,6 +9,10 @@ import time
 from base_exp import BaseExp
 
 class SoyMonoUser(BaseExp):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def userLogic(self):
         # Implementazione specifica della logica utente
         email = self.user_data['email']
