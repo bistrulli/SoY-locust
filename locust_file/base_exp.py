@@ -14,6 +14,7 @@ from prometheus_client import start_http_server, Counter,Summary
 import sys,argparse
 import base_exp
 from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 
 end=None
 initCore=0.1
@@ -59,7 +60,12 @@ def on_locust_stop(environment, **_kwargs):
     global end
     end=True
 
-class BaseExp(HttpUser, ABC):
+# Aggiungi una metaclasse combinata per risolvere il conflitto tra HttpUser e ABCMeta
+class CombinedMeta(ABCMeta, type(HttpUser)):
+    pass
+
+# Utilizza CombinedMeta come metaclasse per BaseExp al posto di ABC
+class BaseExp(HttpUser, metaclass=CombinedMeta):
     wait_time = between(1, 1)
     user_index = 0  # Static variable to keep track of user index
 

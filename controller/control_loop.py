@@ -14,7 +14,7 @@ class ControlLoop():
         estimator=self.getEstimator()
         controller=self.getController()
         monitor=self.getMonitor()
-        while not set.toStop:
+        while not self.toStop:
             '''
                 TODO: Implementare il controllo della coda
             '''
@@ -45,4 +45,4 @@ class ControlLoop():
             TODO: parse config
         '''
         return QNEstimaator()
-    
+
