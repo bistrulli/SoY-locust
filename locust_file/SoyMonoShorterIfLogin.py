@@ -6,128 +6,52 @@ import gevent
 import csv
 from pathlib import Path
 import time
-from estimator import QNEstimaator
-from controller import OPTCTRL
-from estimator import Monitoring
-from controller import ControlLoop
-from prometheus_client import start_http_server, Counter,Summary
-import sys,argparse
+from base_exp import BaseExp
 
-end=None
-initCore=0.1
-estimator=None
-controller=None
-monitor=None
-
-# Avvia il server Prometheus su porta 9646
-start_http_server(9646)
-
-# Metriche Prometheus
-REQUEST_COUNT = Counter('locust_requests_total', 'Total number of Locust requests')
-REQUEST_LATENCY = Summary('locust_request_latency_seconds', 'Request latency in seconds')
-resourceDir=Path(__file__).parent.parent/Path("resources")
-
-#qua inserisco la lettura di un file di configurazione
-ctrlLoop=ControlLoop()
-
-# Parsing manuale degli argomenti (evita errori con Locust)
-def get_custom_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--conf", type=str, default="default_value", help="Parametro personalizzato")
-    
-    # Filtra solo gli argomenti non riconosciuti da Locust
-    known_args, _ = parser.parse_known_args(sys.argv)
-
-    return known_args
-
-print(get_custom_args())
-
-@events.test_start.add_listener
-def on_locust_start(environment, **_kwargs):
-    global end
-    end = False
-    # Salva il tempo di inizio in environment se non esiste
-    if not hasattr(environment, "start_time"):
-        environment.start_time = time.time()
-    if not isinstance(environment.runner, WorkerRunner):
-        gevent.spawn(ctrlLoop.loop, environment)
-
-@events.test_stop.add_listener
-def on_locust_stop(environment, **_kwargs):
-    global end
-    end=True
-
-class SoyMonoUser(HttpUser):
-    wait_time = between(1, 1)
-    user_index = 0  # Static variable to keep track of user index
-
-    def on_start(self):
-        # Carica gli utenti dal file CSV e assegna un utente al processo
-        if not hasattr(self, 'users'):
-            with open(f'{resourceDir.absolute()}/soymono2/users.csv') as csv_file:
-                reader = csv.DictReader(csv_file)
-                SoyMonoUser.users = [row for row in reader]
-
-        # Assegna un ID univoco incrementale per ogni utente
-        self.user_data = SoyMonoUser.users[SoyMonoUser.user_index % len(SoyMonoUser.users)]
-        SoyMonoUser.user_index += 1
-
-    @task
-    def login_and_actions(self):
-        with REQUEST_LATENCY.time():  # Misura la latenza della richiesta
-            email = self.user_data['email']
-            password = self.user_data['password']
-
-            # OPTIONS before login
-            self.client.request("OPTIONS", "/api/user/login")
-            
-            # Login
-            login_response = self.client.post(
-                "/api/user/login",
-                headers={
-                    "Content-Type": "application/json",
-                },
-                json={"email": email, "password": password},
-            )
-
-            if login_response.status_code == 200:
-                access_token = login_response.cookies.get("access_token")
-                refresh_token = login_response.cookies.get("refresh_token")
-
-                if access_token:
-                    # OPTIONS before auth verify
-                    self.client.request("OPTIONS", "/api/auth/verify")
-
-                    # Auth verify
-                    self.client.get(
-                        "/api/auth/verify",
-                        headers={"Authorization": f"Bearer {access_token}"},
+class SoyMonoUser(BaseExp):
+    def userLogic(self):
+        # Implementazione specifica della logica utente
+        email = self.user_data['email']
+        password = self.user_data['password']
+        # OPTIONS before login
+        self.client.request("OPTIONS", "/api/user/login")
+        # Login
+        login_response = self.client.post(
+            "/api/user/login",
+            headers={"Content-Type": "application/json"},
+            json={"email": email, "password": password},
+        )
+        if login_response.status_code == 200:
+            access_token = login_response.cookies.get("access_token")
+            refresh_token = login_response.cookies.get("refresh_token")
+            if access_token:
+                # OPTIONS before auth verify
+                self.client.request("OPTIONS", "/api/auth/verify")
+                # Auth verify
+                self.client.get(
+                    "/api/auth/verify",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                )
+                # OPTIONS before exercise production
+                self.client.request("OPTIONS", "/api/exercise-production")
+                # Exercise production
+                with open(f'{resourceDir.absolute()}/soymono2/0046_request.json') as json_file:
+                    exercise_data = json.load(json_file)
+                    self.client.post(
+                        "/api/exercise-production",
+                        headers={
+                            "Authorization": f"Bearer {access_token}",
+                            "Content-Type": "application/json",
+                        },
+                        json=exercise_data,
                     )
-
-                    # OPTIONS before exercise production
-                    self.client.request("OPTIONS", "/api/exercise-production")
-
-                    # Exercise production
-                    with open(f'{resourceDir.absolute()}/soymono2/0046_request.json') as json_file:
-                        exercise_data = json.load(json_file)
-                        self.client.post(
-                            "/api/exercise-production",
-                            headers={
-                                "Authorization": f"Bearer {access_token}",
-                                "Content-Type": "application/json",
-                            },
-                            json=exercise_data,
-                        )
-
-                    # OPTIONS before logout
-                    self.client.request("OPTIONS", "/api/user/logout")
-
-                    # Logout
-                    self.client.delete(
-                        "/api/user/logout",
-                        headers={"Authorization": f"Bearer {access_token}"},
-                    )
-        REQUEST_COUNT.inc()  # Incrementa il numero totale di richieste
+                # OPTIONS before logout
+                self.client.request("OPTIONS", "/api/user/logout")
+                # Logout
+                self.client.delete(
+                    "/api/user/logout",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                )
 
 # class CustomLoadShape(LoadTestShape):
 #     max_users = 200

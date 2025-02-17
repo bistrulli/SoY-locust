@@ -32,7 +32,7 @@ class ControlLoop():
         '''
             TODO: parse config
         '''
-        return OPTCTRL(init_cores=initCore, min_cores=0.1, max_cores=16, st=1)
+        return OPTCTRL(init_cores=1, min_cores=0.1, max_cores=16, st=1)
     
     def getMonitor(self):
         '''
