@@ -3,6 +3,13 @@ import argparse
 from controller.controlqueuing import OPTCTRL
 from estimator.monitoring import Monitoring
 from estimator.qnestimator import QNEstimaator
+import logging
+from pathlib import Path
+
+# Configura il logger
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+stackName="monotloth-stack"
+stackPath=Path(__file__).parent/"sou"/"monotloth-v4.yml"
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Esegui il load test con Locust")
@@ -14,9 +21,26 @@ def parse_args():
     parser.add_argument("-f", "--locust-file", type=str, required=True, help="Percorso del locustfile")
     return parser.parse_args()
 
+def startSys():
+    # Avvia la specifica Docker Swarm utilizzando il file sou/monotloth-v4.yml
+    logging.info(f"Deploying Docker Swarm stack using {stackName}")
+    cmd = ["docker", "stack", "deploy","--detach=true","-c", str(stackPath.absolute()), stackName]
+    subprocess.run(cmd, check=True)
+    logging.info("Docker Swarm stack deployed successfully.")
+
+def stopSys():
+    # Rimozione della stack Docker Swarm
+    logging.info(f"Removing Docker Swarm stack {stackName}")
+    cmd = ["docker", "stack", "rm", stackName]
+    subprocess.run(cmd, check=True)
+    logging.info("Docker Swarm stack removed successfully.")
+
 def main():
     args = parse_args()
-
+    
+    startSys()  # Deploy Docker Swarm stack
+    logging.info("Starting Locust with command:")
+    
     # Costruzione del comando Locust in base ai parametri
     cmd = [
         "locust",
@@ -28,7 +52,11 @@ def main():
         "--csv", args.csv,
         "-f", args.locust_file
     ]
+    logging.info(" ".join(cmd))
     subprocess.call(cmd)
+    logging.info("Locust execution finished.")
+    
+    stopSys()  # Stop della Docker Swarm stack
 
 if __name__ == "__main__":
     main()
