@@ -8,6 +8,7 @@ from pathlib import Path
 import signal
 import sys
 import os  # Nuovo import
+import time
 
 # Configura il logger
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -61,6 +62,7 @@ def main():
     args = parse_args()
     
     startSys()  # Deploy Docker Swarm stack
+    time.sleep(5)
     logging.info("Starting Locust with command:")
     
     # Costruzione del comando Locust in base ai parametri
