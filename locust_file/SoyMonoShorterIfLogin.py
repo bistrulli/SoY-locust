@@ -27,8 +27,6 @@ REQUEST_COUNT = Counter('locust_requests_total', 'Total number of Locust request
 REQUEST_LATENCY = Summary('locust_request_latency_seconds', 'Request latency in seconds')
 resourceDir=Path(__file__).parent.parent/Path("resources")
 
-print(get_custom_args())
-
 #qua inserisco la lettura di un file di configurazione
 ctrlLoop=ControlLoop()
 
@@ -41,6 +39,8 @@ def get_custom_args():
     known_args, _ = parser.parse_known_args(sys.argv)
 
     return known_args
+
+print(get_custom_args())
 
 @events.test_start.add_listener
 def on_locust_start(environment, **_kwargs):
