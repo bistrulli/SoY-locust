@@ -64,8 +64,10 @@ def on_locust_stop(environment, **_kwargs):
 class CombinedMeta(ABCMeta, type(HttpUser)):
     pass
 
-# Utilizza CombinedMeta come metaclasse per BaseExp al posto di ABC
+# Utilizza CombinedMeta come metaclasse e segnala che questa classe è astratta
 class BaseExp(HttpUser, metaclass=CombinedMeta):
+    __abstract__ = True  # Locust ignorerà questa classe
+    
     wait_time = between(1, 1)
     user_index = 0  # Static variable to keep track of user index
 
