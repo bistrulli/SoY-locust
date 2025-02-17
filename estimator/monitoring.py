@@ -3,12 +3,15 @@ from config import locustDataDir,serviceName
 import pandas as pd
 import numpy as np
 import docker
+from prometheus_api_client import PrometheusConnect
+
 
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x)):
         self.reducer = reducer
         self.window = window
         self.sla = sla
+        self.prom = PrometheusConnect(url="http://localhost:9090", disable_ssl=True)
         self.reset()
 
     def tick(self, t):
@@ -34,8 +37,17 @@ class Monitoring:
     def getCores(self):
         return 0.0
 
+    # Funzione per eseguire una query su Prometheus
+    def query_prometheus(self,metric_name):
+        result = self.prom.custom_query(query=metric_name)
+        return result
+
     def getRT(self):
         #logica per misurare il tempo di risposta dal file di locust
+
+        #http://localhost:9090/api/v1/query?query=locust_request_latency_seconds_sum" | jq -r '.data.result[0].value[1]'
+        #http://localhost:9090/api/v1/query?query=locust_request_latency_seconds_count" | jq -r '.data.result[0].value[1]'
+        
         if not len(self.rts): return 0
         return self.reducer(self.rts)
 
