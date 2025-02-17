@@ -13,8 +13,7 @@ from prometheus_client import start_http_server, Counter,Summary
 
 
 end=None
-setCores=1
-quotaCores=0
+initCore=0.1
 estimator=None
 controller=None
 monitor=None
@@ -41,13 +40,15 @@ def on_locust_stop(environment, **_kwargs):
     global end
     end=True
 
-def controller_loop(environment): 
-    import time  # Necessario per time.time()
-    global setCores, quotaCores, estimator, controller
+def controller_loop(environment):
+    global initCore, estimator, controller
     estimator=QNEstimaator()
-    controller=OPTCTRL(init_cores=setCores, min_cores=0.1, max_cores=16, st=1)
+    controller=OPTCTRL(init_cores=initCore, min_cores=0.1, max_cores=16, st=1)
     monitor=Monitoring(window=30, sla=0.2)
     while not end:
+        '''
+            TODO: Implementare il controllo della coda
+        '''
         # Ottieni il tempo corrente.
         # Se environment.runner non ha start_time, usa il valore salvato in environment.start_time
         if hasattr(environment, "shape_class") and environment.shape_class is not None:
