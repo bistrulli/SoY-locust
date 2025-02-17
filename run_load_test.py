@@ -5,6 +5,8 @@ from estimator.monitoring import Monitoring
 from estimator.qnestimator import QNEstimaator
 import logging
 from pathlib import Path
+import signal
+import sys
 
 # Configura il logger
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -34,6 +36,14 @@ def stopSys():
     cmd = ["docker", "stack", "rm", stackName]
     subprocess.run(cmd, check=True)
     logging.info("Docker Swarm stack removed successfully.")
+
+def handle_sigint(signum, frame):
+    logging.info("SIGINT received. Stopping system...")
+    stopSys()
+    sys.exit(0)
+
+# Registra il signal handler per SIGINT
+signal.signal(signal.SIGINT, handle_sigint)
 
 def main():
     args = parse_args()
