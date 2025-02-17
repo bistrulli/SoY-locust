@@ -24,8 +24,9 @@ class ControlLoop():
                 t = environment.shape_class.get_run_time()
             else:
                 t = time.time() - (getattr(environment.runner, "start_time", environment.start_time))
-            print(f"###tick={t}###")
             monitor.tick(t)
+            print(f"###tick={t}###")
+            print(f"###rt={monitor.rts[-1]},tr={monitor.tr[-1]}###")
             time.sleep(1)
     
     def getController(self):

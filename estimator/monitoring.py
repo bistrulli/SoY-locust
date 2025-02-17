@@ -24,7 +24,7 @@ class Monitoring:
                     break
         
         self.time+=[t]
-        self.rts+=[self.getRT()]
+        self.rts+=[self.getResponseTime()]
         self.tr+=[self.getTroughput()]
         self.users+=[self.getUsers()]
         self.cores+=[self.getCores()]
@@ -42,18 +42,53 @@ class Monitoring:
         result = self.prom.custom_query(query=metric_name)
         return result
 
-    def getRT(self):
-        #logica per misurare il tempo di risposta dal file di locust
-
-        #http://localhost:9090/api/v1/query?query=locust_request_latency_seconds_sum" | jq -r '.data.result[0].value[1]'
-        #http://localhost:9090/api/v1/query?query=locust_request_latency_seconds_count" | jq -r '.data.result[0].value[1]'
-        
-        if not len(self.rts): return 0
-        return self.reducer(self.rts)
+    def getResponseTime(self):
+        """
+        Calcola il tempo di risposta medio effettuando due query Prometheus:
+        - locust_request_latency_seconds_sum
+        - locust_request_latency_seconds_count
+        Restituisce la latenza media (somma/count).
+        """
+        try:
+            sum_result = self.prom.custom_query(query="locust_request_latency_seconds_sum")
+            count_result = self.prom.custom_query(query="locust_request_latency_seconds_count")
+            if sum_result and count_result:
+                latency_sum = float(sum_result[0]['value'][1])
+                latency_count = float(count_result[0]['value'][1])
+                avg_latency = latency_sum / latency_count if latency_count > 0 else 0
+                return avg_latency
+            else:
+                return 0
+        except Exception as e:
+            print("Error querying Prometheus for RT:", e)
+            return 0
 
     def getTroughput(self):
-        #logica per misurare il throughput dal file di locust
-        pass
+        """
+        Misura il numero di richieste al secondo utilizzando la metrica locust_requests_total.
+        Viene eseguita una query Prometheus per ottenere il totale correntemente cumulativo, quindi
+        se sono disponibili un valore e un timestamp precedenti, si calcola il delta richieste / delta tempo.
+        """
+        import time
+        try:
+            result = self.prom.custom_query(query="locust_requests_total")
+            if result:
+                current_total = float(result[0]['value'][1])
+            else:
+                current_total = 0
+            current_time = time.time()
+            if self.last_requests is None or self.last_timestamp is None:
+                self.last_requests = current_total
+                self.last_timestamp = current_time
+                return 0
+            dt = current_time - self.last_timestamp
+            throughput = (current_total - self.last_requests) / dt if dt > 0 else 0
+            self.last_requests = current_total
+            self.last_timestamp = current_time
+            return throughput
+        except Exception as e:
+            print("Error querying throughput from Prometheus:", e)
+            return 0
 
     def getUtil(self):
         #logica per misurare l'utilizzo da docker
@@ -92,8 +127,11 @@ class Monitoring:
         
     def reset(self):
         self.client = docker.from_env()
-        self.cores=[]
+        self.cores = []
         self.rts = []
         self.tr = []
         self.users = []
         self.time = []
+        # Aggiunta per il throughput
+        self.last_requests = None
+        self.last_timestamp = None
