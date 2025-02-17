@@ -9,8 +9,9 @@ import time
 from estimator import QNEstimaator
 from controller import OPTCTRL
 from estimator import Monitoring
+from controller import ControlLoop
 from prometheus_client import start_http_server, Counter,Summary
-
+import sys,argparse
 
 end=None
 initCore=0.1
@@ -24,6 +25,22 @@ start_http_server(9646)
 # Metriche Prometheus
 REQUEST_COUNT = Counter('locust_requests_total', 'Total number of Locust requests')
 REQUEST_LATENCY = Summary('locust_request_latency_seconds', 'Request latency in seconds')
+resourceDir=Path(__file__).parent.parent/Path("resources")
+
+#qua inserisco la lettura di un file di configurazione
+ctrlLoop=ControlLoop()
+
+# Parsing manuale degli argomenti (evita errori con Locust)
+def get_custom_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--conf", type=str, default="default_value", help="Parametro personalizzato")
+    
+    # Filtra solo gli argomenti non riconosciuti da Locust
+    known_args, _ = parser.parse_known_args(sys.argv)
+
+    return known_args
+
+print(get_custom_args())
 
 @events.test_start.add_listener
 def on_locust_start(environment, **_kwargs):
@@ -33,33 +50,12 @@ def on_locust_start(environment, **_kwargs):
     if not hasattr(environment, "start_time"):
         environment.start_time = time.time()
     if not isinstance(environment.runner, WorkerRunner):
-        gevent.spawn(controller_loop, environment)
+        gevent.spawn(ctrlLoop.loop, environment)
 
 @events.test_stop.add_listener
 def on_locust_stop(environment, **_kwargs):
     global end
     end=True
-
-def controller_loop(environment):
-    global initCore, estimator, controller
-    estimator=QNEstimaator()
-    controller=OPTCTRL(init_cores=initCore, min_cores=0.1, max_cores=16, st=1)
-    monitor=Monitoring(window=30, sla=0.2)
-    while not end:
-        '''
-            TODO: Implementare il controllo della coda
-        '''
-        # Ottieni il tempo corrente.
-        # Se environment.runner non ha start_time, usa il valore salvato in environment.start_time
-        if hasattr(environment, "shape_class") and environment.shape_class is not None:
-            t = environment.shape_class.get_run_time()
-        else:
-            t = time.time() - (getattr(environment.runner, "start_time", environment.start_time))
-        print(f"###tick={t}###")
-        monitor.tick(t)
-        time.sleep(1)
-
-resourceDir=Path(__file__).parent.parent/Path("resources")
 
 class SoyMonoUser(HttpUser):
     wait_time = between(1, 1)
