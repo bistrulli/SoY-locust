@@ -7,11 +7,15 @@ import logging
 from pathlib import Path
 import signal
 import sys
+import os  # Nuovo import
 
 # Configura il logger
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 stackName="monotloth-stack"
 stackPath=Path(__file__).parent/"sou"/"monotloth-v4.yml"
+
+# Variabile globale per salvare il processo Locust
+locust_process = None
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Esegui il load test con Locust")
@@ -26,7 +30,7 @@ def parse_args():
 def startSys():
     # Avvia la specifica Docker Swarm utilizzando il file sou/monotloth-v4.yml
     logging.info(f"Deploying Docker Swarm stack using {stackName}")
-    cmd = ["docker", "stack", "deploy","--detach=true","-c", str(stackPath.absolute()), stackName]
+    cmd = ["docker", "stack", "deploy", "--detach=true", "-c", str(stackPath.absolute()), stackName]
     subprocess.run(cmd, check=True)
     logging.info("Docker Swarm stack deployed successfully.")
 
@@ -38,7 +42,14 @@ def stopSys():
     logging.info("Docker Swarm stack removed successfully.")
 
 def handle_sigint(signum, frame):
-    logging.info("SIGINT received. Stopping system...")
+    global locust_process
+    logging.info("SIGINT received. Stopping system and killing child processes...")
+    if locust_process is not None:
+        try:
+            # Invia SIGTERM a tutto il process group
+            os.killpg(os.getpgid(locust_process.pid), signal.SIGTERM)
+        except Exception as e:
+            logging.error(f"Error killing process group: {e}")
     stopSys()
     sys.exit(0)
 
@@ -46,6 +57,7 @@ def handle_sigint(signum, frame):
 signal.signal(signal.SIGINT, handle_sigint)
 
 def main():
+    global locust_process
     args = parse_args()
     
     startSys()  # Deploy Docker Swarm stack
@@ -63,9 +75,11 @@ def main():
         "-f", args.locust_file
     ]
     logging.info(" ".join(cmd))
-    subprocess.call(cmd)
-    logging.info("Locust execution finished.")
     
+    # Avvia il processo in un nuovo process group
+    locust_process = subprocess.Popen(cmd, preexec_fn=os.setsid)
+    locust_process.wait()
+    logging.info("Locust execution finished.")
     stopSys()  # Stop della Docker Swarm stack
 
 if __name__ == "__main__":
