@@ -2,7 +2,8 @@ version: '3.7' # Supporto Swarm
 
 services:
   node:
-    image: gitlab.polytech.umontpellier.fr:5050/dream-team/plage/soy-v4/nodedock
+    #image: gitlab.polytech.umontpellier.fr:5050/dream-team/plage/soy-v4/nodedock
+    image:  gitlab.polytech.umontpellier.fr:5050/dream-team/plage/soy-v4/nodedock@sha256:37862376bcb83795f8f3cce5dfd6f2fc59c1e3c5863f555073773edad5cae2ed
     ports:
       - 5001:5001
     restart: always
