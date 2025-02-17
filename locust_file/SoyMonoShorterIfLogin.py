@@ -6,7 +6,7 @@ import gevent
 import csv
 from pathlib import Path
 import time
-from base_exp import BaseExp
+from base_exp import BaseExp,resourceDir
 
 class SoyMonoUser(BaseExp):
 

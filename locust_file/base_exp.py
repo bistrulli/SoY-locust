@@ -17,7 +17,6 @@ from abc import ABC, abstractmethod
 from abc import ABCMeta, abstractmethod
 
 end=None
-initCore=0.1
 estimator=None
 controller=None
 monitor=None
