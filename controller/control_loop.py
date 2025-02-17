@@ -9,11 +9,11 @@ class ControlLoop():
         self.toStop=False
         self.config=config
 
-    def loop(environment):
+    def loop(self,environment):
         global initCore, estimator, controller
-        estimator=QNEstimaator()
-        controller=OPTCTRL(init_cores=initCore, min_cores=0.1, max_cores=16, st=1)
-        monitor=Monitoring(window=30, sla=0.2)
+        estimator=self.getEstimator()
+        controller=self.getController()
+        monitor=self.getMonitor()
         while not set.toStop:
             '''
                 TODO: Implementare il controllo della coda
@@ -27,4 +27,22 @@ class ControlLoop():
             print(f"###tick={t}###")
             monitor.tick(t)
             time.sleep(1)
+    
+    def getController(self):
+        '''
+            TODO: parse config
+        '''
+        return OPTCTRL(init_cores=initCore, min_cores=0.1, max_cores=16, st=1)
+    
+    def getMonitor(self):
+        '''
+            TODO: parse config
+        '''
+        return Monitoring(window=30, sla=0.2)
+
+    def getEstimator(self):
+        '''
+            TODO: parse config
+        '''
+        return QNEstimaator()
     
