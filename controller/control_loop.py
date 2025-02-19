@@ -39,7 +39,9 @@ class ControlLoop():
                 estim=estimator.estimate(np.array(monitor.rts[-10:]),
                                          totalcores,
                                          np.array(monitor.users[-10:]))
-                print(f"Service Time:  {estim}")
+                ctrl=controller.OPTController(e=[estim], tgt=[0.05], C=[monitor.users[-1]])
+                print(f"Service Time:  {estim}\n"
+                      f"Replica:  {np.roud(ctrl/monitor.cores[-1:])}")
 
             time.sleep(timeparse(self.config["control_period"]))
     
@@ -49,7 +51,7 @@ class ControlLoop():
         '''
             TODO: parse config
         '''
-        return OPTCTRL(init_cores=1, min_cores=0.1, max_cores=16, st=1)
+        return OPTCTRL(init_cores=1, min_cores=0.1, max_cores=16, st=0.8)
     
     def getMonitor(self):
         '''
