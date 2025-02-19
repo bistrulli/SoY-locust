@@ -10,7 +10,7 @@ from estimator import QNEstimaator
 from controller import OPTCTRL
 from estimator import Monitoring
 from controller import ControlLoop
-from prometheus_client import start_http_server, Counter,Summary
+from prometheus_client import start_http_server, Counter, Summary, Gauge  # Aggiunta Gauge
 import sys,argparse
 import base_exp
 from abc import ABC, abstractmethod
