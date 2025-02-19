@@ -29,9 +29,6 @@ REQUEST_COUNT = Counter('locust_requests_total', 'Total number of Locust request
 REQUEST_LATENCY = Summary('locust_request_latency_seconds', 'Request latency in seconds')
 resourceDir=Path(__file__).parent.parent/Path("resources")
 
-#qua inserisco la lettura di un file di configurazione
-#ctrlLoop=ControlLoop()
-
 users=None
 @events.test_start.add_listener
 def on_locust_start(environment, **_kwargs):
@@ -40,8 +37,6 @@ def on_locust_start(environment, **_kwargs):
     # Salva il tempo di inizio in environment se non esiste
     if not hasattr(environment, "start_time"):
         environment.start_time = time.time()
-    # if not isinstance(environment.runner, WorkerRunner):
-    #     gevent.spawn(ctrlLoop.loop, environment)
     
     # Carica gli utenti dal file CSV solo se non sono già stati caricati
     with open(f'{resourceDir.absolute()}/soymono2/users.csv') as csv_file:

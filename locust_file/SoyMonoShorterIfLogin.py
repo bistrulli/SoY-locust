@@ -10,8 +10,10 @@ from base_exp import BaseExp,resourceDir
 from controller import ControlLoop
 import gevent
 
+exp_conf={ "sercice_name": "monotloth-stack_node"}
+
 #Qui la logica di avvio del control loop specifica per ogni locus file
-ctrlLoop=ControlLoop()
+ctrlLoop=ControlLoop(config=exp_conf)
 @events.test_start.add_listener
 def on_locust_start(environment, **_kwargs):
     if not isinstance(environment.runner, WorkerRunner):

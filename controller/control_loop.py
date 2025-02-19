@@ -41,7 +41,8 @@ class ControlLoop():
         '''
             TODO: parse config
         '''
-        return Monitoring(window=30, sla=0.2)
+        return Monitoring(window=30, sla=0.2,serviceName=self.config["sercice_name"],
+                          promHost="localhost",promPort=9090)
 
     def getEstimator(self):
         '''
