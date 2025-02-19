@@ -34,10 +34,18 @@ class ControlLoop():
                   f"Cores:          {monitor.cores[-1]}\n"
                   f"WIP:            {monitor.users[-1]}")
             if(len(monitor.rts)>10):
+                totalcores = np.array(monitor.cores[-10:]) * np.array(monitor.replica[-10:])
                 estim=estimator.estimate(np.array(monitor.rts[-10:]),
-                                         np.array(monitor.cores[-10:]),
+                                         totalcores,
                                          np.array(monitor.users[-10:]))
                 print(f"Service Time:  {estim}")
+                
+                # Esempio di moltiplicazione element-wise
+                cores_array = np.array(monitor.cores[-10:])
+                replica_array = np.array(monitor.replica[-10:])
+                result = cores_array * replica_array
+                print("Prodotto element-wise:", result)
+                
             time.sleep(1)
     
     ###L'idea è quella che in base al file di configurazione instazionio il giusto controllore
