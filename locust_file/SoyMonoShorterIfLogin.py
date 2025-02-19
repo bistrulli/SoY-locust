@@ -13,7 +13,7 @@ import gevent
 cwd=Path(__file__).parent
 
 exp_conf={ "sercice_name": "monotloth-stack_node",
-           "sysfile": cwd.parent/"sou"/"monotloth-v4.yaml"
+           "sysfile": cwd.parent/"sou"/"monotloth-v4.yml"
          }
 
 #Qui la logica di avvio del control loop specifica per ogni locus file
