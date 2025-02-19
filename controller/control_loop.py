@@ -25,8 +25,12 @@ class ControlLoop():
             else:
                 t = time.time() - (getattr(environment.runner, "start_time", environment.start_time))
             monitor.tick(t)
-            print(f"###tick={t}###")
-            print(f"###rt={monitor.rts[-1]},tr={monitor.tr[-1]},R={monitor.replica[-1]}###")
+            print(f"### tick = {t} ###")
+            # Stampa formattata in più righe
+            print(f"Response Time: {monitor.rts[-1]}\n"
+                  f"Throughput:     {monitor.tr[-1]}\n"
+                  f"Replicas:       {monitor.replica[-1]}\n"
+                  f"Cores:          {monitor.cores[-1]}")
             time.sleep(1)
     
     ###L'idea è quella che in base al file di configurazione instazionio il giusto controllore
