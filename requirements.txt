@@ -6,3 +6,4 @@ simpy
 casadi
 docker
 prometheus-api-client
+pyyaml

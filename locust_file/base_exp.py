@@ -21,17 +21,6 @@ estimator=None
 controller=None
 monitor=None
 
-# Avvia il server Prometheus su porta 9646
-start_http_server(9646)
-
-# Metriche Prometheus
-REQUEST_COUNT = Counter('locust_requests_total', 'Total number of Locust requests')
-REQUEST_LATENCY = Summary('locust_request_latency_seconds', 'Request latency in seconds')
-resourceDir=Path(__file__).parent.parent/Path("resources")
-
-#qua inserisco la lettura di un file di configurazione
-ctrlLoop=ControlLoop()
-
 # Parsing manuale degli argomenti (evita errori con Locust)
 def get_custom_args():
     parser = argparse.ArgumentParser()
@@ -42,7 +31,18 @@ def get_custom_args():
 
     return known_args
 
-#print(get_custom_args())
+print(get_custom_args())
+
+# Avvia il server Prometheus su porta 9646
+start_http_server(9646)
+
+# Metriche Prometheus
+REQUEST_COUNT = Counter('locust_requests_total', 'Total number of Locust requests')
+REQUEST_LATENCY = Summary('locust_request_latency_seconds', 'Request latency in seconds')
+resourceDir=Path(__file__).parent.parent/Path("resources")
+
+#qua inserisco la lettura di un file di configurazione
+ctrlLoop=ControlLoop()
 
 users=None
 @events.test_start.add_listener
