@@ -36,7 +36,7 @@ class Monitoring:
         self.rts+=[self.getResponseTime()]
         self.tr+=[self.getTroughput()]
         self.users+=[self.getUsers()]
-        #self.cores+=[self.getCores()]
+        self.cores+=[self.getCores()]
         self.replica+=[self.get_replicas(self.serviceName)]
 
     def getUsers(self):
