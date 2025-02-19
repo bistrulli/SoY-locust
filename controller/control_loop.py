@@ -31,8 +31,7 @@ class ControlLoop():
             print(f"Response Time:  {monitor.rts[-1]}\n"
                   f"Throughput:     {monitor.tr[-1]}\n"
                   f"Replicas:       {monitor.replica[-1]}\n"
-                  f"Cores:          {monitor.cores[-1]}\n"
-                  f"WIP:            {monitor.rts[-1]*monitor.tr[-1]}\n")
+                  f"Cores:          {monitor.cores[-1]}")
             if(len(monitor.rts)>10):
                 #estimator.estimate(monitor.rts,monitor.cores,monitor.users)
                 print(f"WIP:            {np.mean(monitor.rts[-10:])*np.mean(monitor.tr[-10:])}\n")
