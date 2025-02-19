@@ -15,7 +15,7 @@ class Monitoring:
         self.serviceName = serviceName
         self.promPort = promPort
         self.promHost = promHost
-        self.prom = PrometheusConnect(url=f"http://{self.promHost}}:{self.promPort}}", disable_ssl=True)
+        self.prom = PrometheusConnect(url=f"http://{self.promHost}:{self.promPort}", disable_ssl=True)
         self.reset()
 
     def tick(self, t):
