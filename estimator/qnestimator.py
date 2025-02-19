@@ -21,7 +21,7 @@ class QNEstimaator():
         obj=0;
         for i in range(rt.shape[0]):
             self.model.subject_to(t[i,0]==casadi.fmin(c[i]/(1+e),s[i]/e))
-            obj+=(c[i]-(rt[i]+1)*t[i,0])**2;
+            obj+=(c[i]-(rt[i]+0)*t[i,0])**2;
         
         self.model.minimize(obj)    
         optionsIPOPT={'print_time':False,'ipopt':{'print_level':0}}

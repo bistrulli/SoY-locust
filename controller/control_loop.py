@@ -2,6 +2,7 @@ from estimator import QNEstimaator
 from estimator import Monitoring
 from controller import OPTCTRL
 import time
+import numpy as np
 
 class ControlLoop():
 
@@ -27,10 +28,14 @@ class ControlLoop():
             monitor.tick(t)
             print(f"### tick = {t} ###")
             # Stampa formattata in più righe
-            print(f"Response Time: {monitor.rts[-1]}\n"
+            print(f"Response Time:  {monitor.rts[-1]}\n"
                   f"Throughput:     {monitor.tr[-1]}\n"
                   f"Replicas:       {monitor.replica[-1]}\n"
-                  f"Cores:          {monitor.cores[-1]}")
+                  f"Cores:          {monitor.cores[-1]}\n"
+                  f"WIP:            {monitor.rts[-1]*monitor.tr[-1]}\n")
+            if(len(monitor.rts)>10):
+                #estimator.estimate(monitor.rts,monitor.cores,monitor.users)
+                print(f"WIP:            {np.mean(monitor.rts[-10:])*np.mean(monitor.tr[-10:])}\n")
             time.sleep(1)
     
     ###L'idea è quella che in base al file di configurazione instazionio il giusto controllore
