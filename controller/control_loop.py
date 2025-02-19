@@ -26,7 +26,7 @@ class ControlLoop():
                 t = time.time() - (getattr(environment.runner, "start_time", environment.start_time))
             monitor.tick(t)
             print(f"###tick={t}###")
-            print(f"###rt={monitor.rts[-1]},tr={monitor.tr[-1]}###")
+            print(f"###rt={monitor.rts[-1]},tr={monitor.tr[-1]},R={monitor.replica[-1]}###")
             time.sleep(1)
     
     ###L'idea è quella che in base al file di configurazione instazionio il giusto controllore
