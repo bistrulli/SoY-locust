@@ -34,7 +34,9 @@ class ControlLoop():
                   f"Cores:          {monitor.cores[-1]}\n"
                   f"WIP:            {monitor.users[-1]}")
             if(len(monitor.rts)>10):
-                estim=estimator.estimate(monitor.rts[-10:],monitor.cores[-10:],monitor.users[-10:])
+                estim=estimator.estimate(np.array(monitor.rts[-10:]),
+                                         np.array(monitor.cores[-10:]),
+                                         np.array(monitor.users[-10:]))
                 print(f"Service Time:  {estim}")
             time.sleep(1)
     
