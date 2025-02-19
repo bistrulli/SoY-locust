@@ -31,10 +31,12 @@ class ControlLoop():
             print(f"Response Time:  {monitor.rts[-1]}\n"
                   f"Throughput:     {monitor.tr[-1]}\n"
                   f"Replicas:       {monitor.replica[-1]}\n"
-                  f"Cores:          {monitor.cores[-1]}")
+                  f"Cores:          {monitor.cores[-1]}\n",
+                  f"WIP:            {monitor.users[-1]}")
             if(len(monitor.rts)>10):
-                #estimator.estimate(monitor.rts,monitor.cores,monitor.users)
-                print(f"WIP:            {np.mean(monitor.rts[-10:])*np.mean(monitor.tr[-10:])}\n")
+                #estim=estimator.estimate(monitor.rts[-10:],monitor.cores[-10:],monitor.users[-10:])
+                #print(f"WIP:            {np.mean(monitor.rts[-10:])*np.mean(monitor.tr[-10:])}\n")
+                pass
             time.sleep(1)
     
     ###L'idea è quella che in base al file di configurazione instazionio il giusto controllore

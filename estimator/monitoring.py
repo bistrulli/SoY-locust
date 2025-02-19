@@ -35,14 +35,13 @@ class Monitoring:
         self.time+=[t]
         self.rts+=[self.getResponseTime()]
         self.tr+=[self.getTroughput()]
-        self.users+=[self.getUsers()]
         self.cores+=[self.getCores()]
         self.replica+=[self.get_replicas(self.serviceName)]
+        self.users+=[self.getUsers()]
 
     def getUsers(self):
-        #logica per misurare il numero di utenti dal file di locust
-        if not len(self.users): return 0
-        return self.reducer(self.users)
+        #torno il numero di utenti attivi (Little's Law)
+        return self.rt[-1]*self.tr[-1]
 
     def getCores(self):
         # Estrae il valore dell'attributo "cpus" dalla configurazione YAML per il servizio node
