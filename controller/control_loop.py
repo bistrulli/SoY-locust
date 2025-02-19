@@ -40,7 +40,7 @@ class ControlLoop():
                                          totalcores,
                                          np.array(monitor.users[-10:]))
                 #estim=0.038
-                ctrl=controller.OPTController(e=[estim], tgt=[estim], C=[monitor.users[-1]])
+                ctrl=controller.OPTController(e=[estim], tgt=[1/estim], C=[monitor.users[-1]])
                 print(f"Service Time:  {estim}\n"
                       f"Replica:  {ctrl/monitor.cores[-1]}")
 
