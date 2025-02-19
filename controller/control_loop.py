@@ -41,7 +41,7 @@ class ControlLoop():
                                          np.array(monitor.users[-10:]))
                 ctrl=controller.OPTController(e=[estim], tgt=[0.05], C=[monitor.users[-1]])
                 print(f"Service Time:  {estim}\n"
-                      f"Replica:  {ctrl/monitor.cores[-1:]}")
+                      f"Replica:  {ctrl/monitor.cores[-1]}")
 
             time.sleep(timeparse(self.config["control_period"]))
     
