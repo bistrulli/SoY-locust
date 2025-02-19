@@ -19,7 +19,8 @@ class Monitoring:
         self.sysfile = sysfile
         if(not Path(self.sysfile).exists()):
             raise FileNotFoundError(f"File {self.sysfile} not found")
-        self.sys=yaml.safe_load(f)
+        self.sys=yaml.safe_load(self.sysfile.open())
+        self.allRts = pd.read_csv(locustDataDir/"allRts.csv")["rt"].values
         self.prom = PrometheusConnect(url=f"http://{self.promHost}:{self.promPort}", disable_ssl=True)
         self.reset()
 
