@@ -7,6 +7,15 @@ import csv
 from pathlib import Path
 import time
 from base_exp import BaseExp,resourceDir
+from controller import ControlLoop
+import gevent
+
+#Qui la logica di avvio del control loop specifica per ogni locus file
+ctrlLoop=ControlLoop()
+@events.test_start.add_listener
+def on_locust_start(environment, **_kwargs):
+    if not isinstance(environment.runner, WorkerRunner):
+        gevent.spawn(ctrlLoop.loop, environment)
 
 class SoyMonoUser(BaseExp):
 

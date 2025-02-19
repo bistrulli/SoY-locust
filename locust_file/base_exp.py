@@ -21,18 +21,6 @@ estimator=None
 controller=None
 monitor=None
 
-# Parsing manuale degli argomenti (evita errori con Locust)
-def get_custom_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--conf", type=str, default="default_value", help="Parametro personalizzato")
-    
-    # Filtra solo gli argomenti non riconosciuti da Locust
-    known_args, _ = parser.parse_known_args(sys.argv)
-
-    return known_args
-
-print(get_custom_args())
-
 # Avvia il server Prometheus su porta 9646
 start_http_server(9646)
 
@@ -42,7 +30,7 @@ REQUEST_LATENCY = Summary('locust_request_latency_seconds', 'Request latency in 
 resourceDir=Path(__file__).parent.parent/Path("resources")
 
 #qua inserisco la lettura di un file di configurazione
-ctrlLoop=ControlLoop()
+#ctrlLoop=ControlLoop()
 
 users=None
 @events.test_start.add_listener
@@ -52,8 +40,8 @@ def on_locust_start(environment, **_kwargs):
     # Salva il tempo di inizio in environment se non esiste
     if not hasattr(environment, "start_time"):
         environment.start_time = time.time()
-    if not isinstance(environment.runner, WorkerRunner):
-        gevent.spawn(ctrlLoop.loop, environment)
+    # if not isinstance(environment.runner, WorkerRunner):
+    #     gevent.spawn(ctrlLoop.loop, environment)
     
     # Carica gli utenti dal file CSV solo se non sono già stati caricati
     with open(f'{resourceDir.absolute()}/soymono2/users.csv') as csv_file:
