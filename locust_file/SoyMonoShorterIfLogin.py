@@ -10,7 +10,11 @@ from base_exp import BaseExp,resourceDir
 from controller import ControlLoop
 import gevent
 
-exp_conf={ "sercice_name": "monotloth-stack_node"}
+cwd=Path(__file__).parent
+
+exp_conf={ "sercice_name": "monotloth-stack_node",
+           "sysfile": cwd.parent/"sou"/"monotloth-v4.yaml"
+         }
 
 #Qui la logica di avvio del control loop specifica per ogni locus file
 ctrlLoop=ControlLoop(config=exp_conf)

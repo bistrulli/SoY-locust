@@ -4,17 +4,22 @@ import pandas as pd
 import numpy as np
 import docker
 from prometheus_api_client import PrometheusConnect
+import yaml
 
 
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x),
-                 serviceName="",promHost="localhost",promPort=9090):
+                 serviceName="",promHost="localhost",promPort=9090,sysfile=""):
         self.reducer = reducer
         self.window = window
         self.sla = sla
         self.serviceName = serviceName
         self.promPort = promPort
         self.promHost = promHost
+        self.sysfile = sysfile
+        if(not Path(self.sysfile).exists()):
+            raise FileNotFoundError(f"File {self.sysfile} not found")
+        self.sys=yaml.safe_load(f)
         self.prom = PrometheusConnect(url=f"http://{self.promHost}:{self.promPort}", disable_ssl=True)
         self.reset()
 
