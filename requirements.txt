@@ -7,3 +7,4 @@ casadi
 docker
 prometheus-api-client
 pyyaml
+pytimeparse

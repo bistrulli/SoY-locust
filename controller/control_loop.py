@@ -3,6 +3,7 @@ from estimator import Monitoring
 from controller import OPTCTRL
 import time
 import numpy as np
+from pytimeparse.timeparse import timeparse
 
 class ControlLoop():
 
@@ -33,14 +34,14 @@ class ControlLoop():
                   f"Replicas:       {monitor.replica[-1]}\n"
                   f"Cores:          {monitor.cores[-1]}\n"
                   f"WIP:            {monitor.users[-1]}")
-            if(len(monitor.rts)>10):
+            if(len(monitor.rts)>self.config["estimation_window"]):
                 totalcores = np.array(monitor.cores[-10:]) * np.array(monitor.replica[-10:])
                 estim=estimator.estimate(np.array(monitor.rts[-10:]),
                                          totalcores,
                                          np.array(monitor.users[-10:]))
                 print(f"Service Time:  {estim}")
-                
-            time.sleep(1)
+
+            time.sleep(timeparse(self.config["control_period"]))
     
     ###L'idea è quella che in base al file di configurazione instazionio il giusto controllore
     ###Il giusto monitoring e il giusto stimatore

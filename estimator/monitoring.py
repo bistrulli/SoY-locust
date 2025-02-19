@@ -6,7 +6,6 @@ import docker
 from prometheus_api_client import PrometheusConnect
 import yaml
 
-
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x),
                  serviceName="",promHost="localhost",promPort=9090,sysfile=""):
