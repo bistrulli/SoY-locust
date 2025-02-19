@@ -29,6 +29,8 @@ class ControlLoop():
             print(f"###rt={monitor.rts[-1]},tr={monitor.tr[-1]}###")
             time.sleep(1)
     
+    ###L'idea è quella che in base al file di configurazione instazionio il giusto controllore
+    ###Il giusto monitoring e il giusto stimatore
     def getController(self):
         '''
             TODO: parse config

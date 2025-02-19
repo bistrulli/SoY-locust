@@ -12,6 +12,9 @@ class SoyMonoUser(BaseExp):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.conf = {
+            "sercice_name": "soymono2",
+        }
 
     def userLogic(self):
         # Implementazione specifica della logica utente

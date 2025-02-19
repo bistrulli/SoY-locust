@@ -7,11 +7,15 @@ from prometheus_api_client import PrometheusConnect
 
 
 class Monitoring:
-    def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x)):
+    def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x),
+                 serviceName="",promHost="localhost",promPort=9090):
         self.reducer = reducer
         self.window = window
         self.sla = sla
-        self.prom = PrometheusConnect(url="http://localhost:9090", disable_ssl=True)
+        self.serviceName = serviceName
+        self.promPort = promPort
+        self.promHost = promHost
+        self.prom = PrometheusConnect(url=f"http://{self.promHost}}:{self.promPort}}", disable_ssl=True)
         self.reset()
 
     def tick(self, t):
@@ -27,7 +31,8 @@ class Monitoring:
         self.rts+=[self.getResponseTime()]
         self.tr+=[self.getTroughput()]
         self.users+=[self.getUsers()]
-        self.cores+=[self.getCores()]
+        #self.cores+=[self.getCores()]
+        self.replica+=[self.get_replicas(self.serviceName)]
 
     def getUsers(self):
         #logica per misurare il numero di utenti dal file di locust
@@ -132,6 +137,7 @@ class Monitoring:
         self.tr = []
         self.users = []
         self.time = []
+        self.replica = []
         # Aggiunta per il throughput
         self.last_requests = None
         self.last_timestamp = None

@@ -44,15 +44,21 @@ def get_custom_args():
 
 #print(get_custom_args())
 
+users=None
 @events.test_start.add_listener
 def on_locust_start(environment, **_kwargs):
-    global end
+    global end, users
     end = False
     # Salva il tempo di inizio in environment se non esiste
     if not hasattr(environment, "start_time"):
         environment.start_time = time.time()
     if not isinstance(environment.runner, WorkerRunner):
         gevent.spawn(ctrlLoop.loop, environment)
+    
+    # Carica gli utenti dal file CSV solo se non sono già stati caricati
+    with open(f'{resourceDir.absolute()}/soymono2/users.csv') as csv_file:
+        reader = csv.DictReader(csv_file)
+        users = [row for row in reader]
 
 @events.test_stop.add_listener
 def on_locust_stop(environment, **_kwargs):
@@ -71,13 +77,9 @@ class BaseExp(HttpUser, metaclass=CombinedMeta):
     user_index = 0  # Static variable to keep track of user index
 
     def on_start(self):
-        # Carica gli utenti dal file CSV solo se non sono già stati caricati
-        if not hasattr(self.__class__, "users"):
-            with open(f'{resourceDir.absolute()}/soymono2/users.csv') as csv_file:
-                reader = csv.DictReader(csv_file)
-                self.__class__.users = [row for row in reader]
+        global users
         # Assegna un ID univoco incrementale per ogni utente
-        self.user_data = self.__class__.users[self.__class__.user_index % len(self.__class__.users)]
+        self.user_data = users[self.__class__.user_index % len(users)]
         self.__class__.user_index += 1
 
     @abstractmethod
