@@ -41,7 +41,7 @@ class Monitoring:
 
     def getUsers(self):
         #torno il numero di utenti attivi (Little's Law)
-        return self.rt[-1]*self.tr[-1]
+        return self.rts[-1]*self.tr[-1]
 
     def getCores(self):
         # Estrae il valore dell'attributo "cpus" dalla configurazione YAML per il servizio node
