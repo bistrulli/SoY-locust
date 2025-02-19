@@ -45,7 +45,17 @@ class Monitoring:
         return self.reducer(self.users)
 
     def getCores(self):
-        return 0.0
+        # Estrae il valore dell'attributo "cpus" dalla configurazione YAML per il servizio node
+        cpus_str = self.sys.get("services", {}) \
+                           .get("node", {}) \
+                           .get("deploy", {}) \
+                           .get("resources", {}) \
+                           .get("limits", {}) \
+                           .get("cpus", "0")
+        try:
+            return float(cpus_str)
+        except ValueError:
+            return 0.0
 
     # Funzione per eseguire una query su Prometheus
     def query_prometheus(self,metric_name):
