@@ -24,13 +24,13 @@ class Monitoring:
         self.reset()
 
     def tick(self, t):
-        for i in range(1, len(self.time)+1):
-            if t - self.time[-i] > self.window:
-                try:
-                    del self.rts[-i]
-                    del self.users[-i]
-                except:
-                    break
+        # for i in range(1, len(self.time)+1):
+        #     if t - self.time[-i] > self.window:
+        #         try:
+        #             del self.rts[-i]
+        #             del self.users[-i]
+        #         except:
+        #             break
         
         self.time+=[t]
         self.rts+=[self.getResponseTime()]
