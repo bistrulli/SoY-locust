@@ -31,9 +31,10 @@ class Monitoring:
         self.cores+=[self.getCores()]
         self.replica+=[self.get_replicas(self.serviceName)]
         self.users+=[self.getUsers()]
-        #totRes=self.getTotalUtilization()
-        #self.memory+=[totRes["total_mem"]]
-        #self.util+=[totRes["total_cpu"]]
+        
+        totRes=self.getTotalUtilization()
+        self.memory+=[totRes["total_mem"]]
+        self.util+=[totRes["total_cpu"]]
 
     def getUsers(self):
         #torno il numero di utenti attivi (Little's Law)
@@ -122,24 +123,23 @@ class Monitoring:
             return None
 
     def getTotalUtilization(self):
+        """
+        Aggrega l'utilizzo CPU e memoria di tutti i container appartenenti al servizio, filtrandoli per label.
+        """
         total_cpu = 0.0
         total_mem = 0
         try:
-            # Usa l'API low-level (self.client.api) per ottenere i task
-            low_level_api = self.client.api
-            tasks = low_level_api.tasks(filters={"service": self.serviceName, "desired-state": "running"})
-            for task in tasks:
-                container_id = task.get("Status", {}).get("ContainerStatus", {}).get("ContainerID")
-                if container_id:
-                    try:
-                        container = self.client.containers.get(container_id)
-                        stats = container.stats(stream=False)
-                        cpu_usage = stats.get("cpu_stats", {}).get("cpu_usage", {}).get("total_usage", 0)
-                        mem_usage = stats.get("memory_stats", {}).get("usage", 0)
-                        total_cpu += cpu_usage
-                        total_mem += mem_usage
-                    except Exception as ex:
-                        print(f"Error fetching stats for container {container_id}: {ex}")
+            # Filtra i container usando l'etichetta Swarm del servizio
+            containers = self.client.containers.list(filters={"label": f"com.docker.swarm.service.name={self.serviceName}"})
+            for container in containers:
+                try:
+                    stats = container.stats(stream=False)
+                    cpu_usage = stats.get("cpu_stats", {}).get("cpu_usage", {}).get("total_usage", 0)
+                    mem_usage = stats.get("memory_stats", {}).get("usage", 0)
+                    total_cpu += cpu_usage
+                    total_mem += mem_usage
+                except Exception as ex:
+                    print(f"Error fetching stats for container {container.id}: {ex}")
             return {"total_cpu": total_cpu, "total_mem": total_mem}
         except Exception as e:
             print("Error in getTotalUtilization:", e)
