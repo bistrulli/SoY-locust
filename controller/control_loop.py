@@ -35,12 +35,11 @@ class ControlLoop():
                   f"Cores:          {monitor.cores[-1]}\n"
                   f"WIP:            {monitor.users[-1]}")
             if(len(monitor.rts)>self.config["estimation_window"]):
-                totalcores = np.array(monitor.cores[-10:]) * np.array(monitor.replica[-10:])
-                estim=estimator.estimate(np.array(monitor.rts[-10:]),
+                totalcores = np.array(monitor.cores[-self.config["estimation_window"]:]) * np.array(monitor.replica[-10:])
+                estim=estimator.estimate(np.array(monitor.rts[-self.config["estimation_window"]:]),
                                          totalcores,
-                                         np.array(monitor.users[-10:]))
-                #estim=0.038
-                ctrl=controller.OPTController(e=[estim], tgt=[estim], C=[monitor.users[-1]])
+                                         np.array(monitor.users[-self.config["estimation_window"]:]))
+                ctrl=controller.OPTController(e=[estim], tgt=[estim], C=[np.mean(monitor.users[-self.config["estimation_window"]:])])
                 print(f"Service Time:  {estim}\n"
                       f"Replica:  {ctrl/monitor.cores[-1]}")
 
