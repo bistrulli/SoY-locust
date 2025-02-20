@@ -39,9 +39,9 @@ class ControlLoop():
                   f"Throughput:     {self.monitor.tr[-1]}\n"
                   f"Replicas:       {self.monitor.replica[-1]}\n"
                   f"Cores:          {self.monitor.cores[-1]}\n"
-                  f"WIP:            {self.monitor.users[-1]}\n"
-                  f"Util:           {self.monitor.util[-1]}\n"
-                  f"Mem:            {self.monitor.util[-1]}")
+                  f"WIP:            {self.monitor.users[-1]}\n")
+                  #f"Util:           {self.monitor.util[-1]}\n"
+                  #f"Mem:            {self.monitor.util[-1]}")
             if((self.ctrlTick%self.config["estimation_window"])==0 and 
                len(self.monitor.rts)>=self.config["estimation_window"]):
                 totalcores = np.array(self.monitor.cores[-self.config["estimation_window"]:]) * np.array(self.monitor.replica[-self.config["estimation_window"]:])
