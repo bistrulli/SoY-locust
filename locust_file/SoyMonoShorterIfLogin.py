@@ -98,3 +98,5 @@ class RampLoadShape(LoadTestShape):
             current_users = int(self.max_users * current_time / self.ramp_up_time)
             spawn_rate = current_users / 10 if current_users > 0 else 1
             return current_users, spawn_rate
+        else:
+            return None
