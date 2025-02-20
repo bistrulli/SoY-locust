@@ -4,6 +4,7 @@ from controller import OPTCTRL
 import time
 import numpy as np
 from pytimeparse.timeparse import timeparse
+import docker
 
 class ControlLoop():
 
@@ -12,6 +13,7 @@ class ControlLoop():
         self.config=config
         self.stime=None
         self.ctrlTick=0
+        self.docker_client = docker.from_env()
 
     '''TODO: devo ristrutturare il condice in modo tale che le misure
             vengano prese ogni secondo, la stima fatta ogni n tick e il controllo ogni m tick
@@ -48,6 +50,7 @@ class ControlLoop():
                 wip=np.array(monitor.users[-self.config["control_widow"]:]).mean()
                 replicas=controller.OPTController(e=[self.stime], tgt=[self.stime], C=[float(wip)])
                 print(f"CTRL:          {np.ceil(replicas)}")
+                self.actuate(replicas=np.ceil(replicas))
             
             time.sleep(timeparse(self.config["measurament_period"]))
             self.ctrlTick+=1
@@ -82,4 +85,16 @@ class ControlLoop():
             TODO: parse config
         '''
         return QNEstimaator()
+
+    def actuate(self, replicas):
+        """
+        Aggiorna la configurazione del service monitorato impostando il numero di repliche.
+        """
+        try:
+            service_name = self.config["sercice_name"]
+            service = self.docker_client.services.get(service_name)
+            service.scale(replicas)
+            print(f"Updated service {service_name} to {replicas} replicas.")
+        except Exception as e:
+            print(f"Error updating service replicas: {e}")
 
