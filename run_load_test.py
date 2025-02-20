@@ -78,8 +78,13 @@ def main():
     ]
     logging.info(" ".join(cmd))
     
-    # Avvia il processo in un nuovo process group
-    locust_process = subprocess.Popen(cmd, preexec_fn=os.setsid)
+    # Avvia il processo in un nuovo process group e nasconde l'output in stdout e stderr
+    locust_process = subprocess.Popen(
+        cmd,
+        preexec_fn=os.setsid,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
     locust_process.wait()
     logging.info("Locust execution finished.")
     stopSys()  # Stop della Docker Swarm stack

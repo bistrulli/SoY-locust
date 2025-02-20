@@ -11,7 +11,7 @@ class OPTCTRL():
         self.st=st
     
     def OPTController(self, e, tgt, C):
-        print("stime:=", e, "tgt:=", tgt, "user:=", C)
+        #print("stime:=", e, "tgt:=", tgt, "user:=", C)
         if(np.sum(C)>0):
             self.model = casadi.Opti("conic") 
             #self.model = casadi.Opti() 
