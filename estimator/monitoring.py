@@ -6,6 +6,7 @@ import docker
 from prometheus_api_client import PrometheusConnect
 import yaml
 import pandas as pd
+import requests_unixsocket  # Assicurati di avere requests_unixsocket installato (pip install requests-unixsocket)
 
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x),
@@ -143,6 +144,43 @@ class Monitoring:
             return {"total_cpu": total_cpu, "total_mem": total_mem}
         except Exception as e:
             print("Error in getTotalUtilization:", e)
+            return {"total_cpu": 0, "total_mem": 0}
+
+    def get_container_stats_rest(self, container_id):
+        """
+        Recupera le statistiche di un container usando le API REST di Docker.
+        """
+        session = requests_unixsocket.Session()
+        url = f"http+unix://%2Fvar%2Frun%2Fdocker.sock/containers/{container_id}/stats?stream=false"
+        try:
+            response = session.get(url, timeout=1)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"Error: HTTP {response.status_code} for container {container_id}")
+                return {}
+        except Exception as ex:
+            print(f"Error fetching stats (REST) for container {container_id}: {ex}")
+            return {}
+
+    def getTotalUtilization_via_rest(self):
+        """
+        Usa le API REST di Docker per aggregare l'utilizzo CPU e memoria di tutti i container
+        appartenenti al servizio (filtrati per etichetta).
+        """
+        total_cpu = 0.0
+        total_mem = 0
+        try:
+            containers = self.client.containers.list(filters={"label": f"com.docker.swarm.service.name={self.serviceName}"})
+            for container in containers:
+                stats = self.get_container_stats_rest(container.id)
+                cpu_usage = stats.get("cpu_stats", {}).get("cpu_usage", {}).get("total_usage", 0)
+                mem_usage = stats.get("memory_stats", {}).get("usage", 0)
+                total_cpu += cpu_usage
+                total_mem += mem_usage
+            return {"total_cpu": total_cpu, "total_mem": total_mem}
+        except Exception as e:
+            print("Error in getTotalUtilization_via_rest:", e)
             return {"total_cpu": 0, "total_mem": 0}
 
     def getViolations(self):

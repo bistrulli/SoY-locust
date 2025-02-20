@@ -8,3 +8,4 @@ docker
 prometheus-api-client
 pyyaml
 pytimeparse
+requests-unixsocket
