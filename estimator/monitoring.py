@@ -128,6 +128,8 @@ class Monitoring:
         Recupera le statistiche di un container usando le API REST di Docker.
         """
         session = requests_unixsocket.Session()
+        # Monta l'adapter per lo schema http+unix se non già montato
+        session.mount("http+unix://", requests_unixsocket.UnixAdapter())
         url = f"http+unix://%2Fvar%2Frun%2Fdocker.sock/containers/{container_id}/stats?stream=false"
         try:
             response = session.get(url, timeout=1)
