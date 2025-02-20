@@ -35,7 +35,7 @@ class ControlLoop():
                   f"Replicas:       {monitor.replica[-1]}\n"
                   f"Cores:          {monitor.cores[-1]}\n"
                   f"WIP:            {monitor.users[-1]}")
-            if(self.ctrlTick>self.config["estimation_window"] and len(monitor.rts)>=self.config["estimation_window"]):
+            if((self.ctrlTick%self.config["estimation_window"])==0 and len(monitor.rts)>=self.config["estimation_window"]):
                 totalcores = np.array(monitor.cores[-self.config["estimation_window"]:]) * np.array(monitor.replica[-self.config["estimation_window"]:])
                 respnseTimes=np.array(monitor.rts[-self.config["estimation_window"]:])
                 wip=np.array(monitor.users[-self.config["estimation_window"]:])
@@ -44,7 +44,7 @@ class ControlLoop():
                                               wip)
                 print(f"Service Time:  {self.stime}")
             
-            if(self.ctrlTick>self.config["control_widow"] and self.stime is not None):
+            if((self.ctrlTick%self.config["control_widow"]==0) and self.stime is not None):
                 wip=np.array(monitor.users[-self.config["control_widow"]:]).mean()
                 replicas=controller.OPTController(e=[self.stime], tgt=[self.stime], C=[float(wip)])
                 print(f"Replica:       {replicas}")
