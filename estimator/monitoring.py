@@ -29,9 +29,9 @@ class Monitoring:
         self.rts+=[self.getResponseTime()]
         self.tr+=[self.getTroughput()]
         self.cores+=[self.getCores()]
-        #self.replica+=[self.get_replicas(self.serviceName)]
+        self.replica+=[self.get_replicas(self.serviceName)]
         self.users+=[self.getUsers()]
-        totRes=self.getTotalUtilization()
+        #totRes=self.getTotalUtilization()
         #self.memory+=[totRes["total_mem"]]
         #self.util+=[totRes["total_cpu"]]
 
