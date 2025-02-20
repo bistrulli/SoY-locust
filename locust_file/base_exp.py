@@ -16,13 +16,10 @@ import base_exp
 from abc import ABC, abstractmethod
 from abc import ABCMeta, abstractmethod
 
-end=None
-estimator=None
-controller=None
-monitor=None
-
 # Avvia il server Prometheus su porta 9646
 start_http_server(9646)
+
+end = None
 
 # Metriche Prometheus
 REQUEST_COUNT = Counter('locust_requests_total', 'Total number of Locust requests')
@@ -43,10 +40,10 @@ def on_locust_start(environment, **_kwargs):
         reader = csv.DictReader(csv_file)
         users = [row for row in reader]
 
-@events.test_stop.add_listener
-def on_locust_stop(environment, **_kwargs):
-    global end
-    end=True
+# @events.test_stop.add_listener
+# def on_locust_stop(environment, **_kwargs):
+#     global end
+#     end=True
 
 # Aggiungi una metaclasse combinata per risolvere il conflitto tra HttpUser e ABCMeta
 class CombinedMeta(ABCMeta, type(HttpUser)):

@@ -157,7 +157,6 @@ class Monitoring:
         self.last_timestamp = None
 
     def save_to_csv(self, filename):
-        from pathlib import Path
         path = Path(filename)
         path.parent.mkdir(parents=True, exist_ok=True)
         data = {
@@ -167,6 +166,7 @@ class Monitoring:
             "users": self.users,
             "replica": self.replica
         }
+        print("###saving results##")
         df = pd.DataFrame(data)
         df.to_csv(filename, index=False)
         print(f"Data saved to {filename}")
