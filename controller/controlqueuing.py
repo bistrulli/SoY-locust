@@ -13,8 +13,8 @@ class OPTCTRL():
     def OPTController(self, e, tgt, C):
         #print("stime:=", e, "tgt:=", tgt, "user:=", C)
         if(np.sum(C)>0):
-            #self.model = casadi.Opti("conic") 
-            self.model = casadi.Opti() 
+            self.model = casadi.Opti("conic") 
+            #self.model = casadi.Opti() 
             nApp = len(tgt)
             
             T = self.model.variable(1, nApp);
@@ -30,13 +30,13 @@ class OPTCTRL():
                 #self.model.subject_to(T[0, i]<= C[i] / (1.0+e[i]))
                 #self.model.subject_to(T[0, i]<= S[0, i] / e[i])
                 #obj+=(C[i]-(1+tgt[i])*T[0, i])**2+0.000000*S[0, i]
-                obj+=(tgt-(C[i]/T[0,i]))**2
+                obj+=(C[i]-(tgt*T[0,i]))**2
         
             self.model.minimize(obj)    
             # self.model.solver('osqp',{'print_time':False,'error_on_fail':False})
             optionsIPOPT={'print_time':False,'ipopt':{'print_level':0}}
             optionsOSQP={'print_time':False,'osqp':{'verbose':0}}
-            self.model.solver('ipopt',optionsIPOPT) 
+            self.model.solver('osqp',optionsOSQP) 
         
             sol = self.model.solve()
             print(C[0]/sol.value(T),sol.value(obj),sol.value(T))
