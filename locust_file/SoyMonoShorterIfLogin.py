@@ -81,21 +81,24 @@ class SoyMonoUser(BaseExp):
                     headers={"Authorization": f"Bearer {access_token}"},
                 )
 
-# class CustomLoadShape(LoadTestShape):
-#     max_users = 200
-#     phase_duration = 60
-#     rest_duration = 240
-    
-#     stages = [
-#         {"duration": phase_duration, "users": max_users, "spawn_rate": 10},
-#         {"duration": phase_duration + rest_duration, "users": 0, "spawn_rate": 0},
-#     ] * 5
+class RampLoadShape(LoadTestShape):
+    """
+    Load shape that ramps up users from 0 to max_users linearly over ramp_up_time seconds,
+    then maintains max_users until run_time is reached.
+    """
+    max_users = 100
+    ramp_up_time = 300  # secondi per l'incremento lineare
+    run_time = 600      # durata totale del test in secondi
 
-#     def tick(self):
-#         run_time = self.get_run_time()
-
-#         for stage in self.stages:
-#             if run_time < stage["duration"]:
-#                 return stage["users"], stage["spawn_rate"]
-
-#         return None
+    def tick(self):
+        current_time = self.get_run_time()
+        if current_time < self.ramp_up_time:
+            # Aumento lineare degli utenti
+            current_users = int(self.max_users * current_time / self.ramp_up_time)
+            spawn_rate = current_users / 10 if current_users > 0 else 1
+            return current_users, spawn_rate
+        elif current_time < self.run_time:
+            # Mantiene il numero massimo di utenti
+            return self.max_users, self.max_users / 10
+        else:
+            return None
