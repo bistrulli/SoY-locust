@@ -7,6 +7,7 @@ from prometheus_api_client import PrometheusConnect
 import yaml
 import pandas as pd
 import requests_unixsocket
+import requests
 
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x),
@@ -26,16 +27,16 @@ class Monitoring:
         self.reset()
 
     def tick(self, t):
-        self.time+=[t]
-        self.rts+=[self.getResponseTime()]
-        self.tr+=[self.getTroughput()]
-        self.cores+=[self.getCores()]
-        self.replica+=[self.get_replicas(self.serviceName)]
-        self.users+=[self.getUsers()]
-        
-        totRes=self.getTotalUtilization_via_rest()
-        self.memory+=[totRes["total_mem"]]
-        self.util+=[totRes["total_cpu"]]
+        self.time += [t]
+        self.rts += [self.getResponseTime()]
+        self.tr += [self.getTroughput()]
+        self.cores += [self.getCores()]
+        self.replica += [self.get_replicas(self.serviceName)]
+        self.users += [self.getUsers()]
+        # Utilizzo Prometheus per aggregare le metriche CPU e memoria
+        totRes = self.getTotalUtilization_via_prometheus()
+        self.memory += [totRes["total_mem"]]
+        self.util += [totRes["total_cpu"]]
 
     def getUsers(self):
         #torno il numero di utenti attivi (Little's Law)
@@ -122,45 +123,6 @@ class Monitoring:
         except Exception as e:
             print(f"Error: {e}")
             return None
-
-    def get_container_stats_rest(self, container_id):
-        """
-        Recupera le statistiche di un container usando le API REST di Docker.
-        """
-        session = requests_unixsocket.Session()
-        # Monta l'adapter per lo schema http+unix se non già montato
-        session.mount("http+unix://", requests_unixsocket.UnixAdapter())
-        url = f"http+unix://%2Fvar%2Frun%2Fdocker.sock/containers/{container_id}/stats?stream=false"
-        try:
-            response = session.get(url, timeout=1)
-            if response.status_code == 200:
-                return response.json()
-            else:
-                print(f"Error: HTTP {response.status_code} for container {container_id}")
-                return {}
-        except Exception as ex:
-            print(f"Error fetching stats (REST) for container {container_id}: {ex}")
-            return {}
-
-    def getTotalUtilization_via_rest(self):
-        """
-        Usa le API REST di Docker per aggregare l'utilizzo CPU e memoria di tutti i container
-        appartenenti al servizio (filtrati per etichetta).
-        """
-        total_cpu = 0.0
-        total_mem = 0
-        try:
-            containers = self.client.containers.list(filters={"label": f"com.docker.swarm.service.name={self.serviceName}"})
-            for container in containers:
-                stats = self.get_container_stats_rest(container.id)
-                cpu_usage = stats.get("cpu_stats", {}).get("cpu_usage", {}).get("total_usage", 0)
-                mem_usage = stats.get("memory_stats", {}).get("usage", 0)
-                total_cpu += cpu_usage
-                total_mem += mem_usage
-            return {"total_cpu": total_cpu, "total_mem": total_mem}
-        except Exception as e:
-            print("Error in getTotalUtilization_via_rest:", e)
-            return {"total_cpu": 0, "total_mem": 0}
 
     def getTotalUtilization_via_prometheus(self):
         """
