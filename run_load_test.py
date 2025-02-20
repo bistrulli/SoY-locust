@@ -62,7 +62,7 @@ def main():
     args = parse_args()
     
     startSys()  # Deploy Docker Swarm stack
-    time.sleep(5)
+    time.sleep(10)
     logging.info("Starting Locust with command:")
     
     # Costruzione del comando Locust in base ai parametri
