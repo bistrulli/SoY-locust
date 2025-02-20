@@ -35,7 +35,7 @@ class ControlLoop():
                   f"Cores:          {monitor.cores[-1]}\n"
                   f"WIP:            {monitor.users[-1]}")
             if(len(monitor.rts)>self.config["estimation_window"]):
-                totalcores = np.array(monitor.cores[-self.config["estimation_window"]:]) * np.array(monitor.replica[-10:])
+                totalcores = np.array(monitor.cores[-self.config["estimation_window"]:]) * np.array(monitor.replica[-self.config["estimation_window"]:])
                 estim=estimator.estimate(np.array(monitor.rts[-self.config["estimation_window"]:]),
                                          totalcores,
                                          np.array(monitor.users[-self.config["estimation_window"]:]))
