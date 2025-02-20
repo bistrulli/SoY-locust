@@ -6,7 +6,7 @@ import docker
 from prometheus_api_client import PrometheusConnect
 import yaml
 import pandas as pd
-import requests_unixsocket  # Assicurati di avere requests_unixsocket installato (pip install requests-unixsocket)
+import requests_unixsocket
 
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x),
@@ -33,7 +33,7 @@ class Monitoring:
         self.replica+=[self.get_replicas(self.serviceName)]
         self.users+=[self.getUsers()]
         
-        totRes=self.getTotalUtilization()
+        totRes=self.getTotalUtilization_via_rest()
         self.memory+=[totRes["total_mem"]]
         self.util+=[totRes["total_cpu"]]
 
@@ -123,29 +123,6 @@ class Monitoring:
             print(f"Error: {e}")
             return None
 
-    def getTotalUtilization(self):
-        """
-        Aggrega l'utilizzo CPU e memoria di tutti i container appartenenti al servizio, filtrandoli per label.
-        """
-        total_cpu = 0.0
-        total_mem = 0
-        try:
-            # Filtra i container usando l'etichetta Swarm del servizio
-            containers = self.client.containers.list(filters={"label": f"com.docker.swarm.service.name={self.serviceName}"})
-            for container in containers:
-                try:
-                    stats = container.stats(stream=False)
-                    cpu_usage = stats.get("cpu_stats", {}).get("cpu_usage", {}).get("total_usage", 0)
-                    mem_usage = stats.get("memory_stats", {}).get("usage", 0)
-                    total_cpu += cpu_usage
-                    total_mem += mem_usage
-                except Exception as ex:
-                    print(f"Error fetching stats for container {container.id}: {ex}")
-            return {"total_cpu": total_cpu, "total_mem": total_mem}
-        except Exception as e:
-            print("Error in getTotalUtilization:", e)
-            return {"total_cpu": 0, "total_mem": 0}
-
     def get_container_stats_rest(self, container_id):
         """
         Recupera le statistiche di un container usando le API REST di Docker.
@@ -181,6 +158,28 @@ class Monitoring:
             return {"total_cpu": total_cpu, "total_mem": total_mem}
         except Exception as e:
             print("Error in getTotalUtilization_via_rest:", e)
+            return {"total_cpu": 0, "total_mem": 0}
+
+    def getTotalUtilization_via_prometheus(self):
+        """
+        Recupera l'utilizzo aggregato (CPU e memoria) per il servizio interrogando Prometheus.
+        Assicurati che Prometheus stia raccogliendo le metriche dei container (cAdvisor, node exporter, ecc.)
+        e che siano applicate etichette come service_name.
+        """
+        try:
+            # Query per il tasso di utilizzo CPU (in secondi) aggregato per il servizio
+            query_cpu = f'sum(rate(container_cpu_usage_seconds_total{{service_name="{self.serviceName}"}}[1m]))'
+            # Query per l'utilizzo memoria in bytes aggregato per il servizio
+            query_mem = f'sum(container_memory_usage_bytes{{service_name="{self.serviceName}"}})'
+            
+            cpu_result = self.prom.custom_query(query=query_cpu)
+            mem_result = self.prom.custom_query(query=query_mem)
+            
+            total_cpu = float(cpu_result[0]['value'][1]) if cpu_result and 'value' in cpu_result[0] else 0.0
+            total_mem = float(mem_result[0]['value'][1]) if mem_result and 'value' in mem_result[0] else 0.0
+            return {"total_cpu": total_cpu, "total_mem": total_mem}
+        except Exception as e:
+            print("Error in getTotalUtilization_via_prometheus:", e)
             return {"total_cpu": 0, "total_mem": 0}
 
     def getViolations(self):
