@@ -49,6 +49,23 @@ services:
           cpus: "3"
           memory: 2G
 
+  cadvisor:
+    image: google/cadvisor:latest
+    container_name: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - monitoring
+    ports:
+      - "8080:8080"
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -78,51 +95,3 @@ networks:
 volumes:
   postgres_data:
   prometheus_data:
-
-# version: '3.7' # Migliorata per supportare Swarm
-# services:
-#   node:
-#     image: gitlab.polytech.umontpellier.fr:5050/dream-team/plage/soy-v4/nodedock
-#     ports:
-#       - 5001:5001
-#     restart: always
-#     env_file:
-#       - /home/ubuntu/ShellOnYou/sou/monotloth-v4/variables.env
-#     deploy:
-#       replicas: 2 # Puoi cambiare questo valore per il numero iniziale di repliche
-#       update_config:
-#         parallelism: 1
-#         delay: 10s
-#       restart_policy:
-#         condition: none
-#       resources:
-#         limits:
-#           cpus: "1" # Limita le risorse
-#           memory: 2G
-#         reservations:
-#           cpus: "1"
-#           memory: 512M
-
-#   postgres:
-#     image: icws24submission/postgres_monolith:latest
-#     shm_size: 1g
-#     container_name: postgres
-#     restart: always
-#     env_file:
-#       - /home/ubuntu/ShellOnYou/sou/monotloth-v4/variables.env
-#     volumes:
-#       - postgres_data:/var/lib/postgresql/data
-#     deploy:
-#       replicas: 1 # Di solito i database non vengono scalati su Swarm
-#       restart_policy:
-#         condition: none
-#       resources:
-#         limits:
-#           cpus: "3"
-#           memory: 2G
-#         reservations:
-#           cpus: "3"
-#           memory: 2G
-
-# volumes:
-#   postgres_data:
