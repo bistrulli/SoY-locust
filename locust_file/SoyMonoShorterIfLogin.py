@@ -93,13 +93,8 @@ class RampLoadShape(LoadTestShape):
 
     def tick(self):
         current_time = self.get_run_time()
-        if current_time < self.ramp_up_time:
+        if current_time < self.run_time:
             # Aumento lineare degli utenti
             current_users = int(self.max_users * current_time / self.ramp_up_time)
             spawn_rate = current_users / 10 if current_users > 0 else 1
             return current_users, spawn_rate
-        elif current_time < self.run_time:
-            # Mantiene il numero massimo di utenti
-            return self.max_users, self.max_users / 10
-        else:
-            return None
