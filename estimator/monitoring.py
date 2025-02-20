@@ -176,7 +176,7 @@ class Monitoring:
         self.time = []
         self.replica = []
         self.util = []
-        self.memory = []
+        self.memory =[]
         # Aggiunta per il throughput
         self.last_requests = None
         self.last_timestamp = None
