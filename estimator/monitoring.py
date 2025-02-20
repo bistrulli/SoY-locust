@@ -17,7 +17,7 @@ class Monitoring:
         self.promPort = promPort
         self.promHost = promHost
         self.sysfile = sysfile
-        #self.client = docker.from_env()
+        self.client = docker.from_env()
         if(not Path(self.sysfile).exists()):
             raise FileNotFoundError(f"File {self.sysfile} not found")
         self.sys=yaml.safe_load(self.sysfile.open())
