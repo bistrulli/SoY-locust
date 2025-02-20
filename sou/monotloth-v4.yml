@@ -15,7 +15,7 @@ services:
       replicas: 16 # Numero iniziale di repliche
       update_config:
         parallelism: 1
-        delay: 10s
+        delay: 30s
       restart_policy:
         condition: none
       resources:
