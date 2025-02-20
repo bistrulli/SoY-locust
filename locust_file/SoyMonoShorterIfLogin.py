@@ -15,7 +15,7 @@ cwd=Path(__file__).parent
 exp_conf={ "sercice_name": "monotloth-stack_node",
            "sysfile": cwd.parent/"sou"/"monotloth-v4.yml",
            "control_period": "1s",
-           "estimation_window": 30
+           "estimation_window": 5
          }
 
 #Qui la logica di avvio del control loop specifica per ogni locus file
