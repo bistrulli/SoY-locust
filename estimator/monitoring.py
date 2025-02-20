@@ -173,5 +173,5 @@ class Monitoring:
             print(f"Data saved to {filename}")
         except Exception as e:
             print(e)
-            print(f"{len(self.cores)},{len(self.rts)},\
-                  {len(self.tr)},{len(self.users)},{len(self.replica)}")
+            print((f"{len(self.cores)},{len(self.rts)}"
+                   f"{len(self.tr)},{len(self.users)},{len(self.replica)}"))
