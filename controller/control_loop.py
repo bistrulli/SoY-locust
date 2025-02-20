@@ -52,7 +52,7 @@ class ControlLoop():
             
             if((self.ctrlTick%self.config["control_widow"]==0) and self.stime is not None):
                 wip=np.array(self.monitor.users[-self.config["control_widow"]:]).mean()
-                replicas=self.controller.OPTController(e=[self.stime], tgt=[0.8*self.stime], C=[float(wip)])
+                replicas=self.controller.OPTController(e=[self.stime], tgt=[0.8*0.38], C=[float(wip)])
                 print(f"CTRL:          {np.ceil(replicas)}")
                 if(not self.config["stealth"]):
                     self.actuate(replicas=np.ceil(replicas))
