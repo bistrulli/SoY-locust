@@ -17,7 +17,8 @@ exp_conf={ "sercice_name": "monotloth-stack_node",
            "control_widow": 15,
            "estimation_window": 20,
            "measurament_period":"1s",
-           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}.csv"
+           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}.csv",
+           "stealth":True
          }
 
 #Qui la logica di avvio del control loop specifica per ogni locus file
