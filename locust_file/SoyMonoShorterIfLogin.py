@@ -16,7 +16,8 @@ exp_conf={ "sercice_name": "monotloth-stack_node",
            "sysfile": cwd.parent/"sou"/"monotloth-v4.yml",
            "control_widow": 15,
            "estimation_window": 20,
-           "measurament_period":"1s"
+           "measurament_period":"1s",
+           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}.csv"
          }
 
 #Qui la logica di avvio del control loop specifica per ogni locus file
@@ -25,6 +26,11 @@ ctrlLoop=ControlLoop(config=exp_conf)
 def on_locust_start(environment, **_kwargs):
     if not isinstance(environment.runner, WorkerRunner):
         gevent.spawn(ctrlLoop.loop, environment)
+
+@events.test_stop.add_listener
+def on_locust_stop(environment, **_kwargs):
+    global ctrlLoop
+    ctrlLoop.saveResults()
 
 class SoyMonoUser(BaseExp):
 

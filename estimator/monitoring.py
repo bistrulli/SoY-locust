@@ -5,6 +5,7 @@ import numpy as np
 import docker
 from prometheus_api_client import PrometheusConnect
 import yaml
+import pandas as pd
 
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x),
@@ -154,3 +155,18 @@ class Monitoring:
         # Aggiunta per il throughput
         self.last_requests = None
         self.last_timestamp = None
+
+    def save_to_csv(self, filename):
+        from pathlib import Path
+        path = Path(filename)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        data = {
+            "cores": self.cores,
+            "rts": self.rts,
+            "tr": self.tr,
+            "users": self.users,
+            "replica": self.replica
+        }
+        df = pd.DataFrame(data)
+        df.to_csv(filename, index=False)
+        print(f"Data saved to {filename}")

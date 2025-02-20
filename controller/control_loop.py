@@ -14,41 +14,45 @@ class ControlLoop():
         self.stime=None
         self.ctrlTick=0
         self.docker_client = docker.from_env()
+        self.estimator = None
+        self.controller = None
+        self.monitoring = None 
 
     '''TODO: devo ristrutturare il condice in modo tale che le misure
             vengano prese ogni secondo, la stima fatta ogni n tick e il controllo ogni m tick
     '''
     def loop(self,environment):
         global initCore, estimator, controller
-        estimator=self.getEstimator()
-        controller=self.getController()
-        monitor=self.getMonitor()
+        self.estimator=self.getEstimator()
+        self.controller=self.getController()
+        self.monitor=self.getMonitor()
         while not self.toStop:
             '''
                 TODO: Implementare il controllo della coda
             '''
             # Ottieni il tempo corrente.
             t=self.getSimTime(environment=environment)
-            monitor.tick(t)
+            self.monitor.tick(t)
             print(f"### tick = {t},ctrlTick = {self.ctrlTick} ###")
             # Stampa formattata in più righe
-            print(f"Response Time:  {monitor.rts[-1]}\n"
-                  f"Throughput:     {monitor.tr[-1]}\n"
-                  f"Replicas:       {monitor.replica[-1]}\n"
-                  f"Cores:          {monitor.cores[-1]}\n"
-                  f"WIP:            {monitor.users[-1]}")
-            if((self.ctrlTick%self.config["estimation_window"])==0 and len(monitor.rts)>=self.config["estimation_window"]):
-                totalcores = np.array(monitor.cores[-self.config["estimation_window"]:]) * np.array(monitor.replica[-self.config["estimation_window"]:])
-                respnseTimes=np.array(monitor.rts[-self.config["estimation_window"]:])
-                wip=np.array(monitor.users[-self.config["estimation_window"]:])
-                self.stime=estimator.estimate(respnseTimes,
+            print(f"Response Time:  {self.monitor.rts[-1]}\n"
+                  f"Throughput:     {self.monitor.tr[-1]}\n"
+                  f"Replicas:       {self.monitor.replica[-1]}\n"
+                  f"Cores:          {self.monitor.cores[-1]}\n"
+                  f"WIP:            {self.monitor.users[-1]}")
+            if((self.ctrlTick%self.config["estimation_window"])==0 and 
+               len(self.monitor.rts)>=self.config["estimation_window"]):
+                totalcores = np.array(self.monitor.cores[-self.config["estimation_window"]:]) * np.array(self.monitor.replica[-self.config["estimation_window"]:])
+                respnseTimes=np.array(self.monitor.rts[-self.config["estimation_window"]:])
+                wip=np.array(self.monitor.users[-self.config["estimation_window"]:])
+                self.stime=self.estimator.estimate(respnseTimes,
                                               totalcores,
                                               wip)
                 print(f"Service Time:  {self.stime}")
             
             if((self.ctrlTick%self.config["control_widow"]==0) and self.stime is not None):
-                wip=np.array(monitor.users[-self.config["control_widow"]:]).mean()
-                replicas=controller.OPTController(e=[self.stime], tgt=[self.stime], C=[float(wip)])
+                wip=np.array(self.monitor.users[-self.config["control_widow"]:]).mean()
+                replicas=self.controller.OPTController(e=[self.stime], tgt=[self.stime], C=[float(wip)])
                 print(f"CTRL:          {np.ceil(replicas)}")
                 self.actuate(replicas=np.ceil(replicas))
             
@@ -99,3 +103,6 @@ class ControlLoop():
         except Exception as e:
             print(f"Error updating service replicas: {e}")
 
+    def saveResults(self):
+        self.toStop=True
+        self.monitor.save_to_csv(self.config["outfile"])
