@@ -45,7 +45,7 @@ class ControlLoop():
                 print(f"Service Time:  {self.stime}")
             
             if(self.ctrlTick>self.config["control_widow"] and self.stime is not None):
-                wip=np.array(monitor.users[-self.config["estimation_window"]:]).mean()
+                wip=np.array(monitor.users[-self.config["control_widow"]:]).mean()
                 replicas=controller.OPTController(e=[self.stime], tgt=[self.stime], C=[wip])
                 print(f"Replica:       {replicas}")
             
