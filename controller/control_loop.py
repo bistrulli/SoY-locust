@@ -93,8 +93,9 @@ class ControlLoop():
         try:
             service_name = self.config["sercice_name"]
             service = self.docker_client.services.get(service_name)
-            service.scale(replicas)
-            print(f"Updated service {service_name} to {replicas} replicas.")
+            # Converti replicas in int per evitare errori JSON
+            service.scale(int(replicas))
+            print(f"Updated service {service_name} to {int(replicas)} replicas.")
         except Exception as e:
             print(f"Error updating service replicas: {e}")
 
