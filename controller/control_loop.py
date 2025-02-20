@@ -47,7 +47,7 @@ class ControlLoop():
             if(self.ctrlTick>self.config["control_widow"] and self.stime is not None):
                 wip=np.array(monitor.users[-self.config["estimation_window"]:]).mean()
                 replicas=controller.OPTController(e=[self.stime], tgt=[self.stime], C=[wip])
-                print(f"Replica:       {self.stime}")
+                print(f"Replica:       {replicas}")
             
             time.sleep(timeparse(self.config["measurament_period"]))
             self.ctrlTick+=1
