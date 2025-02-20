@@ -14,7 +14,7 @@ cwd=Path(__file__).parent
 
 exp_conf={ "sercice_name": "monotloth-stack_node",
            "sysfile": cwd.parent/"sou"/"monotloth-v4.yml",
-           "control_widow": 3,
+           "control_widow": 15,
            "estimation_window": 20,
            "measurament_period":"1s"
          }

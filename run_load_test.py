@@ -81,9 +81,9 @@ def main():
     # Avvia il processo in un nuovo process group e nasconde l'output in stdout e stderr
     locust_process = subprocess.Popen(
         cmd,
-        preexec_fn=os.setsid,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+        preexec_fn=os.setsid
+        #stdout=subprocess.DEVNULL,
+        #stderr=subprocess.DEVNULL
     )
     locust_process.wait()
     logging.info("Locust execution finished.")
