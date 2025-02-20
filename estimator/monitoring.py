@@ -123,20 +123,20 @@ class Monitoring:
     def getTotalUtilization(self):
         """
         Misura l'utilizzo aggregato (es. CPU e memoria) di tutte le repliche del servizio Swarm indicato da self.serviceName.
-        Utilizza i task associati al servizio (tramite l'API low-level) per recuperare i container e sommare i rispettivi utilizzi.
+        Utilizza i task associati al servizio per recuperare i container e sommare i rispettivi utilizzi.
         """
         total_cpu = 0.0
         total_mem = 0
         try:
-            # Usa l'API low-level per ottenere i task
-            low_level_client = self.client.api
-            tasks = low_level_client.tasks(filters={"service": self.serviceName, "desired-state": "running"})
+            # Recupera i task in esecuzione per il servizio
+            tasks = self.client.tasks(filters={"service": self.serviceName, "desired-state": "running"})
             for task in tasks:
                 container_id = task.get("Status", {}).get("ContainerStatus", {}).get("ContainerID")
                 if container_id:
                     try:
                         container = self.client.containers.get(container_id)
                         stats = container.stats(stream=False)
+                        # Esempio di calcolo: si somma il valore total_usage dalla sezione CPU e usage dalla memoria
                         cpu_usage = stats.get("cpu_stats", {}).get("cpu_usage", {}).get("total_usage", 0)
                         mem_usage = stats.get("memory_stats", {}).get("usage", 0)
                         total_cpu += cpu_usage
@@ -176,7 +176,7 @@ class Monitoring:
         self.time = []
         self.replica = []
         self.util = []
-        self.memory =[]
+        self.memory = []
         # Aggiunta per il throughput
         self.last_requests = None
         self.last_timestamp = None
