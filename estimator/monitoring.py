@@ -167,6 +167,11 @@ class Monitoring:
             "replica": self.replica
         }
         print("###saving results##")
-        df = pd.DataFrame(data)
-        df.to_csv(filename, index=False)
-        print(f"Data saved to {filename}")
+        try:
+            df = pd.DataFrame(data)
+            df.to_csv(filename, index=False)
+            print(f"Data saved to {filename}")
+        except Exception as e:
+            print(e)
+            print(f"{len(self.cores)},{len(self.rts)},
+                  {len(self.tr)},{len(self.users)},{len(self.replica)}")
