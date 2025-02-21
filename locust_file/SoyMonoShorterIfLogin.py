@@ -14,10 +14,10 @@ cwd=Path(__file__).parent
 
 exp_conf={ "sercice_name": "monotloth-stack_node",
            "sysfile": cwd.parent/"sou"/"monotloth-v4.yml",
-           "control_widow": 15,
-           "estimation_window": 30,
+           "control_widow": 3,
+           "estimation_window": 10,
            "measurament_period":"1s",
-           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}_2.csv",
+           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}_3.csv",
            "stealth":False
          }
 

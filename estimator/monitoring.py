@@ -81,27 +81,13 @@ class Monitoring:
             return 0
 
     def getTroughput(self):
-        """
-        Misura il numero di richieste al secondo utilizzando la metrica locust_requests_total.
-        Viene eseguita una query Prometheus per ottenere il totale correntemente cumulativo, quindi
-        se sono disponibili un valore e un timestamp precedenti, si calcola il delta richieste / delta tempo.
-        """
-        import time
+        # Modifica: utilizzare la query per il rate negli ultimi 1 minuto
         try:
-            result = self.prom.custom_query(query="locust_requests_total")
-            if result:
-                current_total = float(result[0]['value'][1])
+            result = self.prom.custom_query(query="sum(rate(locust_requests_total[1m]))")
+            if result and len(result) > 0 and 'value' in result[0]:
+                throughput = float(result[0]['value'][1])
             else:
-                current_total = 0
-            current_time = time.time()
-            if self.last_requests is None or self.last_timestamp is None:
-                self.last_requests = current_total
-                self.last_timestamp = current_time
-                return 0
-            dt = current_time - self.last_timestamp
-            throughput = (current_total - self.last_requests) / dt if dt > 0 else 0
-            self.last_requests = current_total
-            self.last_timestamp = current_time
+                throughput = 0
             return throughput
         except Exception as e:
             print("Error querying throughput from Prometheus:", e)
