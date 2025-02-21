@@ -47,14 +47,16 @@ class ControlLoop():
                len(self.monitor.rts)>=self.config["estimation_window"]):
                 totalcores = np.array(self.monitor.cores[-self.config["estimation_window"]:]) * np.array(self.monitor.replica[-self.config["estimation_window"]:])
                 respnseTimes=np.array(self.monitor.rts[-self.config["estimation_window"]:])
-                wip=np.array(self.monitor.users[-self.config["estimation_window"]:])
+                #wip=np.array(self.monitor.users[-self.config["estimation_window"]:])
+                wip=np.array(self.monitor.active_users[-self.config["estimation_window"]:])
                 self.stime=self.estimator.estimate(respnseTimes,
                                               totalcores,
                                               wip)
                 print(f"Service Time:  {self.stime}")
             
             if((self.ctrlTick%self.config["control_widow"]==0) and self.stime is not None):
-                wip=np.array(self.monitor.users[-self.config["control_widow"]:]).mean()
+                #wip=np.array(self.monitor.users[-self.config["control_widow"]:]).mean()
+                wip=np.array(self.monitor.active_users[-self.config["control_widow"]:]).mean()
                 replicas=self.controller.OPTController(e=[self.stime], tgt=[0.8*0.038], C=[float(wip)])
                 print(f"CTRL:          {np.ceil(replicas)}")
                 if(not self.config["stealth"]):
