@@ -14,7 +14,7 @@ cwd=Path(__file__).parent
 
 exp_conf={ "sercice_name": "monotloth-stack_node",
            "sysfile": cwd.parent/"sou"/"monotloth-v4.yml",
-           "control_widow": 3,
+           "control_widow": 15,
            "estimation_window": 10,
            "measurament_period":"1s",
            "outfile":cwd.parent/"results"/f"{Path(__file__).stem}_3.csv",
@@ -103,16 +103,19 @@ class CustomLoadShape(LoadTestShape):
         cycle_time = run_time % self.cycle_duration
 
         if cycle_time < self.ramp_duration:
+            print("##ramping up")
             # Ramp-up phase: linear increase of users
             current_users = int((cycle_time / self.ramp_duration) * self.max_users)
             spawn_rate = self.max_users / self.ramp_duration
         elif cycle_time < (self.ramp_duration + self.constant_duration):
+            print("##contant up")
             # Constant phase: maintain max_users
             current_users = self.max_users
             spawn_rate = 1
         else:
+            print("##pausing")
             # Pause phase: drop to zero users
-            current_users = 0
-            spawn_rate = 0
+            current_users = 1
+            spawn_rate = 1
 
         return current_users, spawn_rate
