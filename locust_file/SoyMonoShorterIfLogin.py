@@ -17,7 +17,7 @@ exp_conf={ "sercice_name": "monotloth-stack_node",
            "control_widow": 15,
            "estimation_window": 30,
            "measurament_period":"1s",
-           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}.csv",
+           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}_2.csv",
            "stealth":False
          }
 
@@ -82,24 +82,37 @@ class SoyMonoUser(BaseExp):
                     headers={"Authorization": f"Bearer {access_token}"},
                 )
 
-class RampLoadShape(LoadTestShape):
+class CustomLoadShape(LoadTestShape):
     """
-    Load shape that ramps up users from 0 to max_users linearly over ramp_up_time seconds,
-    then maintains max_users until run_time is reached.
+    This load shape simulates a workload pattern with a ramp-up phase, a constant phase, and a pause phase.
+    After the total test duration (max_duration) is reached, it returns None, ending the test.
     """
-    max_users = 80
-    ramp_up_time = 300  # secondi per l'incremento lineare
-    run_time = 600      # durata totale del test in secondi
+    max_users = 100
+    ramp_duration = 60         # seconds for ramp-up
+    constant_duration = 60     # seconds for constant load
+    pause_duration = 240       # seconds with no load
+    max_duration = 600         # total duration of the test in seconds
+
+    cycle_duration = ramp_duration + constant_duration + pause_duration
 
     def tick(self):
-        current_time = self.get_run_time()
-        if current_time < self.ramp_up_time:
-            # Aumento lineare degli utenti
-            current_users = int(self.max_users * current_time / self.ramp_up_time)
+        run_time = self.get_run_time()
+        if run_time > self.max_duration:
+            return None  # End the test
+        
+        cycle_time = run_time % self.cycle_duration
+
+        if cycle_time < self.ramp_duration:
+            # Ramp-up phase: linear increase of users
+            current_users = int((cycle_time / self.ramp_duration) * self.max_users)
+            spawn_rate = self.max_users / self.ramp_duration
+        elif cycle_time < (self.ramp_duration + self.constant_duration):
+            # Constant phase: maintain max_users
+            current_users = self.max_users
             spawn_rate = 1
-            return current_users, spawn_rate
-        elif current_time < self.run_time:
-            # Mantiene il numero massimo di utenti
-            return self.max_users, 1
         else:
-            return None
+            # Pause phase: drop to zero users
+            current_users = 0
+            spawn_rate = 0
+
+        return current_users, spawn_rate
