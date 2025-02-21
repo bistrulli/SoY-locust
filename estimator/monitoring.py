@@ -5,10 +5,7 @@ import numpy as np
 import docker
 from prometheus_api_client import PrometheusConnect
 import yaml
-import pandas as pd
-import requests_unixsocket
-import requests
-import re
+
 
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x),
@@ -20,7 +17,6 @@ class Monitoring:
         self.promPort = promPort
         self.promHost = promHost
         self.sysfile = sysfile
-        self.client = docker.from_env()
         if(not Path(self.sysfile).exists()):
             raise FileNotFoundError(f"File {self.sysfile} not found")
         self.sys=yaml.safe_load(self.sysfile.open())
@@ -28,34 +24,28 @@ class Monitoring:
         self.reset()
 
     def tick(self, t):
-        self.time += [t]
-        self.rts += [self.getResponseTime()]
-        self.tr += [self.getTroughput()]
-        self.cores += [self.getCores()]
-        self.replica += [self.get_replicas(self.serviceName)]
-        self.users += [self.getUsers()]
-        self.active_users += [self.get_active_users()]
-        # Utilizzo Prometheus per aggregare le metriche CPU e memoria
-        totRes = self.getTotalUtilization_via_prometheus()
-        self.memory += [totRes["total_mem"]]
-        self.util += [totRes["total_cpu"]]
+        for i in range(1, len(self.time)+1):
+            if t - self.time[-i] > self.window:
+                try:
+                    del self.rts[-i]
+                    del self.users[-i]
+                except:
+                    break
+        
+        self.time+=[t]
+        self.rts+=[self.getResponseTime()]
+        self.tr+=[self.getTroughput()]
+        self.users+=[self.getUsers()]
+        #self.cores+=[self.getCores()]
+        self.replica+=[self.get_replicas(self.serviceName)]
 
     def getUsers(self):
-        #torno il numero di utenti attivi (Little's Law)
-        return self.rts[-1]*self.tr[-1]
+        #logica per misurare il numero di utenti dal file di locust
+        if not len(self.users): return 0
+        return self.reducer(self.users)
 
     def getCores(self):
-        # Estrae il valore dell'attributo "cpus" dalla configurazione YAML per il servizio node
-        cpus_str = self.sys.get("services", {}) \
-                           .get("node", {}) \
-                           .get("deploy", {}) \
-                           .get("resources", {}) \
-                           .get("limits", {}) \
-                           .get("cpus", "0")
-        try:
-            return float(cpus_str)
-        except ValueError:
-            return 0.0
+        return 0.0
 
     # Funzione per eseguire una query su Prometheus
     def query_prometheus(self,metric_name):
@@ -126,28 +116,6 @@ class Monitoring:
             print(f"Error: {e}")
             return None
 
-    def getTotalUtilization_via_prometheus(self):
-        """
-        Recupera l'utilizzo aggregato (CPU e memoria) per il servizio interrogando Prometheus.
-        Assicurati che Prometheus stia raccogliendo le metriche dei container (cAdvisor, node exporter, ecc.)
-        e che siano applicate etichette come service_name.
-        """
-        try:
-            # Query per il tasso di utilizzo CPU (in secondi) aggregato per il servizio
-            query_cpu = f'sum(rate(container_cpu_usage_seconds_total{{service_name="{self.serviceName}"}}[1m]))'
-            # Query per l'utilizzo memoria in bytes aggregato per il servizio
-            query_mem = f'sum(container_memory_usage_bytes{{service_name="{self.serviceName}"}})'
-            
-            cpu_result = self.prom.custom_query(query=query_cpu)
-            mem_result = self.prom.custom_query(query=query_mem)
-            
-            total_cpu = float(cpu_result[0]['value'][1]) if cpu_result and 'value' in cpu_result[0] else 0.0
-            total_mem = float(mem_result[0]['value'][1]) if mem_result and 'value' in mem_result[0] else 0.0
-            return {"total_cpu": total_cpu, "total_mem": total_mem}
-        except Exception as e:
-            print("Error in getTotalUtilization_via_prometheus:", e)
-            return {"total_cpu": 0, "total_mem": 0}
-
     def getViolations(self):
         def appendViolation(rts):
             if self.reducer(rts) > self.sla:
@@ -168,53 +136,13 @@ class Monitoring:
         return sum(violations)
         
     def reset(self):
+        self.client = docker.from_env()
         self.cores = []
         self.rts = []
         self.tr = []
         self.users = []
         self.time = []
         self.replica = []
-        self.util = []
-        self.memory =[]
         # Aggiunta per il throughput
         self.last_requests = None
         self.last_timestamp = None
-        #numero di utenti attivi cosi come visti da locust
-        self.active_users = []
-
-    def save_to_csv(self, filename):
-        path = Path(filename)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        data = {
-            "cores": self.cores,
-            "rts": self.rts,
-            "tr": self.tr,
-            "users": self.active_users,
-            "replica": self.replica,
-            "util":self.util,
-            "mem":self.memory
-        }
-        print("###saving results##")
-        try:
-            df = pd.DataFrame(data)
-            df.to_csv(filename, index=False)
-            print(f"Data saved to {filename}")
-        except Exception as e:
-            print(e)
-            print((f"{len(self.cores)},{len(self.rts)}"
-                   f"{len(self.tr)},{len(self.users)},{len(self.replica)}"))
-
-    def get_active_users(self):
-        """
-        Recupera il valore attuale del Gauge 'locust_active_users' tramite una query a Prometheus.
-        Assicurati che il job che espone questo metric sia correttamente configurato in Prometheus.
-        """
-        try:
-            query = 'locust_active_users'
-            result = self.prom.custom_query(query=query)
-            if result and 'value' in result[0]:
-                return float(result[0]['value'][1])
-            return None
-        except Exception as e:
-            print("Error fetching active users metric from Prometheus:", e)
-            return None
