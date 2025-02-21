@@ -91,9 +91,10 @@ class CustomLoadShape(LoadTestShape):
     ramp_duration = 60         # seconds for ramp-up
     constant_duration = 60     # seconds for constant load
     pause_duration = 240       # seconds with no load
-    max_duration = 600         # total duration of the test in seconds
 
     cycle_duration = ramp_duration + constant_duration + pause_duration
+
+    max_duration = cycle_duration*4         # total duration of the test in seconds
 
     def tick(self):
         run_time = self.get_run_time()
@@ -103,17 +104,14 @@ class CustomLoadShape(LoadTestShape):
         cycle_time = run_time % self.cycle_duration
 
         if cycle_time < self.ramp_duration:
-            print("##ramping up")
             # Ramp-up phase: linear increase of users
             current_users = int((cycle_time / self.ramp_duration) * self.max_users)
             spawn_rate = self.max_users / self.ramp_duration
         elif cycle_time < (self.ramp_duration + self.constant_duration):
-            print("##contant up")
             # Constant phase: maintain max_users
             current_users = self.max_users
             spawn_rate = 1
         else:
-            print("##pausing")
             # Pause phase: drop to zero users
             current_users = 1
             spawn_rate = 1
