@@ -40,6 +40,7 @@ class ControlLoop():
                   f"Replicas:       {self.monitor.replica[-1]}\n"
                   f"Cores:          {self.monitor.cores[-1]}\n"
                   f"WIP:            {self.monitor.users[-1]}\n"
+                  f"WIP_prom:       {self.monitor.active_users[-1]}\n"
                   f"Util:           {self.monitor.util[-1]}\n"
                   f"Mem:            {self.monitor.util[-1]}")
             if((self.ctrlTick%self.config["estimation_window"])==0 and 

@@ -24,6 +24,9 @@ end = None
 # Metriche Prometheus
 REQUEST_COUNT = Counter('locust_requests_total', 'Total number of Locust requests')
 REQUEST_LATENCY = Summary('locust_request_latency_seconds', 'Request latency in seconds')
+# Nuovo Gauge per il numero totale di utenti attivi
+USER_COUNT = Gauge('locust_active_users', 'Total number of active Locust users')
+
 resourceDir=Path(__file__).parent.parent/Path("resources")
 
 users=None
@@ -39,11 +42,6 @@ def on_locust_start(environment, **_kwargs):
     with open(f'{resourceDir.absolute()}/soymono2/users.csv') as csv_file:
         reader = csv.DictReader(csv_file)
         users = [row for row in reader]
-
-# @events.test_stop.add_listener
-# def on_locust_stop(environment, **_kwargs):
-#     global end
-#     end=True
 
 # Aggiungi una metaclasse combinata per risolvere il conflitto tra HttpUser e ABCMeta
 class CombinedMeta(ABCMeta, type(HttpUser)):
@@ -61,6 +59,12 @@ class BaseExp(HttpUser, metaclass=CombinedMeta):
         # Assegna un ID univoco incrementale per ogni utente
         self.user_data = users[self.__class__.user_index % len(users)]
         self.__class__.user_index += 1
+        # Incrementa il Gauge all'avvio dell'utente
+        USER_COUNT.inc()
+
+    def on_stop(self):
+        # Decrementa il Gauge quando l'utente termina
+        USER_COUNT.dec()
 
     @abstractmethod
     def userLogic(self):
@@ -70,8 +74,12 @@ class BaseExp(HttpUser, metaclass=CombinedMeta):
         pass
 
     @task
-    def login_and_actions(self):
-        with REQUEST_LATENCY.time():
-            self.userLogic()
-        REQUEST_COUNT.inc()
+    def abstractLogic(self):
+        USER_COUNT.inc()  # Incrementa all'inizio dell'esecuzione del task
+        try:
+            with REQUEST_LATENCY.time():
+                self.userLogic()
+            REQUEST_COUNT.inc()
+        finally:
+            USER_COUNT.dec()  # Decrementa al termine
 

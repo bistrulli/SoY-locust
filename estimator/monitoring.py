@@ -8,6 +8,7 @@ import yaml
 import pandas as pd
 import requests_unixsocket
 import requests
+import re
 
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x),
@@ -33,6 +34,7 @@ class Monitoring:
         self.cores += [self.getCores()]
         self.replica += [self.get_replicas(self.serviceName)]
         self.users += [self.getUsers()]
+        self.active_users += [self.get_active_users()]
         # Utilizzo Prometheus per aggregare le metriche CPU e memoria
         totRes = self.getTotalUtilization_via_prometheus()
         self.memory += [totRes["total_mem"]]
@@ -177,6 +179,8 @@ class Monitoring:
         # Aggiunta per il throughput
         self.last_requests = None
         self.last_timestamp = None
+        #numero di utenti attivi cosi come visti da locust
+        self.active_users = []
 
     def save_to_csv(self, filename):
         path = Path(filename)
@@ -199,3 +203,18 @@ class Monitoring:
             print(e)
             print((f"{len(self.cores)},{len(self.rts)}"
                    f"{len(self.tr)},{len(self.users)},{len(self.replica)}"))
+
+    def get_active_users(self):
+        """
+        Recupera il valore attuale del Gauge 'locust_active_users' tramite una query a Prometheus.
+        Assicurati che il job che espone questo metric sia correttamente configurato in Prometheus.
+        """
+        try:
+            query = 'locust_active_users'
+            result = self.prom.custom_query(query=query)
+            if result and 'value' in result[0]:
+                return float(result[0]['value'][1])
+            return None
+        except Exception as e:
+            print("Error fetching active users metric from Prometheus:", e)
+            return None
