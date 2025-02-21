@@ -189,7 +189,7 @@ class Monitoring:
             "cores": self.cores,
             "rts": self.rts,
             "tr": self.tr,
-            "users": self.users,
+            "users": self.active_users,
             "replica": self.replica,
             "util":self.util,
             "mem":self.memory
