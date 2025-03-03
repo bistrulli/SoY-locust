@@ -2,10 +2,11 @@
 # Recupera tutti i file nella cartella locust_file il cui nome inizia per "SoyMonoShorterIfLogin"
 for file in locust_file/SoyMonoShorterIfLogin*.py; do
     if [ -f "$file" ]; then
-        # Estrae il numero che segue il carattere "x"
-        num=$(grep -oP 'x\d+' "$file" | head -n1 | tr -d 'x')
-        echo "replica to set $num"
+        # Estrae l'intero successivo alla sottostringa "_x" nel nome del file (fino a prima di .py)
+        num=$(echo "$file" | grep -oP '(?<=_x).*?(?=\.py$)')
         [ -z "$num" ] && num=1  # Default se non trovato
+
+        echo "replica to set $num"  # questo stampa correttamente il valore estratto se $num è impostato
 
         # Aggiorna il valore di replicas del servizio node in /sou/monotloth-v4.yml
         yml_file="sou/monotloth-v4.yml"
