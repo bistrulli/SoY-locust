@@ -12,7 +12,7 @@ services:
     networks:
       - monitoring
     deploy:
-      replicas: 1 # Numero iniziale di repliche
+      replicas: 10 # Numero iniziale di repliche
       update_config:
         parallelism: 1
         delay: 30s
