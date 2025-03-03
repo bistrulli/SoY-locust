@@ -48,26 +48,28 @@ class SoyMonoUser(BaseExp):
         email = self.user_data['email']
         password = self.user_data['password']
         # OPTIONS before login
-        self.client.request("OPTIONS", "/api/user/login")
+        self.client.request("OPTIONS", "/api/user/login", timeout=1)
         # Login
         login_response = self.client.post(
             "/api/user/login",
             headers={"Content-Type": "application/json"},
             json={"email": email, "password": password},
+            timeout=1
         )
         if login_response.status_code == 200:
             access_token = login_response.cookies.get("access_token")
             refresh_token = login_response.cookies.get("refresh_token")
             if access_token:
                 # OPTIONS before auth verify
-                self.client.request("OPTIONS", "/api/auth/verify")
+                self.client.request("OPTIONS", "/api/auth/verify", timeout=1)
                 # Auth verify
                 self.client.get(
                     "/api/auth/verify",
                     headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=1
                 )
                 # OPTIONS before exercise production
-                self.client.request("OPTIONS", "/api/exercise-production")
+                self.client.request("OPTIONS", "/api/exercise-production", timeout=1)
                 # Exercise production
                 with open(f'{resourceDir.absolute()}/soymono2/0046_request.json') as json_file:
                     exercise_data = json.load(json_file)
@@ -78,13 +80,15 @@ class SoyMonoUser(BaseExp):
                             "Content-Type": "application/json",
                         },
                         json=exercise_data,
+                        timeout=1
                     )
                 # OPTIONS before logout
-                self.client.request("OPTIONS", "/api/user/logout")
+                self.client.request("OPTIONS", "/api/user/logout", timeout=1)
                 # Logout
                 self.client.delete(
                     "/api/user/logout",
                     headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=1
                 )
 
 class CustomLoadShape(LoadTestShape):
