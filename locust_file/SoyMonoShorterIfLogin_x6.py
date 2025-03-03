@@ -17,7 +17,7 @@ exp_conf={ "sercice_name": "monotloth-stack_node",
            "control_widow": 15,
            "estimation_window": 10,
            "measurament_period":"1s",
-           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}_long.csv",
+           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}.csv",
            "stealth":True,
            "init_repica":6
          }
