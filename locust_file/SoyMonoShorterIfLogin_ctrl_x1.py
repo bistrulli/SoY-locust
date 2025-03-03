@@ -95,8 +95,7 @@ class CustomLoadShape(LoadTestShape):
 
     cycle_duration = ramp_duration + constant_duration + pause_duration
 
-    #max_duration = cycle_duration*4         # total duration of the test in seconds
-    max_duration = 30
+    max_duration = cycle_duration*4         # total duration of the test in seconds
 
     def tick(self):
         run_time = self.get_run_time()

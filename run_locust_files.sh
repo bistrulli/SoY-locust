@@ -12,7 +12,7 @@ for file in locust_file/SoyMonoShorterIfLogin*.py; do
 
         base=$(basename "$file" .py)
         csv_dir="results/${base}/${base}"
-        mkdir -p "$csv_dir"
+        mkdir -p "results/${base}"
         echo "Esecuzione del test per: $file con replica $num, CSV in: $csv_dir"
         python3 run_load_test.py --users 1 --spawn-rate 100 --run-time 3m --host http://localhost:5001 --csv "$csv_dir" --locust-file "$file"
         sleep 1m # aggiunto per attendere 1 minuto dopo l'esecuzione del test
