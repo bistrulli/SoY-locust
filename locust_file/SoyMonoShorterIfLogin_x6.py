@@ -36,6 +36,10 @@ def on_locust_stop(environment, **_kwargs):
 
 class SoyMonoUser(BaseExp):
 
+    def request(self, method, url, **kwargs):
+        kwargs.setdefault("timeout", 1)  # Timeout predefinito di 10 secondi
+        return super().request(method, url, **kwargs)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

@@ -8,7 +8,10 @@ for file in locust_file/SoyMonoShorterIfLogin*.py; do
 
         # Aggiorna il valore di replicas del servizio node in /sou/monotloth-v4.yml
         yml_file="sou/monotloth-v4.yml"
-        sed -i.bak -E "/node:/,/deploy:/{s/(replicas:)[[:space:]]*[0-9]+/\1 $num/}" "$yml_file"
+        
+        #sed -i.bak -E '/node:/,/(deploy:)/ { s/^( *replicas:)[ ]*[0-9]+/\1 '"$num"'/ }' "$yml_file"
+        sed -i.bak -E '/^\s*node:/,/^\s*deploy:/ { n; s/^( *replicas:)[ ]*[0-9]+/\1 '"$num"'/ }' "$yml_file"
+
 
         base=$(basename "$file" .py)
         csv_dir="results/${base}/${base}"
