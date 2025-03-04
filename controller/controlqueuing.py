@@ -35,7 +35,7 @@ class OPTCTRL():
         
             self.model.minimize(obj)    
             # self.model.solver('osqp',{'print_time':False,'error_on_fail':False})
-            optionsIPOPT={'print_time':False,'ipopt':{'print_level':0}}
+            optionsIPOPT={'print_time':False,'ipopt':{'print_level':0,"ipopt.max_iter": 5000}}
             optionsOSQP={'print_time':False,'osqp':{'verbose':0}}
             self.model.solver('ipopt',optionsIPOPT) 
         
