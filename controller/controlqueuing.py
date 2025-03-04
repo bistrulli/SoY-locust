@@ -37,7 +37,7 @@ class OPTCTRL():
             # self.model.solver('osqp',{'print_time':False,'error_on_fail':False})
             optionsIPOPT={'print_time':False,'ipopt':{'print_level':0}}
             optionsOSQP={'print_time':False,'osqp':{'verbose':0}}
-            self.model.solver('osqp',optionsOSQP) 
+            self.model.solver('ipopt',optionsIPOPT) 
         
             sol = self.model.solve()
             #(C[0]/sol.value(T),sol.value(obj),sol.value(T))
