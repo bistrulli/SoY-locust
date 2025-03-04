@@ -60,12 +60,12 @@ class BaseExp(HttpUser, metaclass=CombinedMeta):
         self.user_data = users[self.__class__.user_index % len(users)]
         self.__class__.user_index += 1
         # Incrementa il Gauge all'avvio dell'utente
-        #USER_COUNT.inc()
+        USER_COUNT.inc()
 
     def on_stop(self):
         pass
         # Decrementa il Gauge quando l'utente termina
-        #USER_COUNT.dec()
+        USER_COUNT.dec()
 
     @abstractmethod
     def userLogic(self):
@@ -76,11 +76,12 @@ class BaseExp(HttpUser, metaclass=CombinedMeta):
 
     @task
     def abstractLogic(self):
-        USER_COUNT.inc()  # Incrementa all'inizio dell'esecuzione del task
+        #USER_COUNT.inc()  # Incrementa all'inizio dell'esecuzione del task
         try:
             with REQUEST_LATENCY.time():
                 self.userLogic()
             REQUEST_COUNT.inc()
         finally:
-            USER_COUNT.dec()  # Decrementa al termine
+            pass
+            #USER_COUNT.dec()  # Decrementa al termine
 
