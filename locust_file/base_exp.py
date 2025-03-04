@@ -60,11 +60,12 @@ class BaseExp(HttpUser, metaclass=CombinedMeta):
         self.user_data = users[self.__class__.user_index % len(users)]
         self.__class__.user_index += 1
         # Incrementa il Gauge all'avvio dell'utente
-        USER_COUNT.inc()
+        #USER_COUNT.inc()
 
     def on_stop(self):
+        pass
         # Decrementa il Gauge quando l'utente termina
-        USER_COUNT.dec()
+        #USER_COUNT.dec()
 
     @abstractmethod
     def userLogic(self):
