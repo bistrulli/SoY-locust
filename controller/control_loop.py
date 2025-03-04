@@ -46,10 +46,10 @@ class ControlLoop():
                 respnseTimes=np.array(self.monitor.rts[-self.config["estimation_window"]:])
                 #wip=np.array(self.monitor.users[-self.config["estimation_window"]:])
                 wip=np.array(self.monitor.active_users[-self.config["estimation_window"]:])
-                # self.stime=self.estimator.estimate(respnseTimes,
-                #                               totalcores,
-                #                               wip)
-                self.stime=0.083
+                self.stime=self.estimator.estimate(respnseTimes,
+                                              totalcores,
+                                              wip)
+                #self.stime=0.083
                 print(f"Service Time:  {self.stime}")
             
             if((self.ctrlTick%self.config["control_widow"]==0) and self.stime is not None):
