@@ -27,9 +27,6 @@ class ControlLoop():
         self.controller=self.getController()
         self.monitor=self.getMonitor()
         while not self.toStop:
-            '''
-                TODO: Implementare il controllo della coda
-            '''
             # Ottieni il tempo corrente.
             t=self.getSimTime(environment=environment)
             self.monitor.tick(t)
@@ -59,7 +56,7 @@ class ControlLoop():
                 #wip=np.array(self.monitor.users[-self.config["control_widow"]:]).mean()
                 wip=np.array(self.monitor.active_users[-self.config["control_widow"]:]).mean()
                 if(not self.config["stealth"]):
-                    replicas=self.controller.OPTController(e=[self.stime], tgt=[0.8*0.038], C=[float(wip)])
+                    replicas=self.controller.OPTController(e=[self.stime], tgt=[self.stime+1], C=[float(wip)])
                     print(f"CTRL:          {np.ceil(replicas)}")
                     self.actuate(replicas=np.ceil(replicas))
             
