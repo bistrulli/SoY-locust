@@ -1,0 +1,4 @@
+Method,Name,Error,Occurrences
+GET,/api/auth/verify,"ReadTimeout(ReadTimeoutError(""HTTPConnectionPool(host='localhost', port=5001): Read timed out. (read timeout=1)""))",114
+POST,/api/user/login,"ReadTimeout(ReadTimeoutError(""HTTPConnectionPool(host='localhost', port=5001): Read timed out. (read timeout=1)""))",598
+POST,/api/exercise-production,"ReadTimeout(ReadTimeoutError(""HTTPConnectionPool(host='localhost', port=5001): Read timed out. (read timeout=1)""))",10900
