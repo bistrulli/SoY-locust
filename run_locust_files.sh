@@ -8,13 +8,17 @@ for file in locust_file/SoyMonoShorterIfLogin*.py; do
 
         echo "replica to set $num"  # questo stampa correttamente il valore estratto se $num è impostato
 
+        base=$(basename "$file" .py)
+        # Se la cartella "results/${base}" esiste già, salta l'esperimento.
+        if [ -d "results/${base}" ]; then
+            echo "La cartella results/${base} esiste già, salto l'esperimento per $file."
+            continue
+        fi
+
         # Aggiorna il valore di replicas del servizio node in /sou/monotloth-v4.yml
         yml_file="sou/monotloth-v4.yml"
-        
-        #sed -i.bak -E '/node:/,/(deploy:)/ { s/^( *replicas:)[ ]*[0-9]+/\1 '"$num"'/ }' "$yml_file"
         sed -i.bak -E '/^\s*node:/,/^\s*deploy:/ { n; s/^( *replicas:)[ ]*[0-9]+/\1 '"$num"'/ }' "$yml_file"
 
-        base=$(basename "$file" .py)
         csv_dir="results/${base}/${base}"
         mkdir -p "results/${base}"
         echo "Esecuzione del test per: $file con replica $num, CSV in: $csv_dir"
