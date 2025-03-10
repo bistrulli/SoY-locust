@@ -19,7 +19,7 @@ exp_conf={ "service_name": "node",
            "estimation_window": 10,
            "measurament_period":"1s",
            "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}.csv",
-           "stealth":True,
+           "stealth":False,
            "init_repica":1
          }
 
