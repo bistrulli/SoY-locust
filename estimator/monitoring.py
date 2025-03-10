@@ -12,11 +12,12 @@ import re
 
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x),
-                 serviceName="",promHost="localhost",promPort=9090,sysfile=""):
+                 serviceName="", stack_name="", promHost="localhost", promPort=9090, sysfile=""):
         self.reducer = reducer
         self.window = window
         self.sla = sla
         self.serviceName = serviceName
+        self.stack_name = stack_name
         self.promPort = promPort
         self.promHost = promHost
         self.sysfile = sysfile
@@ -35,10 +36,8 @@ class Monitoring:
         self.replica += [self.get_replicas(self.serviceName)]
         self.users += [self.getUsers()]
         self.active_users += [self.get_active_users()]
-        # Utilizzo Prometheus per aggregare le metriche CPU e memoria
-        totRes = self.getTotalUtilization_via_prometheus()
-        self.memory += [totRes["total_mem"]]
-        self.util += [totRes["total_cpu"]]
+        self.memory += [0]
+        self.util += [self.get_service_cpu_utilization(self.stack_name,self.serviceName)]
 
     def getUsers(self):
         #torno il numero di utenti attivi (Little's Law)
@@ -93,11 +92,13 @@ class Monitoring:
             print("Error querying throughput from Prometheus:", e)
             return 0
 
-    def getUtil(self):
-        #logica per misurare l'utilizzo da docker
-        pass
-
-    def get_replicas(self,service_name):
+    def get_replicas(self, service_name):
+        """
+        Gets the number of replicas for a service.
+        
+        Args:
+            service_name (str): The name of the service without stack prefix
+        """
         try:
             service = self.client.services.get(service_name)
             replicas = service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 1)
@@ -108,28 +109,6 @@ class Monitoring:
         except Exception as e:
             print(f"Error: {e}")
             return None
-
-    def getTotalUtilization_via_prometheus(self):
-        """
-        Recupera l'utilizzo aggregato (CPU e memoria) per il servizio interrogando Prometheus.
-        Assicurati che Prometheus stia raccogliendo le metriche dei container (cAdvisor, node exporter, ecc.)
-        e che siano applicate etichette come service_name.
-        """
-        try:
-            # Query per il tasso di utilizzo CPU (in secondi) aggregato per il servizio
-            query_cpu = f'sum(rate(container_cpu_usage_seconds_total{{service_name="{self.serviceName}"}}[1m]))'
-            # Query per l'utilizzo memoria in bytes aggregato per il servizio
-            query_mem = f'sum(container_memory_usage_bytes{{service_name="{self.serviceName}"}})'
-            
-            cpu_result = self.prom.custom_query(query=query_cpu)
-            mem_result = self.prom.custom_query(query=query_mem)
-            
-            total_cpu = float(cpu_result[0]['value'][1]) if cpu_result and 'value' in cpu_result[0] else 0.0
-            total_mem = float(mem_result[0]['value'][1]) if mem_result and 'value' in mem_result[0] else 0.0
-            return {"total_cpu": total_cpu, "total_mem": total_mem}
-        except Exception as e:
-            print("Error in getTotalUtilization_via_prometheus:", e)
-            return {"total_cpu": 0, "total_mem": 0}
 
     def getViolations(self):
         def appendViolation(rts):
@@ -202,132 +181,25 @@ class Monitoring:
             print("Error fetching active users metric from Prometheus:", e)
             return None
 
-    def get_total_cpu_utilization(self):
+    def get_service_cpu_utilization(self, service_name=None, stack_name=None):
         """
-        Collects the total CPU utilization for all replicas of the specified service.
-        Returns the total CPU utilization in absolute value (CPU seconds per second).
-        For example, if you have 2 replicas and each is using 0.5 CPU, the total will be 1.0.
-        """
-        try:
-            # Query for CPU usage rate over 1 minute window
-            # This query sums up CPU usage across all replicas of the service
-            query = f'sum(rate(container_cpu_usage_seconds_total{{service_name="{self.serviceName}"}}[1m]))'
-            result = self.prom.custom_query(query=query)
-            
-            if result and len(result) > 0 and 'value' in result[0]:
-                total_cpu = float(result[0]['value'][1])
-                return total_cpu
-            return 0.0
-        except Exception as e:
-            print(f"Error collecting CPU utilization for service {self.serviceName}:", e)
-            return 0.0
-
-    def test_cadvisor_configuration(self):
-        """
-        Tests if cAdvisor is correctly configured and accessible.
-        Returns a tuple (bool, str) where:
-        - bool: True if cAdvisor is working correctly, False otherwise
-        - str: A message explaining the status
+        Gets the total CPU utilization for all replicas of a specific service in a stack using cAdvisor metrics.
+        
+        Args:
+            service_name (str): The name of the service (e.g., 'node')
+            stack_name (str, optional): The name of the Docker Swarm stack. If None, uses self.stack_name
+        
+        Returns:
+            float: The total CPU utilization as an absolute value (CPU seconds per second)
         """
         try:
-            # Test 1: Check if cAdvisor service is running in Docker Swarm
-            try:
-                cadvisor_service = self.client.services.get('monotloth-stack_cadvisor')
-                if not cadvisor_service:
-                    return False, "cAdvisor service not found in Docker Swarm"
-            except docker.errors.NotFound:
-                return False, "cAdvisor service not found in Docker Swarm"
-            except Exception as e:
-                return False, f"Error checking cAdvisor service: {str(e)}"
-
-            # Test 2: Check if cAdvisor metrics are available in Prometheus
-            query = 'container_cpu_usage_seconds_total'
-            result = self.prom.custom_query(query=query)
+            # Use provided stack_name or fall back to self.stack_name
+            stack = stack_name if stack_name is not None else self.stack_name
+            # Construct the full service name using f-string
+            full_service_name = f"{stack}_{service_name}"
             
-            if not result:
-                return False, "No cAdvisor metrics found in Prometheus. Check if Prometheus is configured to scrape cAdvisor"
-            
-            # Test 3: Check if we can see our service metrics
-            service_query = f'container_cpu_usage_seconds_total{{service_name="{self.serviceName}"}}'
-            service_result = self.prom.custom_query(query=service_query)
-            
-            if not service_result:
-                return False, f"No metrics found for service {self.serviceName}. Check if service labels are correctly set"
-            
-            # Test 4: Check if we can get a valid CPU reading
-            cpu_util = self.get_total_cpu_utilization()
-            if cpu_util is None:
-                return False, "Could not get valid CPU utilization reading"
-            
-            return True, "cAdvisor is correctly configured and working"
-            
-        except Exception as e:
-            return False, f"Error testing cAdvisor configuration: {str(e)}"
-
-    def get_cadvisor_status(self):
-        """
-        Gets detailed status of cAdvisor service including its network configuration.
-        Returns a dictionary with status information.
-        """
-        try:
-            cadvisor_service = self.client.services.get('monotloth-stack_cadvisor')
-            service_info = {
-                'service_name': cadvisor_service.name,
-                'replicas': cadvisor_service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 0),
-                'running_tasks': len([task for task in cadvisor_service.tasks() if task['Status']['State'] == 'running']),
-                'network_mode': cadvisor_service.attrs['Spec']['EndpointSpec']['Mode'],
-                'published_ports': cadvisor_service.attrs['Spec']['EndpointSpec']['Ports']
-            }
-            return service_info
-        except Exception as e:
-            return {'error': str(e)}
-
-    def diagnose_cadvisor_issues(self):
-        """
-        Diagnoses why cAdvisor service is not running properly.
-        Returns a dictionary with diagnostic information.
-        """
-        try:
-            cadvisor_service = self.client.services.get('monotloth-stack_cadvisor')
-            tasks = cadvisor_service.tasks()
-            
-            diagnostics = {
-                'service_name': cadvisor_service.name,
-                'desired_tasks': cadvisor_service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 0),
-                'running_tasks': len([task for task in tasks if task['Status']['State'] == 'running']),
-                'failed_tasks': len([task for task in tasks if task['Status']['State'] == 'failed']),
-                'task_errors': [],
-                'service_config': {
-                    'privileged': cadvisor_service.attrs['Spec']['TaskTemplate']['ContainerSpec'].get('Privileged', False),
-                    'mounts': cadvisor_service.attrs['Spec']['TaskTemplate']['ContainerSpec'].get('Mounts', []),
-                    'network_mode': cadvisor_service.attrs['Spec']['EndpointSpec']['Mode']
-                }
-            }
-            
-            # Check each task for errors
-            for task in tasks:
-                if task['Status']['State'] == 'failed':
-                    error_msg = task.get('Status', {}).get('Err', 'Unknown error')
-                    diagnostics['task_errors'].append({
-                        'task_id': task['ID'],
-                        'error': error_msg,
-                        'desired_state': task['DesiredState'],
-                        'current_state': task['Status']['State']
-                    })
-            
-            return diagnostics
-        except Exception as e:
-            return {'error': str(e)}
-
-    def get_node_service_cpu_utilization(self):
-        """
-        Gets the total CPU utilization for all replicas of the 'node' service using cAdvisor metrics.
-        Returns the total CPU utilization as an absolute value (CPU seconds per second).
-        For example, if you have 2 replicas and each is using 0.5 CPU, the total will be 1.0.
-        """
-        try:
             # Query for CPU usage rate over 1 minute window, summed across all replicas
-            query = 'sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_swarm_service_name="node"}[1m]))'
+            query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_com_docker_swarm_service_name="{full_service_name}"}}[1m]))'
             result = self.prom.custom_query(query=query)
             
             if result and len(result) > 0 and 'value' in result[0]:
@@ -335,27 +207,5 @@ class Monitoring:
                 return total_cpu
             return 0.0
         except Exception as e:
-            print(f"Error collecting CPU utilization for node service:", e)
+            print(f"Error collecting CPU utilization for service {full_service_name}:", e)
             return 0.0
-
-    def get_node_service_cpu_utilization_by_mode(self):
-        """
-        Gets the CPU utilization broken down by mode (user, system, iowait, etc.) for the node service.
-        Returns a dictionary with CPU utilization values for each mode.
-        """
-        try:
-            modes = ['user', 'system', 'iowait', 'irq', 'softirq', 'steal', 'nice']
-            results = {}
-            
-            for mode in modes:
-                query = f'sum(rate(node_cpu_seconds_total{{service_name="node",mode="{mode}"}}[1m]))'
-                result = self.prom.custom_query(query=query)
-                if result and len(result) > 0 and 'value' in result[0]:
-                    results[mode] = float(result[0]['value'][1])
-                else:
-                    results[mode] = 0.0
-            
-            return results
-        except Exception as e:
-            print(f"Error collecting CPU utilization by mode for node service:", e)
-            return {mode: 0.0 for mode in modes}

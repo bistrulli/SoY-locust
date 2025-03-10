@@ -85,8 +85,12 @@ class ControlLoop():
         '''
             TODO: parse config
         '''
-        return Monitoring(window=30, sla=0.2,serviceName=self.config["sercice_name"],
-                          promHost="localhost",promPort=9090,sysfile=self.config["sysfile"])
+        return Monitoring(window=30, sla=0.2,
+                        serviceName=self.config["service_name"],
+                        stack_name=self.config["stack_name"],
+                        promHost="localhost",
+                        promPort=9090,
+                        sysfile=self.config["sysfile"])
 
     def getEstimator(self):
         '''
@@ -99,7 +103,7 @@ class ControlLoop():
         Aggiorna la configurazione del service monitorato impostando il numero di repliche.
         """
         try:
-            service_name = self.config["sercice_name"]
+            service_name = self.config["service_name"]
             service = self.docker_client.services.get(service_name)
             # Converti replicas in int per evitare errori JSON
             service.scale(int(replicas))

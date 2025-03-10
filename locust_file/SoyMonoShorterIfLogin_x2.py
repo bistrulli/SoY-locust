@@ -12,14 +12,15 @@ import gevent
 
 cwd=Path(__file__).parent
 
-exp_conf={ "sercice_name": "monotloth-stack_node",
+exp_conf={ "service_name": "node",
+           "stack_name": "monotloth-stack",
            "sysfile": cwd.parent/"sou"/"monotloth-v4.yml",
            "control_widow": 15,
            "estimation_window": 10,
            "measurament_period":"1s",
            "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}.csv",
            "stealth":True,
-           "init_repica":2
+           "init_repica":1
          }
 
 #Qui la logica di avvio del control loop specifica per ogni locus file
