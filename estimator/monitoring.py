@@ -92,7 +92,7 @@ class Monitoring:
             print("Error querying throughput from Prometheus:", e)
             return 0
 
-    def get_replicas(self, service_name):
+    def get_replicas(self, stack_name, service_name):
         """
         Gets the number of replicas for a service.
         
@@ -100,10 +100,12 @@ class Monitoring:
             service_name (str): The name of the service without stack prefix
         """
         try:
-            print(f"[DEBUG] Attempting to get replicas for service: '{service_name}'")
+            # Construct the full service name using stack_name and service_name
+            full_service_name = f"{stack_name}_{service_name}"
+            print(f"[DEBUG] Attempting to get replicas for service: '{full_service_name}'")
             print(f"[DEBUG] Available services: {[service.name for service in self.client.services.list()]}")
             
-            service = self.client.services.get(service_name)
+            service = self.client.services.get(full_service_name)
             print(f"[DEBUG] Found service: {service.name}")
             print(f"[DEBUG] Service attributes: {service.attrs}")
             
@@ -111,7 +113,7 @@ class Monitoring:
             print(f"[DEBUG] Number of replicas: {replicas}")
             return replicas
         except docker.errors.NotFound:
-            print(f"[ERROR] Service '{service_name}' not found.")
+            print(f"[ERROR] Service '{full_service_name}' not found.")
             return None
         except Exception as e:
             print(f"[ERROR] Error in get_replicas: {str(e)}")
