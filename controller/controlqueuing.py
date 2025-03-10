@@ -26,13 +26,13 @@ class OPTCTRL():
             obj=0;
             for i in range(nApp):
                 self.model.subject_to(T[0, i] == casadi.fmin(C[i] / (1.0+e[i]),S[0, i] / e[i]))
-                self.model.subject_to(e[i]*T[0, i]-0.20*S[0, i]<=0.0)
+                #self.model.subject_to(e[i]*T[0, i]<=0.20*S[0, i])
                 #self.model.subject_to(T[0, i] == S[0, i] / e[i])
                 #self.model.subject_to(S[0, i] <= C[i])
                 #self.model.subject_to(T[0, i] <= C[i] / (e[i]))
                 #self.model.subject_to(T[0, i]<= S[0, i] / e[i])
                 #obj+=(C[i]-(1+tgt[i])*T[0, i])**2+0.000000*S[0, i]
-                #obj+=(C[i]-(tgt*T[0,i]))**2
+                obj+=(e[i]*T[0, i]-0.20*S[0, i])**2
         
             self.model.minimize(obj)    
             # self.model.solver('osqp',{'print_time':False,'error_on_fail':False})
