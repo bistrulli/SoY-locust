@@ -230,21 +230,31 @@ class Monitoring:
         - str: A message explaining the status
         """
         try:
-            # Test 1: Check if cAdvisor metrics are available in Prometheus
+            # Test 1: Check if cAdvisor service is running in Docker Swarm
+            try:
+                cadvisor_service = self.client.services.get('monotloth-stack_cadvisor')
+                if not cadvisor_service:
+                    return False, "cAdvisor service not found in Docker Swarm"
+            except docker.errors.NotFound:
+                return False, "cAdvisor service not found in Docker Swarm"
+            except Exception as e:
+                return False, f"Error checking cAdvisor service: {str(e)}"
+
+            # Test 2: Check if cAdvisor metrics are available in Prometheus
             query = 'container_cpu_usage_seconds_total'
             result = self.prom.custom_query(query=query)
             
             if not result:
-                return False, "No cAdvisor metrics found in Prometheus"
+                return False, "No cAdvisor metrics found in Prometheus. Check if Prometheus is configured to scrape cAdvisor"
             
-            # Test 2: Check if we can see our service metrics
+            # Test 3: Check if we can see our service metrics
             service_query = f'container_cpu_usage_seconds_total{{service_name="{self.serviceName}"}}'
             service_result = self.prom.custom_query(query=service_query)
             
             if not service_result:
-                return False, f"No metrics found for service {self.serviceName}"
+                return False, f"No metrics found for service {self.serviceName}. Check if service labels are correctly set"
             
-            # Test 3: Check if we can get a valid CPU reading
+            # Test 4: Check if we can get a valid CPU reading
             cpu_util = self.get_total_cpu_utilization()
             if cpu_util is None:
                 return False, "Could not get valid CPU utilization reading"
@@ -253,3 +263,58 @@ class Monitoring:
             
         except Exception as e:
             return False, f"Error testing cAdvisor configuration: {str(e)}"
+
+    def get_cadvisor_status(self):
+        """
+        Gets detailed status of cAdvisor service including its network configuration.
+        Returns a dictionary with status information.
+        """
+        try:
+            cadvisor_service = self.client.services.get('monotloth-stack_cadvisor')
+            service_info = {
+                'service_name': cadvisor_service.name,
+                'replicas': cadvisor_service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 0),
+                'running_tasks': len([task for task in cadvisor_service.tasks() if task['Status']['State'] == 'running']),
+                'network_mode': cadvisor_service.attrs['Spec']['EndpointSpec']['Mode'],
+                'published_ports': cadvisor_service.attrs['Spec']['EndpointSpec']['Ports']
+            }
+            return service_info
+        except Exception as e:
+            return {'error': str(e)}
+
+    def diagnose_cadvisor_issues(self):
+        """
+        Diagnoses why cAdvisor service is not running properly.
+        Returns a dictionary with diagnostic information.
+        """
+        try:
+            cadvisor_service = self.client.services.get('monotloth-stack_cadvisor')
+            tasks = cadvisor_service.tasks()
+            
+            diagnostics = {
+                'service_name': cadvisor_service.name,
+                'desired_tasks': cadvisor_service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 0),
+                'running_tasks': len([task for task in tasks if task['Status']['State'] == 'running']),
+                'failed_tasks': len([task for task in tasks if task['Status']['State'] == 'failed']),
+                'task_errors': [],
+                'service_config': {
+                    'privileged': cadvisor_service.attrs['Spec']['TaskTemplate']['ContainerSpec'].get('Privileged', False),
+                    'mounts': cadvisor_service.attrs['Spec']['TaskTemplate']['ContainerSpec'].get('Mounts', []),
+                    'network_mode': cadvisor_service.attrs['Spec']['EndpointSpec']['Mode']
+                }
+            }
+            
+            # Check each task for errors
+            for task in tasks:
+                if task['Status']['State'] == 'failed':
+                    error_msg = task.get('Status', {}).get('Err', 'Unknown error')
+                    diagnostics['task_errors'].append({
+                        'task_id': task['ID'],
+                        'error': error_msg,
+                        'desired_state': task['DesiredState'],
+                        'current_state': task['Status']['State']
+                    })
+            
+            return diagnostics
+        except Exception as e:
+            return {'error': str(e)}
