@@ -50,15 +50,20 @@ services:
           memory: 2G
 
   cadvisor:
-    image: google/cadvisor:latest
+    image: google/cadvisor:v0.47.0
     container_name: cadvisor
-    privileged: true  # Added privileged mode
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
+      - SYS_RESOURCE
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro  # Added disk metrics mount
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg:/dev/kmsg
     networks:
       - monitoring
     ports:
