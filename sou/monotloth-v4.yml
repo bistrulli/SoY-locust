@@ -52,11 +52,13 @@ services:
   cadvisor:
     image: google/cadvisor:latest
     container_name: cadvisor
+    privileged: true  # Added privileged mode
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro  # Added disk metrics mount
     networks:
       - monitoring
     ports:
@@ -65,6 +67,13 @@ services:
       mode: global
       restart_policy:
         condition: any
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   prometheus:
     image: prom/prometheus:latest
