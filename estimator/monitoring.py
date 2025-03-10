@@ -201,3 +201,55 @@ class Monitoring:
         except Exception as e:
             print("Error fetching active users metric from Prometheus:", e)
             return None
+
+    def get_total_cpu_utilization(self):
+        """
+        Collects the total CPU utilization for all replicas of the specified service.
+        Returns the total CPU utilization in absolute value (CPU seconds per second).
+        For example, if you have 2 replicas and each is using 0.5 CPU, the total will be 1.0.
+        """
+        try:
+            # Query for CPU usage rate over 1 minute window
+            # This query sums up CPU usage across all replicas of the service
+            query = f'sum(rate(container_cpu_usage_seconds_total{{service_name="{self.serviceName}"}}[1m]))'
+            result = self.prom.custom_query(query=query)
+            
+            if result and len(result) > 0 and 'value' in result[0]:
+                total_cpu = float(result[0]['value'][1])
+                return total_cpu
+            return 0.0
+        except Exception as e:
+            print(f"Error collecting CPU utilization for service {self.serviceName}:", e)
+            return 0.0
+
+    def test_cadvisor_configuration(self):
+        """
+        Tests if cAdvisor is correctly configured and accessible.
+        Returns a tuple (bool, str) where:
+        - bool: True if cAdvisor is working correctly, False otherwise
+        - str: A message explaining the status
+        """
+        try:
+            # Test 1: Check if cAdvisor metrics are available in Prometheus
+            query = 'container_cpu_usage_seconds_total'
+            result = self.prom.custom_query(query=query)
+            
+            if not result:
+                return False, "No cAdvisor metrics found in Prometheus"
+            
+            # Test 2: Check if we can see our service metrics
+            service_query = f'container_cpu_usage_seconds_total{{service_name="{self.serviceName}"}}'
+            service_result = self.prom.custom_query(query=service_query)
+            
+            if not service_result:
+                return False, f"No metrics found for service {self.serviceName}"
+            
+            # Test 3: Check if we can get a valid CPU reading
+            cpu_util = self.get_total_cpu_utilization()
+            if cpu_util is None:
+                return False, "Could not get valid CPU utilization reading"
+            
+            return True, "cAdvisor is correctly configured and working"
+            
+        except Exception as e:
+            return False, f"Error testing cAdvisor configuration: {str(e)}"

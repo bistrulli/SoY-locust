@@ -40,15 +40,25 @@ def compute_rt_dist(results_csv):
 
 def getavg_avg_replica(results_csv):
     rep=None
+    cumRep=None
+
+    #history file
+    history=pd.read_csv(Path(results_csv).parent/Path(f"{Path(results_csv).parent.stem}_stats_history.csv"))
+    start=history["Timestamp"].min()
+    end=history["Timestamp"].max()
+    duration=end-start
+
     if("ctr" in results_csv):
         ctrl_data=pd.read_csv(Path(results_csv).parent/Path(f"{Path(results_csv).parent.stem}.csv"))
         rep=ctrl_data["replica"].mean()
+        cumRep=ctrl_data["replica"].sum()
     else:
         rep=re.findall(r"x[0-9]+",Path(results_csv).name)
         if(len(rep)!=1):
             raise ValueError(f"Error while getting replica for {Path(results_csv).name}")
         rep=int(re.findall(r"[0-9]+",rep[0])[0])
-    return rep
+        cumRep=duration*rep
+    return rep,cumRep
 
 def get_sys_troughput(results_csv):
     df = pd.read_csv(results_csv)
@@ -72,12 +82,12 @@ if __name__ == "__main__":
             fr = calulate_fr(csv_file)
             efr = compute_efr(csv_file,theoretical_total)
             rt_dist=compute_rt_dist(csv_file)
-            rep=getavg_avg_replica(csv_file)
+            rep,cumRep=getavg_avg_replica(csv_file)
             thr=get_sys_troughput(csv_file)
-            res+=[[Path(csv_file).stem,rac_ok+rac_ko,fr,efr,rep,thr]+rt_dist.tolist()]
+            res+=[[Path(csv_file).stem,rac_ok+rac_ko,fr,efr,rep,cumRep,thr]+rt_dist.tolist()]
 
-        df=pd.DataFrame(res,columns=["EXP","RAC","FR","EFR","REP","R/s","50%","75%","95%"])
-        print(df)
+        df=pd.DataFrame(res,columns=["EXP","RAC","FR","EFR","REP","∫REP","R/s","50%","75%","95%"])
+        print(df.sort_values(by="REP"))
     else:
         # Single file case
         rac_ok, rac_ko = calculate_rac(path, theoretical_total)
