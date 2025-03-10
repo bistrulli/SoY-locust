@@ -6,3 +6,8 @@ scrape_configs:
     metrics_path: '/metrics'
     static_configs:
       - targets: ['172.17.0.1:9646']  # Se Prometheus è in un container e Locust gira sull'host
+
+  - job_name: 'node-exporter'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['node-exporter:9100']  # Using Docker service name for internal DNS resolution
