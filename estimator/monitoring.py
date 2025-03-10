@@ -321,14 +321,13 @@ class Monitoring:
 
     def get_node_service_cpu_utilization(self):
         """
-        Gets the total CPU utilization for all replicas of the node service using node-exporter metrics.
-        Returns the total CPU utilization as an absolute value (sum of all CPU cores).
+        Gets the total CPU utilization for all replicas of the 'node' service using cAdvisor metrics.
+        Returns the total CPU utilization as an absolute value (CPU seconds per second).
+        For example, if you have 2 replicas and each is using 0.5 CPU, the total will be 1.0.
         """
         try:
-            # Query for CPU usage rate over 1 minute window
-            # This query sums up CPU usage across all modes except idle for all cores
-            # Filtering by the node service name
-            query = f'sum(rate(node_cpu_seconds_total{{service_name="node",mode!="idle"}}[1m]))'
+            # Query for CPU usage rate over 1 minute window, summed across all replicas
+            query = 'sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_swarm_service_name="node"}[1m]))'
             result = self.prom.custom_query(query=query)
             
             if result and len(result) > 0 and 'value' in result[0]:
