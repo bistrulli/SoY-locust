@@ -52,7 +52,8 @@ class ControlLoop():
                 #print(f"stime1={self.stime},stime2={self.monitor.util[-1]/self.monitor.tr[-1]}")
                 #self.stime=0.095
                 self.stime=self.monitor.util[-1]/self.monitor.tr[-1]
-                print(f"Service Time:  {self.stime} stealth={self.config["stealth"]}")
+                stealth=self.config["stealth"]
+                print(f"Service Time:  {self.stime} stealth={stealth}")
             
             if((self.ctrlTick%self.config["control_widow"]==0) and self.stime is not None):
                 #wip=np.array(self.monitor.users[-self.config["control_widow"]:]).mean()
