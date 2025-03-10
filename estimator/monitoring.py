@@ -100,34 +100,23 @@ class Monitoring:
             service_name (str): The name of the service without stack prefix
         """
         try:
+            print(f"[DEBUG] Attempting to get replicas for service: '{service_name}'")
+            print(f"[DEBUG] Available services: {[service.name for service in self.client.services.list()]}")
+            
             service = self.client.services.get(service_name)
+            print(f"[DEBUG] Found service: {service.name}")
+            print(f"[DEBUG] Service attributes: {service.attrs}")
+            
             replicas = service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 1)
+            print(f"[DEBUG] Number of replicas: {replicas}")
             return replicas
         except docker.errors.NotFound:
-            print(f"Service '{service_name}' not found.")
+            print(f"[ERROR] Service '{service_name}' not found.")
             return None
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"[ERROR] Error in get_replicas: {str(e)}")
+            print(f"[ERROR] Error type: {type(e)}")
             return None
-
-    def getViolations(self):
-        def appendViolation(rts):
-            if self.reducer(rts) > self.sla:
-                return 1
-            else:
-                return 0
-        second = int(self.time[0])
-        violations = []
-        rts = []
-        
-        for (t, rt) in zip(self.time, self.allRts):
-            if int(t) != second:
-                violations.append(appendViolation(rts))
-                rts = []
-                second = int(t)
-            rts.append(rt)
-        violations.append(appendViolation(rts))
-        return sum(violations)
         
     def reset(self):
         self.cores = []
