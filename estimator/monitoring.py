@@ -102,15 +102,15 @@ class Monitoring:
         try:
             # Construct the full service name using stack_name and service_name
             full_service_name = f"{stack_name}_{service_name}"
-            print(f"[DEBUG] Attempting to get replicas for service: '{full_service_name}'")
-            print(f"[DEBUG] Available services: {[service.name for service in self.client.services.list()]}")
+            # print(f"[DEBUG] Attempting to get replicas for service: '{full_service_name}'")
+            # print(f"[DEBUG] Available services: {[service.name for service in self.client.services.list()]}")
             
             service = self.client.services.get(full_service_name)
-            print(f"[DEBUG] Found service: {service.name}")
-            print(f"[DEBUG] Service attributes: {service.attrs}")
+            # print(f"[DEBUG] Found service: {service.name}")
+            # print(f"[DEBUG] Service attributes: {service.attrs}")
             
             replicas = service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 1)
-            print(f"[DEBUG] Number of replicas: {replicas}")
+            # print(f"[DEBUG] Number of replicas: {replicas}")
             return replicas
         except docker.errors.NotFound:
             print(f"[ERROR] Service '{full_service_name}' not found.")
