@@ -50,7 +50,7 @@ services:
           memory: 2G
 
   cadvisor:
-    image: google/cadvisor:v0.47.0
+    image: google/cadvisor:latest
     container_name: cadvisor
     privileged: true
     cap_add:
