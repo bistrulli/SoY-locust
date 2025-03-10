@@ -40,17 +40,18 @@ class ControlLoop():
                   f"WIP_prom:       {self.monitor.active_users[-1]}\n"
                   f"Util:           {self.monitor.util[-1]}\n"
                   f"Mem:            {self.monitor.util[-1]}")
-            if((self.ctrlTick%self.config["estimation_window"])==0 and 
+            if((self.ctrlTick>self.config["estimation_window"])==0 and 
                len(self.monitor.rts)>=self.config["estimation_window"]):
                 totalcores = np.array(self.monitor.cores[-self.config["estimation_window"]:]) * np.array(self.monitor.replica[-self.config["estimation_window"]:])
                 respnseTimes=np.array(self.monitor.rts[-self.config["estimation_window"]:])
                 #wip=np.array(self.monitor.users[-self.config["estimation_window"]:])
                 wip=np.array(self.monitor.active_users[-self.config["estimation_window"]:])
-                self.stime=self.estimator.estimate(respnseTimes,
-                                              totalcores,
-                                              wip)
-                print(f"#######stime1={self.stime},stime2={self.monitor.util[-1]/self.monitor.tr[-1]}")
+                # self.stime=self.estimator.estimate(respnseTimes,
+                #                               totalcores,
+                #                               wip)
+                #print(f"stime1={self.stime},stime2={self.monitor.util[-1]/self.monitor.tr[-1]}")
                 #self.stime=0.095
+                self.stime=self.monitor.util[-1]/self.monitor.tr[-1]
                 print(f"Service Time:  {self.stime}")
             
             if((self.ctrlTick%self.config["control_widow"]==0) and self.stime is not None):

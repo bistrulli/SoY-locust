@@ -184,29 +184,29 @@ class Monitoring:
             float: The total CPU utilization as an absolute value (CPU seconds per second)
         """
         try:
-            print(f"[DEBUG CPU] Input parameters - service_name: '{service_name}', stack_name: '{stack_name}'")
+            #print(f"[DEBUG CPU] Input parameters - service_name: '{service_name}', stack_name: '{stack_name}'")
             
             # Use provided stack_name or fall back to self.stack_name
             stack = stack_name if stack_name is not None else self.stack_name
-            print(f"[DEBUG CPU] Using stack name: '{stack}'")
+            # print(f"[DEBUG CPU] Using stack name: '{stack}'")
             
             # Construct the full service name using f-string
             full_service_name = f"{stack}_{service_name}"
-            print(f"[DEBUG CPU] Constructed full service name: '{full_service_name}'")
+            #print(f"[DEBUG CPU] Constructed full service name: '{full_service_name}'")
             
             # Query for CPU usage rate over 1 minute window, summed across all replicas
             
             query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_com_docker_swarm_service_name="{full_service_name}"}}[1m]))'
-            print(f"[DEBUG CPU] Prometheus query: {query}")
+            #print(f"[DEBUG CPU] Prometheus query: {query}")
             
             result = self.prom.custom_query(query=query)
-            print(f"[DEBUG CPU] Raw Prometheus result: {result}")
+            #print(f"[DEBUG CPU] Raw Prometheus result: {result}")
             
             if result and len(result) > 0:
                 print(f"[DEBUG CPU] Result has data: {result[0]}")
                 if 'value' in result[0]:
                     total_cpu = float(result[0]['value'][1])
-                    print(f"[DEBUG CPU] Extracted CPU value: {total_cpu}")
+                    #print(f"[DEBUG CPU] Extracted CPU value: {total_cpu}")
                     return total_cpu
                 else:
                     print("[DEBUG CPU] No 'value' key in result[0]")
