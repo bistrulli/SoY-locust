@@ -33,7 +33,7 @@ class Monitoring:
         self.rts += [self.getResponseTime()]
         self.tr += [self.getTroughput()]
         self.cores += [self.getCores()]
-        self.replica += [self.get_replicas(self.serviceName)]
+        self.replica += [self.get_replicas(self.stack_name,self.serviceName)]
         self.users += [self.getUsers()]
         self.active_users += [self.get_active_users()]
         self.memory += [0]
