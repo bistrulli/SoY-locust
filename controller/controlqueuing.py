@@ -41,7 +41,7 @@ class OPTCTRL():
             self.model.solver('osqp',optionsOSQP) 
         
             sol = self.model.solve()
-            #(C[0]/sol.value(T),sol.value(obj),sol.value(T))
+            print(C[0]/sol.value(T),sol.value(obj),sol.value(T))
             if(nApp==1):
                 return sol.value(S)
             else:
