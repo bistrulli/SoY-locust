@@ -82,7 +82,7 @@ class Monitoring:
     def getTroughput(self):
         # Modifica: utilizzare la query per il rate negli ultimi 1 minuto
         try:
-            result = self.prom.custom_query(query="sum(rate(locust_requests_total[1m]))")
+            result = self.prom.custom_query(query="sum(rate(locust_requests_total[30s]))")
             if result and len(result) > 0 and 'value' in result[0]:
                 throughput = float(result[0]['value'][1])
             else:
@@ -196,7 +196,7 @@ class Monitoring:
             
             # Query for CPU usage rate over 1 minute window, summed across all replicas
             
-            query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_com_docker_swarm_service_name="{full_service_name}"}}[1m]))'
+            query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_com_docker_swarm_service_name="{full_service_name}"}}[30s]))'
             #print(f"[DEBUG CPU] Prometheus query: {query}")
             
             result = self.prom.custom_query(query=query)
