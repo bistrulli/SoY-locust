@@ -49,6 +49,7 @@ class ControlLoop():
                 self.stime=self.estimator.estimate(respnseTimes,
                                               totalcores,
                                               wip)
+                print(f"#######stime1={self.stime},stime2={self.monitor.util[-1]/self.monitor.tr[-1]}")
                 #self.stime=0.095
                 print(f"Service Time:  {self.stime}")
             
