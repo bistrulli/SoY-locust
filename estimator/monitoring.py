@@ -318,3 +318,45 @@ class Monitoring:
             return diagnostics
         except Exception as e:
             return {'error': str(e)}
+
+    def get_node_service_cpu_utilization(self):
+        """
+        Gets the total CPU utilization for all replicas of the node service using node-exporter metrics.
+        Returns the total CPU utilization as an absolute value (sum of all CPU cores).
+        """
+        try:
+            # Query for CPU usage rate over 1 minute window
+            # This query sums up CPU usage across all modes except idle for all cores
+            # Filtering by the node service name
+            query = f'sum(rate(node_cpu_seconds_total{{service_name="node",mode!="idle"}}[1m]))'
+            result = self.prom.custom_query(query=query)
+            
+            if result and len(result) > 0 and 'value' in result[0]:
+                total_cpu = float(result[0]['value'][1])
+                return total_cpu
+            return 0.0
+        except Exception as e:
+            print(f"Error collecting CPU utilization for node service:", e)
+            return 0.0
+
+    def get_node_service_cpu_utilization_by_mode(self):
+        """
+        Gets the CPU utilization broken down by mode (user, system, iowait, etc.) for the node service.
+        Returns a dictionary with CPU utilization values for each mode.
+        """
+        try:
+            modes = ['user', 'system', 'iowait', 'irq', 'softirq', 'steal', 'nice']
+            results = {}
+            
+            for mode in modes:
+                query = f'sum(rate(node_cpu_seconds_total{{service_name="node",mode="{mode}"}}[1m]))'
+                result = self.prom.custom_query(query=query)
+                if result and len(result) > 0 and 'value' in result[0]:
+                    results[mode] = float(result[0]['value'][1])
+                else:
+                    results[mode] = 0.0
+            
+            return results
+        except Exception as e:
+            print(f"Error collecting CPU utilization by mode for node service:", e)
+            return {mode: 0.0 for mode in modes}
