@@ -195,7 +195,8 @@ class Monitoring:
             print(f"[DEBUG CPU] Constructed full service name: '{full_service_name}'")
             
             # Query for CPU usage rate over 1 minute window, summed across all replicas
-            query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_com_docker_swarm_service_name="{full_service_name}"}}[1m]))'
+            
+            query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_com_docker_swarm_service_name="{full_service_name}"}}[int({self.window})s]))'
             print(f"[DEBUG CPU] Prometheus query: {query}")
             
             result = self.prom.custom_query(query=query)

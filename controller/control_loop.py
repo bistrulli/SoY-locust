@@ -85,7 +85,8 @@ class ControlLoop():
         '''
             TODO: parse config
         '''
-        return Monitoring(window=30, sla=0.2,
+        return Monitoring(window=self.config["measurament_period"], 
+                        sla=0.2,
                         serviceName=self.config["service_name"],
                         stack_name=self.config["stack_name"],
                         promHost="localhost",
