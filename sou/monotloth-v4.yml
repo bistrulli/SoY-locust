@@ -62,8 +62,11 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
     devices:
       - /dev/kmsg:/dev/kmsg
+    environment:
+      - CADVISOR_STORAGE_DRIVER=memory
     networks:
       - monitoring
     ports:
