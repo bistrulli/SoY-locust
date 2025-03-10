@@ -55,9 +55,10 @@ class ControlLoop():
                 stealth=self.config["stealth"]
                 print(f"Service Time:  {self.stime} stealth={stealth}")
             
-            if((self.ctrlTick%self.config["control_widow"]==0) and self.stime is not None):
+            if((self.ctrlTick%self.config["control_widow"]==0) and self.stime>0):
                 #wip=np.array(self.monitor.users[-self.config["control_widow"]:]).mean()
                 wip=np.array(self.monitor.active_users[-self.config["control_widow"]:]).mean()
+                print("Cristo")
                 if(not self.config["stealth"]):
                     replicas=self.controller.OPTController(e=[self.stime], tgt=[(self.stime+1)], C=[float(wip)])
                     print(f"CTRL:          {np.ceil(replicas)}")
