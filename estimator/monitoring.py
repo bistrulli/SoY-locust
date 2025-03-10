@@ -37,7 +37,7 @@ class Monitoring:
         self.users += [self.getUsers()]
         self.active_users += [self.get_active_users()]
         self.memory += [0]
-        self.util += [self.get_service_cpu_utilization(self.stack_name,self.serviceName)]
+        self.util += [self.get_service_cpu_utilization(stack_name=self.stack_name,service_name=self.serviceName)]
 
     def getUsers(self):
         #torno il numero di utenti attivi (Little's Law)
