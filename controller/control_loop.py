@@ -46,7 +46,8 @@ class ControlLoop():
                 totalcores = np.array(self.monitor.cores[-self.config["estimation_window"]:]) * np.array(self.monitor.replica[-self.config["estimation_window"]:])
                 respnseTimes=np.array(self.monitor.rts[-self.config["estimation_window"]:])
                 #wip=np.array(self.monitor.users[-self.config["estimation_window"]:])
-                wip=np.array(self.monitor.active_users[-self.config["estimation_window"]:])
+                #wip=np.array(self.monitor.active_users[-self.config["estimation_window"]:])
+                wip=self.monitor.predict_users()
                 # self.stime=self.estimator.estimate(respnseTimes,
                 #                               totalcores,
                 #                               wip)
