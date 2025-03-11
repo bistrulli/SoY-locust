@@ -20,7 +20,9 @@ exp_conf={ "service_name": "node",
            "measurament_period":"1s",
            "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}.csv",
            "stealth":False,
-           "init_repica":10
+           "init_repica":1,
+           "prediction_horizon":15,
+           "target_utilization":0.4
          }
 
 #Qui la logica di avvio del control loop specifica per ogni locus file
