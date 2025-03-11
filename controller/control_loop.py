@@ -60,7 +60,7 @@ class ControlLoop():
                 wip=np.array(self.monitor.active_users[-self.config["control_widow"]:]).mean()
                 print("###Cristo")
                 if(not self.config["stealth"]):
-                    replicas=self.controller.OPTController(e=[self.stime], tgt=[0.7], C=[float(wip)])
+                    replicas=self.controller.OPTController(e=[self.stime], tgt=[0.3], C=[float(wip)])
                     print(f"CTRL:          {np.ceil(replicas)}")
                     self.actuate(replicas=np.ceil(replicas))
             
