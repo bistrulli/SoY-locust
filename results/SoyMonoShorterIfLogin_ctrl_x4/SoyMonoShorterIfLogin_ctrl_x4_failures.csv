@@ -1,0 +1,9 @@
+Method,Name,Error,Occurrences
+OPTIONS,/api/exercise-production,"ConnectionResetError(104, 'Connection reset by peer')",1
+OPTIONS,/api/user/login,"ConnectionRefusedError(111, 'Connection refused')",17
+OPTIONS,/api/user/login,"ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x....>, 'Connection to localhost timed out. (connect timeout=1)')",2
+GET,/api/auth/verify,"ConnectionResetError(104, 'Connection reset by peer')",1
+OPTIONS,/api/user/logout,RemoteDisconnected('Remote end closed connection without response'),1
+POST,/api/user/login,"ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x....>, 'Connection to localhost timed out. (connect timeout=1)')",1
+POST,/api/user/login,"ConnectionRefusedError(111, 'Connection refused')",4
+POST,/api/exercise-production,RemoteDisconnected('Remote end closed connection without response'),5
