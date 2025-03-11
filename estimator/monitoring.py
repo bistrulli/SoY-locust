@@ -218,3 +218,47 @@ class Monitoring:
             print(f"[ERROR CPU] Error details: {str(e)}")
             print(f"[ERROR CPU] Error type: {type(e)}")
             return 0.0
+
+    def predict_users(self, horizon=1):
+        """
+        Predice il numero di utenti futuri basandosi sul gradiente medio degli ultimi 5 step.
+        
+        Args:
+            horizon (int): Numero di step nel futuro per la predizione (default: 1)
+            
+        Returns:
+            float: Numero predetto di utenti dopo 'horizon' step
+        """
+        if len(self.active_users) < 5:
+            # Se non abbiamo abbastanza dati, ritorna l'ultimo valore noto
+            return self.active_users[-1] if self.active_users else 0
+            
+        # Prendi gli ultimi 5 valori
+        recent_users = self.active_users[-5:]
+        recent_times = self.time[-5:]
+        
+        # Calcola i gradienti per ogni coppia di punti consecutivi
+        gradients = []
+        for i in range(1, len(recent_users)):
+            dt = recent_times[i] - recent_times[i-1]
+            if dt > 0:  # Evita divisione per zero
+                gradient = (recent_users[i] - recent_users[i-1]) / dt
+                gradients.append(gradient)
+                
+        if not gradients:
+            return recent_users[-1]  # Ritorna l'ultimo valore se non possiamo calcolare gradienti
+            
+        # Calcola il gradiente medio
+        avg_gradient = sum(gradients) / len(gradients)
+        
+        # Stima il tempo per l'orizzonte di predizione (assumendo step costanti)
+        avg_dt = (recent_times[-1] - recent_times[-2])
+        prediction_dt = avg_dt * horizon
+        
+        # Predici il numero di utenti
+        predicted_users = max(0, recent_users[-1] + avg_gradient * prediction_dt)
+        
+        return predicted_users
+
+    def __str__(self):
+        return f"Monitoring(window={self.window}, sla={self.sla})"
