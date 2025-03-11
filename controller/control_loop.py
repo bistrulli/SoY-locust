@@ -38,7 +38,7 @@ class ControlLoop():
                   f"Cores:          {self.monitor.cores[-1]}\n"
                   f"WIP:            {self.monitor.users[-1]}\n"
                   f"WIP_prom:       {self.monitor.active_users[-1]}\n"
-                  f"WIP_prom:       {self.monitor.predict_users()}\n"
+                  f"WIP_pred:       {self.monitor.predict_users()}\n"
                   f"Util:           {self.monitor.util[-1]}\n"
                   f"Mem:            {self.monitor.util[-1]}")
             if(self.ctrlTick>self.config["estimation_window"] and 

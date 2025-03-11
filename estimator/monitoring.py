@@ -222,6 +222,7 @@ class Monitoring:
     def predict_users(self, horizon=1):
         """
         Predice il numero di utenti futuri basandosi sul gradiente medio degli ultimi 5 step.
+        Gestisce i valori None nella lista degli utenti attivi.
         
         Args:
             horizon (int): Numero di step nel futuro per la predizione (default: 1)
@@ -229,13 +230,17 @@ class Monitoring:
         Returns:
             float: Numero predetto di utenti dopo 'horizon' step
         """
-        if len(self.active_users) < 5:
-            # Se non abbiamo abbastanza dati, ritorna l'ultimo valore noto
-            return self.active_users[-1] if self.active_users else 0
+        # Filtra i valori None dalla lista degli utenti attivi
+        valid_data = [(t, u) for t, u in zip(self.time, self.active_users) if u is not None]
+        
+        if len(valid_data) < 5:
+            # Se non abbiamo abbastanza dati validi, ritorna l'ultimo valore valido o 0
+            return valid_data[-1][1] if valid_data else 0
             
-        # Prendi gli ultimi 5 valori
-        recent_users = self.active_users[-5:]
-        recent_times = self.time[-5:]
+        # Prendi gli ultimi 5 valori validi
+        recent_data = valid_data[-5:]
+        recent_times = [t for t, _ in recent_data]
+        recent_users = [u for _, u in recent_data]
         
         # Calcola i gradienti per ogni coppia di punti consecutivi
         gradients = []
