@@ -38,7 +38,7 @@ class ControlLoop():
                   f"Cores:          {self.monitor.cores[-1]}\n"
                   f"WIP:            {self.monitor.users[-1]}\n"
                   f"WIP_prom:       {self.monitor.active_users[-1]}\n"
-                  f"WIP_pred:       {self.monitor.predict_users()}\n"
+                  f"WIP_pred:       {self.monitor.predict_users(horizon=3)}\n"
                   f"Util:           {self.monitor.util[-1]}\n"
                   f"Mem:            {self.monitor.util[-1]}")
             if(self.ctrlTick>self.config["estimation_window"] and 
@@ -47,7 +47,7 @@ class ControlLoop():
                 respnseTimes=np.array(self.monitor.rts[-self.config["estimation_window"]:])
                 #wip=np.array(self.monitor.users[-self.config["estimation_window"]:])
                 #wip=np.array(self.monitor.active_users[-self.config["estimation_window"]:])
-                wip=self.monitor.predict_users()
+                wip=self.monitor.predict_users(horizon=3)
                 # self.stime=self.estimator.estimate(respnseTimes,
                 #                               totalcores,
                 #                               wip)
