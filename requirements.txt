@@ -9,3 +9,5 @@ prometheus-api-client
 pyyaml
 pytimeparse
 requests-unixsocket
+pyomo>=6.9.1
+pyscipopt
