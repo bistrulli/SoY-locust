@@ -11,7 +11,18 @@ class OPTCTRL():
         self.max_cores=max_cores
         self.st=st
     
-    def OPTController(self, e, tgt, C):
+    def OPTControllerCasadi(self, e, tgt, C):
+        """
+        Implementa il controllore ottimo usando CasADi (versione legacy).
+        
+        Args:
+            e (list): Service time attuale
+            tgt (list): Service time target
+            C (list): Numero di utenti attivi
+        
+        Returns:
+            float o list: Numero ottimo di repliche
+        """
         #print("stime:=", e, "tgt:=", tgt, "user:=", C)
         if(np.sum(C)>0):
             self.model = casadi.Opti("conic") 
@@ -50,9 +61,9 @@ class OPTCTRL():
         else:
             return 10**(-3)
     
-    def OPTControllerPyomo(self, e, tgt, C):
+    def OPTController(self, e, tgt, C):
         """
-        Implementa il controllore ottimo usando pyscipopt con obiettivo linearizzato.
+        Implementa il controllore ottimo usando SCIP.
         
         Args:
             e (list): Service time attuale
@@ -110,8 +121,6 @@ class OPTCTRL():
             model.addCons(T >= S/e_val - M*z, "bound4")
 
             # Vincoli per linearizzare l'obiettivo quadratico
-            # diff = C_val - (1+tgt_val)*T
-            #model.addCons(diff == C_val - (1+tgt_val)*T, "diff_def")
             model.addCons(diff == e_val*T-tgt[0]*S, "diff_def")
             
             # error >= |diff| usando due vincoli lineari
@@ -128,33 +137,28 @@ class OPTCTRL():
             # Verifica la soluzione
             if model.getStatus() == "optimal":
                 opt_value = model.getVal(S)
-                print(f"[DEBUG SCIP] U={(e_val*model.getVal(T))/model.getVal(S)}, C={C_val}, e={e_val}, T={model.getVal(T)}, S={opt_value}, z={model.getVal(z)}")
-                print(f"[DEBUG SCIP] term1={term1}, term2={opt_value/e_val}")
-                print(f"[DEBUG SCIP] error={model.getVal(error)}, diff={model.getVal(diff)}")
+                print(f"[DEBUG] U={(e_val*model.getVal(T))/model.getVal(S)}, C={C_val}, e={e_val}, T={model.getVal(T)}, S={opt_value}, z={model.getVal(z)}")
+                print(f"[DEBUG] term1={term1}, term2={opt_value/e_val}")
+                print(f"[DEBUG] error={model.getVal(error)}, diff={model.getVal(diff)}")
                 return opt_value
             else:
-                print(f"[ERROR SCIP] Optimization failed: {model.getStatus()}")
+                print(f"[ERROR] Optimization failed: {model.getStatus()}")
                 return self.init_cores
 
         except Exception as e:
-            print(f"[ERROR SCIP] Exception in optimization: {str(e)}")
-            print(f"[ERROR SCIP] Error type: {type(e)}")
+            print(f"[ERROR] Exception in optimization: {str(e)}")
+            print(f"[ERROR] Error type: {type(e)}")
             import traceback
-            print(f"[ERROR SCIP] Traceback: {traceback.format_exc()}")
+            print(f"[ERROR] Traceback: {traceback.format_exc()}")
             return self.init_cores
 
     def __str__(self):
         return super().__str__() + " OPTCTRL: %.2f, l: %.2f h: %.2f " % (self.step, self.l, self.h)
     
 if __name__ == '__main__':
-    # S=ctrl.OPTController([0.08], [0.25*0.7], [55])
-    # print(S)
-    import scipy.io as sio
-    import numpy as np
-
     def test_controllers():
         """
-        Test sia OPTController che OPTControllerPyomo e confronta i risultati
+        Test sia OPTControllerCasadi che OPTController e confronta i risultati
         """
         # Parametri di test
         e = [0.038]      # service time
@@ -164,18 +168,18 @@ if __name__ == '__main__':
         # Crea il controllore
         ctrl = OPTCTRL(init_cores=1, min_cores=0.1, max_cores=16, st=0.8)
         
-        # Test OPTController originale
-        print("\nTest OPTController (casadi):")
+        # Test OPTControllerCasadi
+        print("\nTest OPTControllerCasadi (legacy):")
         start_time = time.time()
-        s_casadi = ctrl.OPTController(e, tgt, C)
+        s_casadi = ctrl.OPTControllerCasadi(e, tgt, C)
         casadi_time = time.time() - start_time
         print(f"Tempo di esecuzione casadi: {casadi_time:.4f} secondi")
         print(f"Risultato casadi: {s_casadi}")
         
-        # Test OPTControllerPyomo
-        print("\nTest OPTControllerSCIP (SCIP):")
+        # Test OPTController
+        print("\nTest OPTController (SCIP):")
         start_time = time.time()
-        s_scip = ctrl.OPTControllerPyomo(e, tgt, C)
+        s_scip = ctrl.OPTController(e, tgt, C)
         scip_time = time.time() - start_time
         print(f"Tempo di esecuzione SCIP: {scip_time:.4f} secondi")
         print(f"Risultato SCIP: {s_scip}")
