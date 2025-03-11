@@ -38,7 +38,7 @@ class ControlLoop():
                   f"Cores:          {self.monitor.cores[-1]}\n"
                   f"WIP:            {self.monitor.users[-1]}\n"
                   f"WIP_prom:       {self.monitor.active_users[-1]}\n"
-                  f"WIP_pred:       {self.monitor.predict_users(horizon=3)}\n"
+                  f"WIP_pred:       {self.monitor.predict_users(horizon=8)}\n"
                   f"Util:           {self.monitor.util[-1]}\n"
                   f"Mem:            {self.monitor.util[-1]}")
             if(self.ctrlTick>self.config["estimation_window"] and 
@@ -47,7 +47,7 @@ class ControlLoop():
                 respnseTimes=np.array(self.monitor.rts[-self.config["estimation_window"]:])
                 #wip=np.array(self.monitor.users[-self.config["estimation_window"]:])
                 #wip=np.array(self.monitor.active_users[-self.config["estimation_window"]:])
-                wip=self.monitor.predict_users(horizon=3)
+                wip=self.monitor.predict_users(horizon=8)
                 # self.stime=self.estimator.estimate(respnseTimes,
                 #                               totalcores,
                 #                               wip)
@@ -62,7 +62,7 @@ class ControlLoop():
                 wip=np.array(self.monitor.active_users[-self.config["control_widow"]:]).mean()
                 print("###Cristo")
                 if(not self.config["stealth"]):
-                    replicas=self.controller.OPTController(e=[self.stime], tgt=[0.3], C=[float(wip)])
+                    replicas=self.controller.OPTController(e=[self.stime], tgt=[0.4], C=[float(wip)])
                     print(f"CTRL:          {np.ceil(replicas)}")
                     self.actuate(replicas=np.ceil(replicas))
             
