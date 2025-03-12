@@ -43,13 +43,14 @@ def getavg_avg_replica(results_csv):
     cumRep=None
 
     #history file
-    history=pd.read_csv(Path(results_csv).parent/Path(f"{Path(results_csv).parent.stem}_stats_history.csv"))
+    parent_dir = Path(results_csv).parent.name  # Nome della directory contenente il file
+    history=pd.read_csv(Path(results_csv).parent/f"{parent_dir}_stats_history.csv")
     start=history["Timestamp"].min()
     end=history["Timestamp"].max()
     duration=end-start
 
     if("ctr" in results_csv):
-        ctrl_data=pd.read_csv(Path(results_csv).parent/Path(f"{Path(results_csv).parent.stem}.csv"))
+        ctrl_data=pd.read_csv(Path(results_csv).parent/f"{parent_dir}.csv")
         rep=ctrl_data["replica"].mean()
         cumRep=ctrl_data["replica"].sum()
     else:
