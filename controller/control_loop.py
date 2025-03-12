@@ -13,6 +13,7 @@ class ControlLoop():
         self.config=config
         self.stime=None
         self.ctrlTick=0
+        self.prediction_horizon=config["prediction_horizon"]
         self.docker_client = docker.from_env()
         self.estimator = None
         self.controller = None
@@ -38,7 +39,7 @@ class ControlLoop():
                   f"Cores:          {self.monitor.cores[-1]}\n"
                   f"WIP:            {self.monitor.users[-1]}\n"
                   f"WIP_prom:       {self.monitor.active_users[-1]}\n"
-                  f"WIP_pred:       {self.monitor.predict_users(horizon=self.config["prediction_horizon"])}\n"
+                  f"WIP_pred:       {self.monitor.predict_users(horizon=self.prediction_horizon)}\n"
                   f"Util:           {self.monitor.util[-1]}\n"
                   f"Mem:            {self.monitor.util[-1]}")
             if(self.ctrlTick>self.config["estimation_window"] and 
@@ -47,7 +48,7 @@ class ControlLoop():
                 respnseTimes=np.array(self.monitor.rts[-self.config["estimation_window"]:])
                 #wip=np.array(self.monitor.users[-self.config["estimation_window"]:])
                 #wip=np.array(self.monitor.active_users[-self.config["estimation_window"]:])
-                wip=self.monitor.predict_users(horizon=self.config["prediction_horizon"])
+                wip=self.monitor.predict_users(horizon=self.prediction_horizon)
                 # self.stime=self.estimator.estimate(respnseTimes,
                 #                               totalcores,
                 #                               wip)
