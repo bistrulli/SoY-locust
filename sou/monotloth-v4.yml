@@ -13,9 +13,9 @@ services:
       - monitoring
     healthcheck:
       test: ["CMD", "curl", "-X", "OPTIONS", "-f", "http://localhost:5001/api/exercise-production"]
-      interval: 5s
+      interval: 1s
       timeout: 3s
-      retries: 3
+      retries: 1
       start_period: 15s
     deploy:
       replicas: 1 # Numero iniziale di repliche
