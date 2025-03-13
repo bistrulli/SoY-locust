@@ -18,7 +18,7 @@ services:
       retries: 1
       start_period: 15s
     deploy:
-      replicas: 1 # Numero iniziale di repliche
+      replicas: 4 # Numero iniziale di repliche
       update_config:
         parallelism: 1
         delay: 30s
