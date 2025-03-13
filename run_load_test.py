@@ -76,8 +76,7 @@ def main():
         "--run-time", args.run_time,
         "--host", args.host,
         "--csv", args.csv,
-        "-f", args.locust_file,
-        "-f", args.loadshape_file  # Aggiungiamo il file della LoadShape
+        "-f", f"{args.locust_file},{args.loadshape_file}"  # Passa entrambi i file con una singola -f
     ]
     logging.info(" ".join(cmd))
     
