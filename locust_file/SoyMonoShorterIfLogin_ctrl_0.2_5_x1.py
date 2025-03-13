@@ -93,29 +93,3 @@ class SoyMonoUser(BaseExp):
                     headers={"Authorization": f"Bearer {access_token}"},
                     timeout=1
                 )
-
-    cycle_duration = ramp_duration + constant_duration + pause_duration
-
-    max_duration = cycle_duration*4         # total duration of the test in seconds
-
-    def tick(self):
-        run_time = self.get_run_time()
-        if run_time > self.max_duration:
-            return None  # End the test
-        
-        cycle_time = run_time % self.cycle_duration
-
-        if cycle_time < self.ramp_duration:
-            # Ramp-up phase: linear increase of users
-            current_users = int((cycle_time / self.ramp_duration) * self.max_users)
-            spawn_rate = self.max_users / self.ramp_duration
-        elif cycle_time < (self.ramp_duration + self.constant_duration):
-            # Constant phase: maintain max_users
-            current_users = self.max_users
-            spawn_rate = 1
-        else:
-            # Pause phase: drop to zero users
-            current_users = 1
-            spawn_rate = 1
-
-        return current_users, spawn_rate
