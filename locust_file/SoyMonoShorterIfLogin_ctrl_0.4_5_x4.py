@@ -1,4 +1,4 @@
-from locust import HttpUser, task, between, LoadTestShape
+from locust import HttpUser, task, between
 from locust import events
 from locust.runners import WorkerRunner
 import json
@@ -93,16 +93,6 @@ class SoyMonoUser(BaseExp):
                     headers={"Authorization": f"Bearer {access_token}"},
                     timeout=1
                 )
-
-class CustomLoadShape(LoadTestShape):
-    """
-    This load shape simulates a workload pattern with a ramp-up phase, a constant phase, and a pause phase.
-    After the total test duration (max_duration) is reached, it returns None, ending the test.
-    """
-    max_users = 100
-    ramp_duration = 60         # seconds for ramp-up
-    constant_duration = 60     # seconds for constant load
-    pause_duration = 240       # seconds with no load
 
     cycle_duration = ramp_duration + constant_duration + pause_duration
 

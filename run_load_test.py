@@ -26,6 +26,8 @@ def parse_args():
     parser.add_argument("--host", type=str, required=True, help="HOST da testare")
     parser.add_argument("--csv", type=str, required=True, help="Percorso del file CSV per i risultati")
     parser.add_argument("-f", "--locust-file", type=str, required=True, help="Percorso del locustfile")
+    parser.add_argument("--loadshape-file", type=str, required=True, 
+                        help="Percorso del file che definisce la LoadShape da utilizzare")
     return parser.parse_args()
 
 def startSys():
@@ -74,11 +76,12 @@ def main():
         "--run-time", args.run_time,
         "--host", args.host,
         "--csv", args.csv,
-        "-f", args.locust_file
+        "-f", args.locust_file,
+        "-f", args.loadshape_file  # Aggiungiamo il file della LoadShape
     ]
     logging.info(" ".join(cmd))
     
-    # Avvia il processo in un nuovo process group e nasconde l'output in stdout e stderr
+    # Avvia il processo in un nuovo process group
     locust_process = subprocess.Popen(
         cmd,
         preexec_fn=os.setsid
