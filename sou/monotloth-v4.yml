@@ -13,7 +13,7 @@ services:
       - monitoring
     healthcheck:
       test: ["CMD", "curl", "-X", "OPTIONS", "-f", "http://localhost:5001/api/exercise-production"]
-      interval: 1s
+      interval: 5s
       timeout: 3s
       retries: 1
       start_period: 15s
