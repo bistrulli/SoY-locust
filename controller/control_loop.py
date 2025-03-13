@@ -36,6 +36,7 @@ class ControlLoop():
             print(f"Response Time:  {self.monitor.rts[-1]}\n"
                   f"Throughput:     {self.monitor.tr[-1]}\n"
                   f"Replicas:       {self.monitor.replica[-1]}\n"
+                  f"Ready Replicas: {self.monitor.ready_replica[-1]}\n"
                   f"Cores:          {self.monitor.cores[-1]}\n"
                   f"WIP:            {self.monitor.users[-1]}\n"
                   f"WIP_prom:       {self.monitor.active_users[-1]}\n"

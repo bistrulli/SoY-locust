@@ -9,6 +9,8 @@ import pandas as pd
 import requests_unixsocket
 import requests
 import re
+import json
+import time
 
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x),
@@ -34,6 +36,7 @@ class Monitoring:
         self.tr += [self.getTroughput()]
         self.cores += [self.getCores()]
         self.replica += [self.get_replicas(self.stack_name,self.serviceName)]
+        self.ready_replica += [self.get_ready_replicas(self.stack_name, self.serviceName)]
         self.users += [self.getUsers()]
         self.active_users += [self.get_active_users()]
         self.memory += [0]
@@ -119,6 +122,87 @@ class Monitoring:
             print(f"[ERROR] Error in get_replicas: {str(e)}")
             print(f"[ERROR] Error type: {type(e)}")
             return None
+      
+    def get_ready_replicas(self, stack_name, service_name):
+        """
+        Gets the number of replicas for a service that are actually ready to process requests.
+        This means containers that are in running state and have passed health checks (if configured).
+        
+        Args:
+            stack_name (str): The name of the stack
+            service_name (str): The name of the service without stack prefix
+            
+        Returns:
+            int: Number of ready replicas
+        """
+        try:
+            # Construct the full service name
+            full_service_name = f"{stack_name}_{service_name}"
+            
+            # Get service info using Docker CLI
+            import subprocess
+            
+            # Get all tasks for this service with their status
+            cmd = ["docker", "service", "ps", "--format", "{{.CurrentState}}", full_service_name]
+            output = subprocess.check_output(cmd, universal_newlines=True)
+            
+            # Count only "Running" tasks
+            task_states = output.strip().split('\n')
+            # Filter lines that start with "Running" and are not empty
+            ready_count = sum(1 for state in task_states if state and state.startswith("Running"))
+            
+            print(f"[DEBUG] Service {full_service_name}: found {ready_count} running replicas")
+            
+            # Check for health status - Abilita il controllo degli health check
+            has_health_check = True
+            
+            # If the service has health checks, we need to count only healthy containers
+            if has_health_check:
+                try:
+                    # Get task IDs for the service tasks
+                    cmd = ["docker", "service", "ps", "--format", "{{.ID}}", full_service_name]
+                    task_ids = subprocess.check_output(cmd, universal_newlines=True).strip().split('\n')
+                    
+                    # Get container IDs from task IDs
+                    container_ids = []
+                    for task_id in task_ids:
+                        if not task_id:
+                            continue
+                        # Get container ID for the task
+                        cmd = ["docker", "inspect", "--format", "{{.Status.ContainerStatus.ContainerID}}", task_id]
+                        try:
+                            container_id = subprocess.check_output(cmd, universal_newlines=True).strip()
+                            if container_id:
+                                container_ids.append(container_id)
+                        except:
+                            pass
+                    
+                    healthy_count = 0
+                    for container_id in container_ids:
+                        # Get container health status
+                        cmd = ["docker", "inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}", container_id]
+                        try:
+                            health_status = subprocess.check_output(cmd, universal_newlines=True).strip()
+                            print(f"[DEBUG] Container {container_id[:12]}: Health status = {health_status}")
+                            if health_status == "healthy":
+                                healthy_count += 1
+                        except Exception as e:
+                            print(f"[DEBUG] Error checking health for container {container_id[:12]}: {str(e)}")
+                    
+                    print(f"[DEBUG] Service {full_service_name}: found {healthy_count} healthy containers out of {len(container_ids)} containers")
+                    return healthy_count
+                except Exception as e:
+                    print(f"[DEBUG] Error checking container health: {str(e)}")
+                    # Fall back to running count
+                    return ready_count
+            else:
+                # If no health checks, return the number of running containers
+                return ready_count
+            
+        except Exception as e:
+            print(f"[ERROR] Error in get_ready_replicas: {str(e)}")
+            # Fallback to nominal replica count
+            return self.get_replicas(stack_name, service_name)
         
     def reset(self):
         self.cores = []
@@ -127,6 +211,7 @@ class Monitoring:
         self.users = []
         self.time = []
         self.replica = []
+        self.ready_replica = []  # Aggiungo la lista per le repliche pronte
         self.util = []
         self.memory =[]
         # Aggiunta per il throughput
@@ -144,6 +229,7 @@ class Monitoring:
             "tr": self.tr,
             "users": self.active_users,
             "replica": self.replica,
+            "ready_replica": self.ready_replica,  # Aggiungo le repliche pronte al CSV
             "util":self.util,
             "mem":self.memory
         }
@@ -155,7 +241,8 @@ class Monitoring:
         except Exception as e:
             print(e)
             print((f"{len(self.cores)},{len(self.rts)}"
-                   f"{len(self.tr)},{len(self.users)},{len(self.replica)}"))
+                   f"{len(self.tr)},{len(self.users)},{len(self.replica)}"
+                   f"{len(self.ready_replica)}"))
 
     def get_active_users(self):
         """
