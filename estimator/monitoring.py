@@ -12,7 +12,7 @@ import re
 import json
 import time
 # Get service info using Docker CLI
-            import subprocess
+import subprocess
 
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x),
@@ -181,13 +181,13 @@ class Monitoring:
                         cmd = ["docker", "inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}", container_id]
                         try:
                             health_status = subprocess.check_output(cmd, universal_newlines=True).strip()
-                            print(f"[DEBUG] Container {container_id[:12]}: Health status = {health_status}")
+                            #print(f"[DEBUG] Container {container_id[:12]}: Health status = {health_status}")
                             if health_status == "healthy":
                                 healthy_count += 1
                         except Exception as e:
                             print(f"[DEBUG] Error checking health for container {container_id[:12]}: {str(e)}")
                     
-                    print(f"[DEBUG] Service {full_service_name}: found {healthy_count} healthy containers out of {len(container_ids)} containers")
+                    #print(f"[DEBUG] Service {full_service_name}: found {healthy_count} healthy containers out of {len(container_ids)} containers")
                     return healthy_count
                 except Exception as e:
                     print(f"[DEBUG] Error checking container health: {str(e)}")
