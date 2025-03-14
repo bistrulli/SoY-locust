@@ -61,7 +61,7 @@ class ControlLoop():
                     replicas=self.controller.OPTController(e=[self.stime], tgt=[self.config["target_utilization"]], C=[float(wip)])
                     self.addSuggestion(np.round(replicas))
                     print(f"CTRL:          {np.round(replicas)}")
-                    self.actuate(replicas=np.round(replicas))
+                    self.actuate(np.round(replicas))
             
             time.sleep(timeparse(self.config["measurament_period"]))
             self.ctrlTick+=1
@@ -83,10 +83,35 @@ class ControlLoop():
             # Aggiungi il valore alla fine dell'array
             self.suggestion.append(replica)
     
-    def isDownScale(self,curRep):
-        if(np.mean(self.suggestion)>curRep):
-            return True
-        else:
+    def isDownScale(self, requested_replicas):
+        """
+        Determina se si tratta di downscaling confrontando le repliche richieste
+        con quelle attualmente configurate nel servizio Docker.
+        
+        Args:
+            requested_replicas (int): Numero di repliche richieste dal controllore
+            
+        Returns:
+            bool: True se è downscaling (richieste < attuali), False altrimenti
+        """
+        try:
+            # Construct full service name
+            full_service_name = f"{self.config['stack_name']}_{self.config['service_name']}"
+            
+            # Get the service
+            service = self.docker_client.services.get(full_service_name)
+            
+            # Get current number of replicas from Docker service
+            current_replicas = service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 1)
+            
+            # It's downscaling if requested replicas are less than current replicas
+            is_downscaling = requested_replicas < current_replicas
+            print(f"[DEBUG] Checking scaling: requested={requested_replicas}, current={current_replicas}, isDownScale={is_downscaling}")
+            
+            return is_downscaling
+        except Exception as e:
+            print(f"[ERROR] Error in isDownScale: {str(e)}")
+            # In case of error, assume upscaling for safety
             return False
 
     ###L'idea è quella che in base al file di configurazione instazionio il giusto controllore
@@ -125,7 +150,7 @@ class ControlLoop():
         '''
         return QNEstimaator()
 
-    def actuate(self, replicas):
+    def actuate(self,replicas):
         """
         Aggiorna la configurazione del service monitorato impostando il numero di repliche.
         Implementa una logica differenziata: ritardo nel downscaling, risposta immediata nell'upscaling.

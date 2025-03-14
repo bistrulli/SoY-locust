@@ -90,9 +90,11 @@ if __name__ == "__main__":
                 rep,cumRep=getavg_avg_replica(csv_file)
                 thr=get_sys_troughput(csv_file)
                 res+=[[Path(csv_file).stem,rac_ok+rac_ko,fr,efr,rep,cumRep,thr]+rt_dist.tolist()]
+            else:
+                print(f"Experiment {Path(csv_file).parent.name} is not complete")
 
         df=pd.DataFrame(res,columns=["EXP","RAC","FR","EFR","REP","∫REP","R/s","50%","75%","95%"])
-        print(df.sort_values(by="REP"))
+        print(df.sort_values(by=['REP', '95%', '75%', '50%'], ascending=[True, True, True, True]))
     else:
         # Single file case
         rac_ok, rac_ko = calculate_rac(path, theoretical_total)
