@@ -105,15 +105,15 @@ class ControlLoop():
         try:
             # Construct full service name
             full_service_name = f"{self.config['stack_name']}_{self.config['service_name']}"
-            print(f"[DEBUG ACTUATE] Attempting to scale service: '{full_service_name}' to {int(replicas)} replicas")
-            print(f"[DEBUG ACTUATE] Available services: {[service.name for service in self.docker_client.services.list()]}")
+            #print(f"[DEBUG ACTUATE] Attempting to scale service: '{full_service_name}' to {int(replicas)} replicas")
+            #print(f"[DEBUG ACTUATE] Available services: {[service.name for service in self.docker_client.services.list()]}")
             
             service = self.docker_client.services.get(full_service_name)
-            print(f"[DEBUG ACTUATE] Found service: {service.name}")
+            #print(f"[DEBUG ACTUATE] Found service: {service.name}")
             
             # Converti replicas in int per evitare errori JSON
             service.scale(max(1,int(replicas)))
-            print(f"[SUCCESS] Updated service {full_service_name} to {int(replicas)} replicas")
+            #print(f"[SUCCESS] Updated service {full_service_name} to {int(replicas)} replicas")
         except docker.errors.NotFound:
             print(f"[ERROR ACTUATE] Service '{full_service_name}' not found")
             print(f"[ERROR ACTUATE] Make sure both stack_name ('{self.config['stack_name']}') and service_name ('{self.config['service_name']}') are correct")
