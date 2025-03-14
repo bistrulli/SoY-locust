@@ -11,10 +11,13 @@ import requests
 import re
 import json
 import time
+# Get service info using Docker CLI
+            import subprocess
 
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x)/len(x),
-                 serviceName="", stack_name="", promHost="localhost", promPort=9090, sysfile=""):
+                 serviceName="", stack_name="", promHost="localhost",
+                 promPort=9090, sysfile="",has_health_check=False):
         self.reducer = reducer
         self.window = window
         self.sla = sla
@@ -24,6 +27,7 @@ class Monitoring:
         self.promHost = promHost
         self.sysfile = sysfile
         self.client = docker.from_env()
+        self.has_health_check = has_health_check
         if(not Path(self.sysfile).exists()):
             raise FileNotFoundError(f"File {self.sysfile} not found")
         self.sys=yaml.safe_load(self.sysfile.open())
@@ -139,9 +143,6 @@ class Monitoring:
             # Construct the full service name
             full_service_name = f"{stack_name}_{service_name}"
             
-            # Get service info using Docker CLI
-            import subprocess
-            
             # Get all tasks for this service with their status
             cmd = ["docker", "service", "ps", "--format", "{{.CurrentState}}", full_service_name]
             output = subprocess.check_output(cmd, universal_newlines=True)
@@ -151,13 +152,10 @@ class Monitoring:
             # Filter lines that start with "Running" and are not empty
             ready_count = sum(1 for state in task_states if state and state.startswith("Running"))
             
-            print(f"[DEBUG] Service {full_service_name}: found {ready_count} running replicas")
-            
-            # Check for health status - Abilita il controllo degli health check
-            has_health_check = True
+            #print(f"[DEBUG] Service {full_service_name}: found {ready_count} running replicas")
             
             # If the service has health checks, we need to count only healthy containers
-            if has_health_check:
+            if self.has_health_check:
                 try:
                     # Get task IDs for the service tasks
                     cmd = ["docker", "service", "ps", "--format", "{{.ID}}", full_service_name]

@@ -112,7 +112,7 @@ class ControlLoop():
             print(f"[DEBUG ACTUATE] Found service: {service.name}")
             
             # Converti replicas in int per evitare errori JSON
-            service.scale(int(replicas))
+            service.scale(max(1,int(replicas)))
             print(f"[SUCCESS] Updated service {full_service_name} to {int(replicas)} replicas")
         except docker.errors.NotFound:
             print(f"[ERROR ACTUATE] Service '{full_service_name}' not found")
