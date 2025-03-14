@@ -65,7 +65,10 @@ def get_sys_troughput(results_csv):
     df = pd.read_csv(results_csv)
     df_no_last = df.iloc[:-1]  # Escludo l'ultima riga
     return df_no_last["Requests/s"].mean()
-    
+
+def is_complete(results_csv):
+    resPath=Path(results_csv)
+    return (resPath.parent/f"{resPath.parent.name}.csv").exists()
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -79,13 +82,14 @@ if __name__ == "__main__":
         csv_files = glob.glob(os.path.join(path, "**", "*_stats.csv"), recursive=True)
         res=[]
         for csv_file in csv_files:
-            rac_ok, rac_ko = calculate_rac(csv_file, theoretical_total)
-            fr = calulate_fr(csv_file)
-            efr = compute_efr(csv_file,theoretical_total)
-            rt_dist=compute_rt_dist(csv_file)
-            rep,cumRep=getavg_avg_replica(csv_file)
-            thr=get_sys_troughput(csv_file)
-            res+=[[Path(csv_file).stem,rac_ok+rac_ko,fr,efr,rep,cumRep,thr]+rt_dist.tolist()]
+            if(is_complete(csv_file)):
+                rac_ok, rac_ko = calculate_rac(csv_file, theoretical_total)
+                fr = calulate_fr(csv_file)
+                efr = compute_efr(csv_file,theoretical_total)
+                rt_dist=compute_rt_dist(csv_file)
+                rep,cumRep=getavg_avg_replica(csv_file)
+                thr=get_sys_troughput(csv_file)
+                res+=[[Path(csv_file).stem,rac_ok+rac_ko,fr,efr,rep,cumRep,thr]+rt_dist.tolist()]
 
         df=pd.DataFrame(res,columns=["EXP","RAC","FR","EFR","REP","∫REP","R/s","50%","75%","95%"])
         print(df.sort_values(by="REP"))

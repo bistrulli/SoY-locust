@@ -19,6 +19,9 @@ class ControlLoop():
         self.controller = None
         self.monitoring = None 
 
+        self.cooldown = 3
+        self.suggestion = []
+
     '''TODO: devo ristrutturare il condice in modo tale che le misure
             vengano prese ogni secondo, la stima fatta ogni n tick e il controllo ogni m tick
     '''
@@ -56,12 +59,36 @@ class ControlLoop():
                 wip=self.monitor.predict_users(horizon=self.prediction_horizon)
                 if(not self.config["stealth"]):
                     replicas=self.controller.OPTController(e=[self.stime], tgt=[self.config["target_utilization"]], C=[float(wip)])
+                    self.addSuggestion(np.round(replicas))
                     print(f"CTRL:          {np.round(replicas)}")
                     self.actuate(replicas=np.round(replicas))
             
             time.sleep(timeparse(self.config["measurament_period"]))
             self.ctrlTick+=1
     
+    def addSuggestion(self,replica):
+        """
+        Aggiunge un nuovo valore all'array circolare delle suggestioni.
+        Quando l'array raggiunge la dimensione massima (self.cooldown),
+        sposta tutti gli elementi a sinistra e aggiunge il nuovo valore alla fine.
+        
+        Args:
+            replica (float): Valore di replica da aggiungere
+        """
+        if len(self.suggestion) >= self.cooldown:
+            # Shift tutti gli elementi a sinistra (rimuove il primo elemento)
+            # e aggiungi il nuovo valore alla fine
+            self.suggestion = self.suggestion[1:] + [replica]
+        else:
+            # Aggiungi il valore alla fine dell'array
+            self.suggestion.append(replica)
+    
+    def isDownScale(self,curRep):
+        if(np.mean(self.suggestion)>curRep):
+            return True
+        else:
+            return False
+
     ###L'idea è quella che in base al file di configurazione instazionio il giusto controllore
     ###Il giusto monitoring e il giusto stimatore
     def getController(self):
@@ -101,19 +128,38 @@ class ControlLoop():
     def actuate(self, replicas):
         """
         Aggiorna la configurazione del service monitorato impostando il numero di repliche.
+        Implementa una logica differenziata: ritardo nel downscaling, risposta immediata nell'upscaling.
         """
         try:
             # Construct full service name
             full_service_name = f"{self.config['stack_name']}_{self.config['service_name']}"
-            #print(f"[DEBUG ACTUATE] Attempting to scale service: '{full_service_name}' to {int(replicas)} replicas")
-            #print(f"[DEBUG ACTUATE] Available services: {[service.name for service in self.docker_client.services.list()]}")
+            print(f"[DEBUG ACTUATE] Attempting to scale service: '{full_service_name}' to {int(replicas)} replicas")
+            print(f"[DEBUG ACTUATE] Available services: {[service.name for service in self.docker_client.services.list()]}")
             
             service = self.docker_client.services.get(full_service_name)
-            #print(f"[DEBUG ACTUATE] Found service: {service.name}")
+            print(f"[DEBUG ACTUATE] Found service: {service.name}")
             
-            # Converti replicas in int per evitare errori JSON
-            service.scale(max(1,int(replicas)))
-            #print(f"[SUCCESS] Updated service {full_service_name} to {int(replicas)} replicas")
+            # Ottieni il numero attuale di repliche
+            current_replicas = service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 1)
+            
+            # Verifica se si tratta di downscaling (richiesta repliche < repliche attuali)
+            if self.isDownScale(int(replicas)):
+                # Per il downscaling, utilizziamo il massimo delle ultime suggestioni
+                # in modo da essere ancora più cauti nella riduzione delle risorse
+                if len(self.suggestion) > 0:
+                    # Calcola il massimo delle suggestioni, ma non scendere sotto il valore minimo
+                    max_suggestion = max(self.suggestion)
+                    target_replicas = max(1, int(max_suggestion))
+                    print(f"[DOWNSCALING] Richiesto: {int(replicas)}, Massimo suggestioni: {max_suggestion}, Target: {target_replicas}")
+                    service.scale(target_replicas)
+                else:
+                    # Se non abbiamo suggestioni, usiamo il valore richiesto
+                    service.scale(max(1, int(replicas)))
+            else:
+                # Per l'upscaling, rispondiamo immediatamente per garantire prestazioni
+                # Converti replicas in int per evitare errori JSON
+                service.scale(max(1, int(replicas)))
+                print(f"[UPSCALING] Updated service {full_service_name} to {int(replicas)} replicas")
         except docker.errors.NotFound:
             print(f"[ERROR ACTUATE] Service '{full_service_name}' not found")
             print(f"[ERROR ACTUATE] Make sure both stack_name ('{self.config['stack_name']}') and service_name ('{self.config['service_name']}') are correct")
