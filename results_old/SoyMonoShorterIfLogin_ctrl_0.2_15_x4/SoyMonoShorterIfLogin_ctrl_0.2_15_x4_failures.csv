@@ -1,0 +1,7 @@
+Method,Name,Error,Occurrences
+OPTIONS,/api/user/login,"ConnectionRefusedError(111, 'Connection refused')",11
+GET,/api/auth/verify,RemoteDisconnected('Remote end closed connection without response'),1
+POST,/api/user/login,RemoteDisconnected('Remote end closed connection without response'),1
+POST,/api/user/login,"ConnectionRefusedError(111, 'Connection refused')",1
+POST,/api/exercise-production,RemoteDisconnected('Remote end closed connection without response'),7
+DELETE,/api/user/logout,"ConnectionResetError(104, 'Connection reset by peer')",1

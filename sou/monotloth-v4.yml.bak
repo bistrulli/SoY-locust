@@ -11,8 +11,14 @@ services:
       - /home/ubuntu/ShellOnYou/sou/monotloth-v4/variables.env
     networks:
       - monitoring
+    # healthcheck:
+    #   test: ["CMD", "curl", "-X", "OPTIONS", "-f", "http://localhost:5001/api/exercise-production"]
+    #   interval: 5s
+    #   timeout: 3s
+    #   retries: 3
+    #   start_period: 15s
     deploy:
-      replicas: 4 # Numero iniziale di repliche
+      replicas: 1 # Numero iniziale di repliche
       update_config:
         parallelism: 1
         delay: 30s
