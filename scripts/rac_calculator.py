@@ -2,6 +2,7 @@ import sys
 import os
 import glob
 import pandas as pd
+import numpy as np
 from pathlib import Path
 import re
 
@@ -70,6 +71,59 @@ def is_complete(results_csv):
     resPath=Path(results_csv)
     return (resPath.parent/f"{resPath.parent.name}.csv").exists()
 
+def calculate_replica_integral(results_csv):
+    """
+    Calcola l'integrale numerico della colonna "replica" nel file CSV originale 
+    associato al file di statistiche fornito.
+    Utilizza il metodo dei trapezi per l'integrazione numerica.
+    
+    Args:
+        results_csv (str): Path al file CSV di statistiche (es. *_stats.csv)
+        
+    Returns:
+        float: Valore dell'integrale numerico delle repliche
+    """
+    try:
+        # Determino il percorso del file dati originale
+        experiment_dir = Path(results_csv).parent
+        experiment_name = experiment_dir.name
+        data_file = experiment_dir / f"{experiment_name}.csv"
+        
+        if not data_file.exists():
+            print(f"Errore: File dati originale {data_file} non trovato")
+            return 0.0
+            
+        # Leggi il file CSV originale
+        df = pd.read_csv(data_file)
+        
+        # Verifica che la colonna "replica" esista
+        if 'replica' not in df.columns:
+            print(f"Errore: La colonna 'replica' non esiste nel file {data_file}")
+            return 0.0
+        
+        # Estrai i valori di replica
+        replicas = df['replica'].values
+        
+        # Se il file contiene timestamp, usali per una migliore approssimazione
+        if 'Timestamp' in df.columns:
+            timestamps = df['Timestamp'].values
+            # Converti i timestamp in secondi se necessario
+            if isinstance(timestamps[0], str):
+                timestamps = pd.to_datetime(timestamps).astype(np.int64) // 10**9
+            
+            # Calcola l'integrale usando il metodo dei trapezi con i timestamp
+            integral = np.trapezoid(replicas, timestamps)
+        else:
+            # Altrimenti, assume punti equidistanti (1 secondo tra ogni misurazione)
+            # Calcola l'integrale usando il metodo dei trapezi con intervalli di 1
+            integral = np.trapezoid(replicas)
+        
+        return integral
+    
+    except Exception as e:
+        print(f"Errore durante il calcolo dell'integrale per {results_csv}: {str(e)}")
+        return 0.0
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python rac_calculator.py <results_csv_or_directory>")
@@ -89,15 +143,25 @@ if __name__ == "__main__":
                 rt_dist=compute_rt_dist(csv_file)
                 rep,cumRep=getavg_avg_replica(csv_file)
                 thr=get_sys_troughput(csv_file)
-                res+=[[Path(csv_file).stem,rac_ok+rac_ko,fr,efr,rep,cumRep,thr]+rt_dist.tolist()]
+                
+                # Calcola l'integrale delle repliche
+                replica_integral = calculate_replica_integral(csv_file)
+                
+                res+=[[Path(csv_file).stem,rac_ok+rac_ko,fr,
+                       efr,rep,replica_integral,thr]+rt_dist.tolist()]
             else:
                 print(f"Experiment {Path(csv_file).parent.name} is not complete")
 
         df=pd.DataFrame(res,columns=["EXP","RAC","FR","EFR","REP","∫REP","R/s","50%","75%","95%"])
-        print(df.sort_values(by=['REP', '95%', '75%', '50%'], ascending=[True, True, True, True]))
+        print(df.sort_values(by=['95%', '75%', '50%','∫REP'], ascending=[True, True, True, True]))
     else:
         # Single file case
         rac_ok, rac_ko = calculate_rac(path, theoretical_total)
         print(f"Request Acceptance Capability (OK): {rac_ok:.4f}")
         print(f"Request Acceptance Capability (KO): {rac_ko:.4f}")
         print(f"RAC: {rac_ok+rac_ko:.4f}")
+        
+        # If it's a stats file, try to find the corresponding data file for replica integral
+        if "_stats.csv" in path:
+            replica_integral = calculate_replica_integral(path)
+            print(f"Replica Integral: {replica_integral:.4f}")
