@@ -33,19 +33,32 @@ class ControlLoop():
         while not self.toStop:
             # Ottieni il tempo corrente.
             t=self.getSimTime(environment=environment)
-            self.monitor.tick(t)
-            print(f"### tick = {t},ctrlTick = {self.ctrlTick} ###")
-            # Stampa formattata in più righe
-            print(f"Response Time:  {self.monitor.rts[-1]}\n"
-                  f"Throughput:     {self.monitor.tr[-1]}\n"
-                  f"Replicas:       {self.monitor.replica[-1]}\n"
-                  f"Ready Replicas: {self.monitor.ready_replica[-1]}\n"
-                  f"Cores:          {self.monitor.cores[-1]}\n"
-                  f"WIP:            {self.monitor.users[-1]}\n"
-                  f"WIP_prom:       {self.monitor.active_users[-1]}\n"
-                  f"WIP_pred:       {self.monitor.predict_users(horizon=self.prediction_horizon)}\n"
-                  f"Util:           {self.monitor.util[-1]}\n"
-                  f"Mem:            {self.monitor.util[-1]}")
+            try:
+                self.monitor.tick(t)
+                print(f"### tick = {t},ctrlTick = {self.ctrlTick} ###")
+                
+                # Verifica che tutte le liste abbiano almeno un elemento prima di accedervi
+                if (len(self.monitor.rts) > 0 and len(self.monitor.tr) > 0 and
+                    len(self.monitor.replica) > 0 and len(self.monitor.ready_replica) > 0 and
+                    len(self.monitor.cores) > 0 and len(self.monitor.users) > 0 and
+                    len(self.monitor.active_users) > 0 and len(self.monitor.util) > 0):
+                    
+                    # Stampa formattata in più righe
+                    print(f"Response Time:  {self.monitor.rts[-1]}\n"
+                          f"Throughput:     {self.monitor.tr[-1]}\n"
+                          f"Replicas:       {self.monitor.replica[-1]}\n"
+                          f"Ready Replicas: {self.monitor.ready_replica[-1]}\n"
+                          f"Cores:          {self.monitor.cores[-1]}\n"
+                          f"WIP:            {self.monitor.users[-1]}\n"
+                          f"WIP_prom:       {self.monitor.active_users[-1]}\n"
+                          f"WIP_pred:       {self.monitor.predict_users(horizon=self.prediction_horizon)}\n"
+                          f"Util:           {self.monitor.util[-1]}\n"
+                          f"Mem:            {self.monitor.memory[-1]}")  # Corretto: memory invece di util
+                else:
+                    print(f"[WARNING] Dati del monitor non ancora disponibili o incompleti nel ciclo {self.ctrlTick}")
+            except Exception as e:
+                print(f"[ERROR] Errore durante il ciclo di controllo: {str(e)}")
+                # Continua l'esecuzione per provare nel prossimo ciclo
             if(self.ctrlTick>self.config["estimation_window"] and 
                len(self.monitor.rts)>=self.config["estimation_window"]):
                 totalcores = np.array(self.monitor.cores[-self.config["estimation_window"]:]) * np.array(self.monitor.replica[-self.config["estimation_window"]:])
