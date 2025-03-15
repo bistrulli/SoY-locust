@@ -35,69 +35,16 @@ class Monitoring:
         self.reset()
 
     def tick(self, t):
-        """
-        Aggiorna tutte le metriche in modo atomico, garantendo che tutti gli array 
-        mantengano la stessa lunghezza anche in caso di errori o interruzioni.
-        """
-        try:
-            # Raccolgo tutti i valori prima di aggiungere qualsiasi cosa alle liste
-            rt_value = self.getResponseTime()
-            tr_value = self.getTroughput()
-            cores_value = self.getCores()
-            replica_value = self.get_replicas(self.stack_name, self.serviceName)
-            ready_replica_value = self.get_ready_replicas(self.stack_name, self.serviceName)
-            users_value = self.getUsers()
-            active_users_value = self.get_active_users()
-            memory_value = 0  # Il valore sembra essere sempre 0
-            util_value = self.get_service_cpu_utilization(stack_name=self.stack_name, service_name=self.serviceName)
-            
-            # Aggiungo tutti i valori alle liste in modo atomico
-            self.time.append(t)
-            self.rts.append(rt_value)
-            self.tr.append(tr_value)
-            self.cores.append(cores_value)
-            self.replica.append(replica_value)
-            self.ready_replica.append(ready_replica_value)
-            self.users.append(users_value)
-            self.active_users.append(active_users_value)
-            self.memory.append(memory_value)
-            self.util.append(util_value)
-            
-            # Debug info - verifica la lunghezza delle liste
-            lengths = {
-                "time": len(self.time),
-                "rts": len(self.rts),
-                "tr": len(self.tr),
-                "cores": len(self.cores),
-                "replica": len(self.replica),
-                "ready_replica": len(self.ready_replica),
-                "users": len(self.users),
-                "active_users": len(self.active_users),
-                "memory": len(self.memory),
-                "util": len(self.util)
-            }
-            
-            if len(set(lengths.values())) > 1:
-                print(f"[WARNING] Inconsistent array lengths detected: {lengths}")
-            
-        except Exception as e:
-            print(f"[ERROR] Exception in tick: {str(e)}")
-            # In caso di errore, assicuro che tutte le liste abbiano la stessa lunghezza
-            max_len = max(len(self.time), len(self.rts), len(self.tr), len(self.cores), 
-                          len(self.replica), len(self.ready_replica), len(self.users), 
-                          len(self.active_users), len(self.memory), len(self.util))
-            
-            # Allineo tutte le liste alla lunghezza massima
-            while len(self.time) < max_len: self.time.append(self.time[-1] if self.time else t)
-            while len(self.rts) < max_len: self.rts.append(self.rts[-1] if self.rts else 0)
-            while len(self.tr) < max_len: self.tr.append(self.tr[-1] if self.tr else 0)
-            while len(self.cores) < max_len: self.cores.append(self.cores[-1] if self.cores else 0)
-            while len(self.replica) < max_len: self.replica.append(self.replica[-1] if self.replica else 0)
-            while len(self.ready_replica) < max_len: self.ready_replica.append(self.ready_replica[-1] if self.ready_replica else 0)
-            while len(self.users) < max_len: self.users.append(self.users[-1] if self.users else 0)
-            while len(self.active_users) < max_len: self.active_users.append(self.active_users[-1] if self.active_users else 0)
-            while len(self.memory) < max_len: self.memory.append(self.memory[-1] if self.memory else 0)
-            while len(self.util) < max_len: self.util.append(self.util[-1] if self.util else 0)
+        self.time += [t]
+        self.rts += [self.getResponseTime()]
+        self.tr += [self.getTroughput()]
+        self.cores += [self.getCores()]
+        self.replica += [self.get_replicas(self.stack_name,self.serviceName)]
+        self.ready_replica += [self.get_ready_replicas(self.stack_name, self.serviceName)]
+        self.users += [self.getUsers()]
+        self.active_users += [self.get_active_users()]
+        self.memory += [0]
+        self.util += [self.get_service_cpu_utilization(stack_name=self.stack_name,service_name=self.serviceName)]
 
     def getUsers(self):
         #torno il numero di utenti attivi (Little's Law)
