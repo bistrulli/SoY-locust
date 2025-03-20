@@ -1,9 +1,0 @@
-Method,Name,Error,Occurrences
-OPTIONS,/api/user/login,"ConnectionResetError(104, 'Connection reset by peer')",1
-POST,/api/user/login,"ConnectionResetError(104, 'Connection reset by peer')",1
-OPTIONS,/api/user/login,"ConnectionRefusedError(111, 'Connection refused')",13
-OPTIONS,/api/user/logout,RemoteDisconnected('Remote end closed connection without response'),1
-OPTIONS,/api/auth/verify,"ConnectionResetError(104, 'Connection reset by peer')",1
-POST,/api/user/login,"ConnectionRefusedError(111, 'Connection refused')",1
-POST,/api/exercise-production,RemoteDisconnected('Remote end closed connection without response'),6
-POST,/api/exercise-production,"ConnectionResetError(104, 'Connection reset by peer')",1
