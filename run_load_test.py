@@ -12,23 +12,41 @@ import time
 
 # Configura il logger
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-stackName="monotloth-stack"
-stackPath=Path(__file__).parent/"sou"/"monotloth-v4.yml"
+stackName = "monotloth-stack"
+stackPath = Path(__file__).parent / "sou" / "monotloth-v4.yml"
 
 # Variabile globale per salvare il processo Locust
 locust_process = None
 
+
 def parse_args():
-    parser = argparse.ArgumentParser(description="Esegui il load test con Locust")
-    parser.add_argument("--users", type=int, required=True, help="Numero di utenti (LOCUST_USERS)")
-    parser.add_argument("--spawn-rate", type=int, default=100, help="Velocità di spawn degli utenti")
-    parser.add_argument("--run-time", type=str, required=True, help="Tempo di esecuzione del test")
-    parser.add_argument("--host", type=str, required=True, help="HOST da testare")
-    parser.add_argument("--csv", type=str, required=True, help="Percorso del file CSV per i risultati")
-    parser.add_argument("-f", "--locust-file", type=str, required=True, help="Percorso del locustfile")
-    parser.add_argument("--loadshape-file", type=str, required=True, 
-                        help="Percorso del file che definisce la LoadShape da utilizzare")
+    parser = argparse.ArgumentParser(description="Perform the load test with Locust")
+    parser.add_argument("--users", type=int, required=True, help="Number of users (LOCUST_USERS)")
+    parser.add_argument("--spawn-rate", type=int, default=100, help="User spawn speed")
+    parser.add_argument("--run-time", type=str, required=True, help="Test execution time")
+    parser.add_argument("--host", type=str, required=True, help="Host to test")
+    parser.add_argument("--csv", type=str, required=True, help="CSV file path for the results")
+    parser.add_argument("-f", "--locust-file", type=str, required=True, help="Locustfile path")
+    parser.add_argument("--loadshape-file", type=str, required=True,
+                        help="Path of the file that defines the LoadShape to be used.")
     return parser.parse_args()
+
+
+def initSys():
+    try:
+        logging.info(f"Deploying Docker Swarm leave")
+        cmd = ["docker", "swarm", "leave", "--force"]
+        subprocess.run(cmd, check=True)
+        logging.info("Docker Swarm stack leave successfully.")
+    except :
+
+        logging.info("Docker Swarm stack leave failed.")
+
+    logging.info(f"Deploying Docker Swarm init")
+    cmd = ["docker", "swarm", "init"]
+    subprocess.run(cmd, check=True)
+    logging.info("Docker Swarm stack initiated successfully.")
+
 
 def startSys():
     # Avvia la specifica Docker Swarm utilizzando il file sou/monotloth-v4.yml
@@ -37,12 +55,14 @@ def startSys():
     subprocess.run(cmd, check=True)
     logging.info("Docker Swarm stack deployed successfully.")
 
+
 def stopSys():
     # Rimozione della stack Docker Swarm
     logging.info(f"Removing Docker Swarm stack {stackName}")
     cmd = ["docker", "stack", "rm", stackName]
     subprocess.run(cmd, check=True)
     logging.info("Docker Swarm stack removed successfully.")
+
 
 def handle_sigint(signum, frame):
     global locust_process
@@ -56,17 +76,19 @@ def handle_sigint(signum, frame):
     stopSys()
     sys.exit(0)
 
+
 # Registra il signal handler per SIGINT
 signal.signal(signal.SIGINT, handle_sigint)
+
 
 def main():
     global locust_process
     args = parse_args()
-    
+    initSys()  # Deploy Docker Swarm stack
     startSys()  # Deploy Docker Swarm stack
     time.sleep(10)
     logging.info("Starting Locust with command:")
-    
+
     # Costruzione del comando Locust in base ai parametri
     cmd = [
         "locust",
@@ -79,17 +101,18 @@ def main():
         "-f", f"{args.locust_file},{args.loadshape_file}"  # Passa entrambi i file con una singola -f
     ]
     logging.info(" ".join(cmd))
-    
+
     # Avvia il processo in un nuovo process group
     locust_process = subprocess.Popen(
         cmd,
         preexec_fn=os.setsid
-        #stdout=subprocess.DEVNULL,
-        #stderr=subprocess.DEVNULL
+        # stdout=subprocess.DEVNULL,
+        # stderr=subprocess.DEVNULL
     )
     locust_process.wait()
     logging.info("Locust execution finished.")
     stopSys()  # Stop della Docker Swarm stack
+
 
 if __name__ == "__main__":
     main()

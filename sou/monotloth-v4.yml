@@ -8,7 +8,7 @@ services:
       - 5001:5001
     restart: always
     env_file:
-      - /home/ubuntu/ShellOnYou/sou/monotloth-v4/variables.env
+      - ./monotlith-v4/variables.env
     networks:
       - monitoring
     # healthcheck:
@@ -38,7 +38,7 @@ services:
     container_name: postgres
     restart: always
     env_file:
-      - /home/ubuntu/ShellOnYou/sou/monotloth-v4/variables.env
+      - ./monotlith-v4/variables.env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -132,6 +132,7 @@ services:
 networks:
   monitoring:
     driver: overlay
+    attachable: true
 
 volumes:
   postgres_data:
