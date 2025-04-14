@@ -522,6 +522,23 @@ if __name__ == "__main__":
         res=[]
         for csv_file in csv_files:
             if(is_complete(csv_file)):
+                Pred=None
+                Util=None
+                Name=None
+                
+                Init=None
+                Init=re.findall(r"_x[0-9]+_",csv_file)[0]
+                Init=re.findall(r"[0-9]+",string=Init)[0]
+
+                if("ctrl" in csv_file):
+                    Name="Dynamic"
+                    Util=re.findall(r"_[0-9]+\.[0-9]+_",csv_file)[0]
+                    Util=re.findall(r"[0-9]+\.[0-9]+",Util)[0]
+                    Pred=re.findall(r"_[0-9]+_",csv_file)[0]
+                    Pred=re.findall(r"[0-9]+",Pred)[0]
+                else:
+                    Name="Static"
+
                 rac_ok, rac_ko = calculate_rac(csv_file, theoretical_total)
                 fr = calulate_fr(csv_file)
                 efr = compute_efr(csv_file,theoretical_total)
@@ -533,13 +550,13 @@ if __name__ == "__main__":
                 # Calcola l'integrale delle repliche
                 replica_integral = calculate_replica_integral(csv_file)
                 
-                res+=[[Path(csv_file).stem,rac_ok+rac_ko,fr,
+                res+=[[Name,Pred,Util,Init,rac_ok+rac_ko,fr,
                        efr,rep,replica_integral,thr,pre_cost[0]]+rt_dist.tolist()]
             else:
                 print(f"Experiment {Path(csv_file).parent.name} is not complete")
 
         # Calcola la pendenza del modello lineare
-        df=pd.DataFrame(res,columns=["EXP","RAC","FR","EFR","REP","∫REP","R/s","PRE_COST","50%","75%","95%"])
+        df=pd.DataFrame(res,columns=["CTRL","PRED","UTIL","INIT","RAC","FR","EFR","REP","∫REP","R/s","PRE_COST","50%","75%","95%"])
         print(df.sort_values(by=['∫REP','50%','75%','95%'], ascending=[True, True, True, True]))
         
         # Crea il boxplot dei tempi di risposta
