@@ -16,8 +16,11 @@ echo "Starting batch tests for all locust files..."
 
 current_date=$(date +"%Y-%m-%d_%H-%M-%S")
 
-base_path="results/${current_date}"
+#base_path="results/${current_date}"
+base_path="results"
 # Recupera tutti i file nella cartella locust_file il cui nome inizia per "SoyMonoShorterIfLogin"
+
+curl --location 'https://measure.tasul.fr/api/measure/start/6802620805dedb7e0abf62fa'
 for file in locust_file/SoyMonoShorterIfLogin*.py; do
     if [ -f "$file" ]; then
         # Estrae l'intero successivo alla sottostringa "_x" nel nome del file (fino a prima di .py)
@@ -41,9 +44,12 @@ for file in locust_file/SoyMonoShorterIfLogin*.py; do
         mkdir -p "${base_path}/${base}"
         echo "Execution of the test for: $file with replica $num, CSV in: $csv_dir"
 
+        curl --location 'https://measure.tasul.fr/api/measure/step/start/6802620805dedb7e0abf62fa?step='+$file
         # Aggiorno il comando per passare anche il parametro loadshape-file
-        python3 run_load_test.py --users 1 --spawn-rate 100 --run-time 3m --host http://127.0.0.1:5001 --csv "$csv_dir" --locust-file "$file" --loadshape-file "$LOADSHAPE_FILE" >> "${base_path}/${base}/locust.log" 2>&1
-        #echo "python3 run_load_test.py --users 1 --spawn-rate 100 --run-time 3m --host http://localhost:5001 --csv "${csv_dir}" --locust-file "$file" --loadshape-file "$LOADSHAPE_FILE" >> "${base_path}/${base}/locust.log" 2>&1"
+        python3 run_load_test.py --remote 192.168.3.102 --users 1 --spawn-rate 100 --run-time 3m --host http://192.168.3.102:5001 --csv "$csv_dir" --locust-file "$file" --loadshape-file "$LOADSHAPE_FILE" >> "${base_path}/${base}/locust.log" 2>&1
         sleep 3m # aggiunto per attendere 3 minuti dopo l'esecuzione del test
+        curl --location 'https://measure.tasul.fr/api/measure/step/stop/6802620805dedb7e0abf62fa?step='+$file
+        break
     fi
 done
+curl --location 'https://measure.tasul.fr/api/measure/stop/6802620805dedb7e0abf62fa'

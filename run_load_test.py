@@ -26,16 +26,24 @@ def parse_args():
     parser.add_argument("--run-time", type=str, required=True, help="Test execution time")
     parser.add_argument("--host", type=str, required=True, help="Host to test")
     parser.add_argument("--csv", type=str, required=True, help="CSV file path for the results")
+    parser.add_argument("-r", "--remote", type=str, required=False, help="Remote host to test")
     parser.add_argument("-f", "--locust-file", type=str, required=True, help="Locustfile path")
     parser.add_argument("--loadshape-file", type=str, required=True,
                         help="Path of the file that defines the LoadShape to be used.")
     return parser.parse_args()
 
 
-def initSys():
+def initSys(args):
     try:
         logging.info(f"Deploying Docker Swarm leave")
-        cmd = ["docker", "swarm", "leave", "--force"]
+        cmd = []
+        if args.remote:
+            cmd.append("ssh")
+            cmd.append(args.remote)
+        cmd.append("docker")
+        cmd.append("swarm")
+        cmd.append("leave")
+        cmd.append("--force")
         subprocess.run(cmd, check=True)
         logging.info("Docker Swarm stack leave successfully.")
     except :
@@ -43,23 +51,48 @@ def initSys():
         logging.info("Docker Swarm stack leave failed.")
 
     logging.info(f"Deploying Docker Swarm init")
-    cmd = ["docker", "swarm", "init"]
+    cmd = []
+    if args.remote:
+        cmd.append("ssh")
+        cmd.append(args.remote)
+    cmd.append("docker")
+    cmd.append("swarm")
+    cmd.append("init")
     subprocess.run(cmd, check=True)
     logging.info("Docker Swarm stack initiated successfully.")
 
 
-def startSys():
+def startSys(args):
     # Avvia la specifica Docker Swarm utilizzando il file sou/monotloth-v4.yml
     logging.info(f"Deploying Docker Swarm stack using {stackName}")
-    cmd = ["docker", "stack", "deploy", "--detach=true", "-c", str(stackPath.absolute()), stackName]
+    cmd = []
+    if args.remote:
+        cmd.append("ssh")
+        cmd.append(args.remote)
+    cmd.append("docker")
+    cmd.append("stack")
+    cmd.append("deploy")
+    cmd.append("--detach=true")
+    cmd.append("-c")
+    cmd.append(str(stackPath.absolute()))
+    cmd.append(stackName)
+
     subprocess.run(cmd, check=True)
     logging.info("Docker Swarm stack deployed successfully.")
 
 
-def stopSys():
+def stopSys(args):
     # Rimozione della stack Docker Swarm
     logging.info(f"Removing Docker Swarm stack {stackName}")
-    cmd = ["docker", "stack", "rm", stackName]
+    cmd = []
+    if args.remote:
+        cmd.append("ssh")
+        cmd.append(args.remote)
+    cmd.append("docker")
+    cmd.append("stack")
+    cmd.append("rm")
+    cmd.append(stackName)
+
     subprocess.run(cmd, check=True)
     logging.info("Docker Swarm stack removed successfully.")
 
@@ -84,10 +117,6 @@ signal.signal(signal.SIGINT, handle_sigint)
 def main():
     global locust_process
     args = parse_args()
-    initSys()  # Deploy Docker Swarm stack
-    startSys()  # Deploy Docker Swarm stack
-    time.sleep(10)
-    logging.info("Starting Locust with command:")
 
     # Costruzione del comando Locust in base ai parametri
     cmd = [
@@ -102,6 +131,12 @@ def main():
     ]
     logging.info(" ".join(cmd))
 
+
+    initSys(args)  # Deploy Docker Swarm stack
+    startSys(args)  # Deploy Docker Swarm stack
+    time.sleep(10)
+    logging.info("Starting Locust with command:")
+
     # Avvia il processo in un nuovo process group
     locust_process = subprocess.Popen(
         cmd,
@@ -111,7 +146,7 @@ def main():
     )
     locust_process.wait()
     logging.info("Locust execution finished.")
-    stopSys()  # Stop della Docker Swarm stack
+    stopSys(args)  # Stop della Docker Swarm stack
 
 
 if __name__ == "__main__":

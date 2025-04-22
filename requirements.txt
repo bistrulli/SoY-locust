@@ -11,3 +11,4 @@ pytimeparse
 requests-unixsocket
 pyomo>=6.9.1
 pyscipopt
+prometheus-client
