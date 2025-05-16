@@ -20,7 +20,15 @@ exp_conf={ "service_name": "node",
            "measurament_period":"1s",
            "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}.csv",
            "stealth":True,
-           "init_repica":1
+           "init_repica":4,
+           "prediction_horizon":None,
+           "target_utilization":None,
+           "prometheus":{
+               "host":"192.168.3.102",
+               "port":9090
+           },
+           "remote":"192.168.3.102",
+           "remote_docker_port":2375
          }
 
 #Qui la logica di avvio del control loop specifica per ogni locus file

@@ -14,10 +14,14 @@ class ControlLoop():
         self.stime=None
         self.ctrlTick=0
         self.prediction_horizon=config["prediction_horizon"]
-        self.docker_client = docker.from_env()
+        if config["remote"] is not None and config["remote_docker_port"] is not None:
+            self.client = docker.DockerClient(base_url='tcp://'+config["remote"]+":"+str(config["remote_docker_port"]))
+        else:
+            self.client = docker.from_env()
+
         self.estimator = None
         self.controller = None
-        self.monitoring = None 
+        self.monitoring = None
 
         self.cooldown = 3
         self.suggestion = []
@@ -36,13 +40,13 @@ class ControlLoop():
             try:
                 self.monitor.tick(t)
                 print(f"### tick = {t},ctrlTick = {self.ctrlTick} ###")
-                
+
                 # Verifica che tutte le liste abbiano almeno un elemento prima di accedervi
                 if (len(self.monitor.rts) > 0 and len(self.monitor.tr) > 0 and
                     len(self.monitor.replica) > 0 and len(self.monitor.ready_replica) > 0 and
                     len(self.monitor.cores) > 0 and len(self.monitor.users) > 0 and
                     len(self.monitor.active_users) > 0 and len(self.monitor.util) > 0):
-                    
+
                     # Stampa formattata in più righe
                     print(f"Response Time:  {self.monitor.rts[-1]}\n"
                           f"Throughput:     {self.monitor.tr[-1]}\n"
@@ -59,7 +63,7 @@ class ControlLoop():
             except Exception as e:
                 print(f"[ERROR] Errore durante il ciclo di controllo: {str(e)}")
                 # Continua l'esecuzione per provare nel prossimo ciclo
-            if(self.ctrlTick>self.config["estimation_window"] and 
+            if(self.ctrlTick>self.config["estimation_window"] and
                len(self.monitor.rts)>=self.config["estimation_window"]):
                 totalcores = np.array(self.monitor.cores[-self.config["estimation_window"]:]) * np.array(self.monitor.replica[-self.config["estimation_window"]:])
                 respnseTimes=np.array(self.monitor.rts[-self.config["estimation_window"]:])
@@ -67,7 +71,7 @@ class ControlLoop():
                 self.stime=self.monitor.util[-1]/self.monitor.tr[-1]
                 stealth=self.config["stealth"]
                 print(f"Service Time:  {self.stime} stealth={stealth}")
-            
+
             if((self.ctrlTick%self.config["control_widow"]==0) and self.stime is not None and self.stime>0):
                 wip=self.monitor.predict_users(horizon=self.prediction_horizon)
                 if(not self.config["stealth"]):
@@ -75,16 +79,16 @@ class ControlLoop():
                     self.addSuggestion(np.round(replicas))
                     print(f"CTRL:          {np.round(replicas)}")
                     self.actuate(np.round(replicas))
-            
+
             time.sleep(timeparse(self.config["measurament_period"]))
             self.ctrlTick+=1
-    
+
     def addSuggestion(self,replica):
         """
         Aggiunge un nuovo valore all'array circolare delle suggestioni.
         Quando l'array raggiunge la dimensione massima (self.cooldown),
         sposta tutti gli elementi a sinistra e aggiunge il nuovo valore alla fine.
-        
+
         Args:
             replica (float): Valore di replica da aggiungere
         """
@@ -95,32 +99,32 @@ class ControlLoop():
         else:
             # Aggiungi il valore alla fine dell'array
             self.suggestion.append(replica)
-    
+
     def isDownScale(self, requested_replicas):
         """
         Determina se si tratta di downscaling confrontando le repliche richieste
         con quelle attualmente configurate nel servizio Docker.
-        
+
         Args:
             requested_replicas (int): Numero di repliche richieste dal controllore
-            
+
         Returns:
             bool: True se è downscaling (richieste < attuali), False altrimenti
         """
         try:
             # Construct full service name
             full_service_name = f"{self.config['stack_name']}_{self.config['service_name']}"
-            
+
             # Get the service
             service = self.docker_client.services.get(full_service_name)
-            
+
             # Get current number of replicas from Docker service
             current_replicas = service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 1)
-            
+
             # It's downscaling if requested replicas are less than current replicas
             is_downscaling = requested_replicas < current_replicas
             print(f"[DEBUG] Checking scaling: requested={requested_replicas}, current={current_replicas}, isDownScale={is_downscaling}")
-            
+
             return is_downscaling
         except Exception as e:
             print(f"[ERROR] Error in isDownScale: {str(e)}")
@@ -144,18 +148,20 @@ class ControlLoop():
             t = time.time() - (getattr(environment.runner, "start_time", environment.start_time))
 
         return t
-    
+
     def getMonitor(self):
         '''
             TODO: parse config
         '''
-        return Monitoring(window=self.config["measurament_period"], 
+        return Monitoring(window=self.config["measurament_period"],
                         sla=0.2,
                         serviceName=self.config["service_name"],
                         stack_name=self.config["stack_name"],
-                        promHost="localhost",
-                        promPort=9090,
-                        sysfile=self.config["sysfile"])
+                        promHost=self.config["prometheus"]["host"],
+                        promPort=self.config["prometheus"]["port"],
+                        sysfile=self.config["sysfile"],
+                          remote=self.config["remote"],
+                          remote_docker_port=self.config["remote_docker_port"],)
 
     def getEstimator(self):
         '''
@@ -173,13 +179,13 @@ class ControlLoop():
             full_service_name = f"{self.config['stack_name']}_{self.config['service_name']}"
             print(f"[DEBUG ACTUATE] Attempting to scale service: '{full_service_name}' to {int(replicas)} replicas")
             print(f"[DEBUG ACTUATE] Available services: {[service.name for service in self.docker_client.services.list()]}")
-            
+
             service = self.docker_client.services.get(full_service_name)
             print(f"[DEBUG ACTUATE] Found service: {service.name}")
-            
+
             # Ottieni il numero attuale di repliche
             current_replicas = service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 1)
-            
+
             # Verifica se si tratta di downscaling (richiesta repliche < repliche attuali)
             if self.isDownScale(int(replicas)):
                 # Per il downscaling, utilizziamo il massimo delle ultime suggestioni
