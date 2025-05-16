@@ -64,7 +64,8 @@ class ControlLoop():
                 print(f"[ERROR] Errore durante il ciclo di controllo: {str(e)}")
                 # Continua l'esecuzione per provare nel prossimo ciclo
             if(self.ctrlTick>self.config["estimation_window"] and
-               len(self.monitor.rts)>=self.config["estimation_window"]):
+               len(self.monitor.rts)>=self.config["estimation_window"] and
+                self.monitor.tr[-1] > 0 ):
                 totalcores = np.array(self.monitor.cores[-self.config["estimation_window"]:]) * np.array(self.monitor.replica[-self.config["estimation_window"]:])
                 respnseTimes=np.array(self.monitor.rts[-self.config["estimation_window"]:])
                 wip=self.monitor.predict_users(horizon=self.prediction_horizon)
