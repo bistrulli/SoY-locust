@@ -58,6 +58,8 @@ def initSys(args):
     cmd.append("docker")
     cmd.append("swarm")
     cmd.append("init")
+    cmd.append("--advertise-addr")
+    cmd.append(args.remote)
     subprocess.run(cmd, check=True)
     logging.info("Docker Swarm stack initiated successfully.")
 

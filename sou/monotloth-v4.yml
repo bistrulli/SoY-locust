@@ -70,7 +70,7 @@ services:
     networks:
       - monitoring
     ports:
-      - "9100:9100"
+      - 9100:9100
     deploy:
       mode: global
       restart_policy:
@@ -89,10 +89,14 @@ services:
     volumes:
       - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
+    command:
+      - '--web.listen-address=:9090'
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
     networks:
       - monitoring
     ports:
-      - "9090:9090"
+      - 9090:9090
     deploy:
       mode: global
       restart_policy:
@@ -116,7 +120,7 @@ services:
     networks:
       - monitoring
     ports:
-      - "8080:8080"
+      - 8080:8080
     deploy:
       mode: global
       restart_policy:

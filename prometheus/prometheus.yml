@@ -1,3 +1,6 @@
+
+
+
 global:
   scrape_interval: 1s  # Frequenza di raccolta metriche
 
