@@ -15,9 +15,9 @@ class ControlLoop():
         self.ctrlTick=0
         self.prediction_horizon=config["prediction_horizon"]
         if config["remote"] is not None and config["remote_docker_port"] is not None:
-            self.client = docker.DockerClient(base_url='tcp://'+config["remote"]+":"+str(config["remote_docker_port"]))
+            self.docker_client = docker.DockerClient(base_url='tcp://'+config["remote"]+":"+str(config["remote_docker_port"]))
         else:
-            self.client = docker.from_env()
+            self.docker_client = docker.from_env()
 
         self.estimator = None
         self.controller = None

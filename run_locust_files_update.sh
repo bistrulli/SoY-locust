@@ -50,7 +50,6 @@ for file in locust_file/SoyMonoShorterIfLogin*.py; do
         sleep 3m # aggiunto per attendere 3 minuti dopo l'esecuzione del test
         echo "End of execution of the test for: $file with replica $num, CSV in: $csv_dir"
         curl --location 'https://measure.tasul.fr/api/measure/step/stop/6827242ad1bec86556636b28?step='+$file
-
     fi
 done
 curl --location 'https://measure.tasul.fr/api/measure/stop/6827242ad1bec86556636b28'

@@ -8,7 +8,7 @@ scrape_configs:
   - job_name: 'locust'
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['172.17.0.1:9646']  # Se Prometheus è in un container e Locust gira sull'host
+      - targets: ['192.168.3.101:9646']  # Se Prometheus è in un container e Locust gira sull'host
 
   # - job_name: 'node-exporter'
   #   metrics_path: '/metrics'
