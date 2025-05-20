@@ -5,7 +5,7 @@ class CustomLoadShape(LoadTestShape):
     This load shape simulates a workload pattern with a ramp-up phase, a constant phase, and a pause phase.
     After the total test duration (max_duration) is reached, it returns None, ending the test.
     """
-    max_users = 300
+    max_users = 200
     ramp_duration = 60         # seconds for ramp-up
     constant_duration = 60     # seconds for constant load
     pause_duration = 240       # seconds with no load

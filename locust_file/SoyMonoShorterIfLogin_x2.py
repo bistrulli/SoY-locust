@@ -21,8 +21,8 @@ exp_conf={ "service_name": "node",
            "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}.csv",
            "stealth":True,
            "init_repica":2,
-           "prediction_horizon":None,
-           "target_utilization":None,
+           "prediction_horizon":1,
+           "target_utilization":1,
            "prometheus":{
                "host":"192.168.3.102",
                "port":9090

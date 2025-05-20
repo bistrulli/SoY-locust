@@ -25,6 +25,17 @@ class ControlLoop():
 
         self.cooldown = 3
         self.suggestion = []
+        self.setDefaultNumberOfReplicas(config["init_repica"])
+
+
+    def setDefaultNumberOfReplicas(self,replicas):
+        full_service_name = f"{self.config['stack_name']}_{self.config['service_name']}"
+        print(f"[DEBUG ACTUATE] Attempting to scale service: '{full_service_name}' to {int(replicas)} replicas")
+        print(f"[DEBUG ACTUATE] Available services: {[service.name for service in self.docker_client.services.list()]}")
+
+        service = self.docker_client.services.get(full_service_name)
+        print(f"[DEBUG ACTUATE] Found service: {service.name}")
+        service.scale(max(1, int(replicas)))
 
     '''TODO: devo ristrutturare il condice in modo tale che le misure
             vengano prese ogni secondo, la stima fatta ogni n tick e il controllo ogni m tick
@@ -161,8 +172,8 @@ class ControlLoop():
                         promHost=self.config["prometheus"]["host"],
                         promPort=self.config["prometheus"]["port"],
                         sysfile=self.config["sysfile"],
-                          remote=self.config["remote"],
-                          remote_docker_port=self.config["remote_docker_port"],)
+                        remote=self.config["remote"],
+                        remote_docker_port=self.config["remote_docker_port"],)
 
     def getEstimator(self):
         '''
