@@ -20,7 +20,7 @@ exp_conf={ "service_name": "node",
            "measurament_period":"1s",
            "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}.csv",
            "stealth":True,
-           "init_repica":6,
+           "init_repica":8,
            "prediction_horizon":1,
            "target_utilization":1,
            "prometheus":{

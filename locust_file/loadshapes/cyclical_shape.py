@@ -6,13 +6,13 @@ class CustomLoadShape(LoadTestShape):
     After the total test duration (max_duration) is reached, it returns None, ending the test.
     """
     max_users = 200
-    ramp_duration = 60         # seconds for ramp-up
-    constant_duration = 60     # seconds for constant load
-    pause_duration = 240       # seconds with no load
+    ramp_duration = 50         # seconds for ramp-up
+    constant_duration = 350     # seconds for constant load
+    pause_duration = 2000       # seconds with no load
 
     cycle_duration = ramp_duration + constant_duration + pause_duration
 
-    max_duration = cycle_duration*4         # total duration of the test in seconds
+    max_duration = cycle_duration*3         # total duration of the test in seconds
 
     def tick(self):
         run_time = self.get_run_time()
