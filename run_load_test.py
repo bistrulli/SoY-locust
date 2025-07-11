@@ -12,8 +12,8 @@ import time
 
 # Configura il logger
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-stackName = "monolith-stack"
-stackPath = Path(__file__).parent / "sou" / "monolith-v4.yml"
+#stackName = "monolith-stack"
+#stackPath = Path(__file__).parent / "sou" / "monolith-v4.yml"
 
 # Variabile globale per salvare il processo Locust
 locust_process = None
@@ -21,6 +21,8 @@ locust_process = None
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Perform the load test with Locust")
+    parser.add_argument("--stack", type=str, default="v4", required=False,
+                        help="Stack name to deploy (default: v4, v5, v7 (not implemented yet))")
     parser.add_argument("--users", type=int, required=True, help="Number of users (LOCUST_USERS)")
     parser.add_argument("--spawn-rate", type=int, default=100, help="User spawn speed")
     parser.add_argument("--run-time", type=str, required=True, help="Test execution time")
@@ -46,7 +48,7 @@ def initSys(args):
         cmd.append("--force")
         subprocess.run(cmd, check=True)
         logging.info("Docker Swarm stack leave successfully.")
-    except :
+    except:
 
         logging.info("Docker Swarm stack leave failed.")
 
@@ -64,9 +66,22 @@ def initSys(args):
     logging.info("Docker Swarm stack initiated successfully.")
 
 
+def getStackName(stack):
+    stackName= "monolith-stack-v4"
+    if stack == "v5":
+        stackName= "ms-stack-v5"
+    return stackName
+
+def getStackPath(stack):
+    stackPath = Path(__file__).parent / "sou" / "monolith-v4.yml"
+    if stack == "v5":
+        stackPath = Path(__file__).parent / "sou" / "monolith-v5.yml"
+    return str(stackPath.absolute())
+
+
 def startSys(args):
     # Avvia la specifica Docker Swarm utilizzando il file sou/monolith-v4.yml
-    logging.info(f"Deploying Docker Swarm stack using {stackName}")
+    logging.info(f"Deploying Docker Swarm stack using {getStackName(args.stack)}")
     cmd = []
     if args.remote:
         cmd.append("ssh")
@@ -76,8 +91,8 @@ def startSys(args):
     cmd.append("deploy")
     cmd.append("--detach=true")
     cmd.append("-c")
-    cmd.append(str(stackPath.absolute()))
-    cmd.append(stackName)
+    cmd.append(getStackPath(args.stack))
+    cmd.append(getStackName(args.stack))
 
     subprocess.run(cmd, check=True)
     logging.info("Docker Swarm stack deployed successfully.")
@@ -85,7 +100,7 @@ def startSys(args):
 
 def stopSys(args):
     # Rimozione della stack Docker Swarm
-    logging.info(f"Removing Docker Swarm stack {stackName}")
+    logging.info(f"Removing Docker Swarm stack {getStackName(args.stack)}")
     cmd = []
     if args.remote:
         cmd.append("ssh")
@@ -93,7 +108,7 @@ def stopSys(args):
     cmd.append("docker")
     cmd.append("stack")
     cmd.append("rm")
-    cmd.append(stackName)
+    cmd.append(getStackName(args.stack))
 
     subprocess.run(cmd, check=True)
     logging.info("Docker Swarm stack removed successfully.")
@@ -133,10 +148,8 @@ def main():
     ]
     logging.info(" ".join(cmd))
 
-
     initSys(args)  # Deploy Docker Swarm stack
     startSys(args)  # Deploy Docker Swarm stack
-
 
     time.sleep(10)
     logging.info("Starting Locust with command:")
