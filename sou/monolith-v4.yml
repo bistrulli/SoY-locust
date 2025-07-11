@@ -8,15 +8,9 @@ services:
       - 5001:5001
     restart: always
     env_file:
-      - /home/ubuntu/ShellOnYou/sou/monotloth-v4/variables.env
+      - monolith-v4/variables.env
     networks:
       - monitoring
-    # healthcheck:
-    #   test: ["CMD", "curl", "-X", "OPTIONS", "-f", "http://localhost:5001/api/exercise-production"]
-    #   interval: 5s
-    #   timeout: 3s
-    #   retries: 3
-    #   start_period: 15s
     deploy:
       replicas: 1 # Numero iniziale di repliche
       update_config:
@@ -24,13 +18,13 @@ services:
         delay: 30s
       restart_policy:
         condition: none
-      resources:
-        limits:
-          cpus: "1" # Limita le risorse
-          memory: 2G
-        reservations:
-          cpus: "1"
-          memory: 512M
+#      resources:
+#        limits:
+#          cpus: "1" # Limita le risorse
+#          memory: 2G
+#        reservations:
+#          cpus: "1"
+#          memory: 512M
 
   postgres:
     image: icws24submission/postgres_monolith:latest
@@ -38,7 +32,7 @@ services:
     container_name: postgres
     restart: always
     env_file:
-      - /home/ubuntu/ShellOnYou/sou/monotloth-v4/variables.env
+      - monolith-v4/variables.env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -47,13 +41,13 @@ services:
       replicas: 1 # Di solito i database non vengono scalati su Swarm
       restart_policy:
         condition: none
-      resources:
-        limits:
-          cpus: "3"
-          memory: 2G
-        reservations:
-          cpus: "3"
-          memory: 2G
+#      resources:
+#        limits:
+#          cpus: "3"
+#          memory: 2G
+#        reservations:
+#          cpus: "3"
+#          memory: 2G
 
   node-exporter:
     image: prom/node-exporter:latest
@@ -70,7 +64,7 @@ services:
     networks:
       - monitoring
     ports:
-      - "9100:9100"
+      - 9100:9100
     deploy:
       mode: global
       restart_policy:
@@ -89,10 +83,14 @@ services:
     volumes:
       - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
+    command:
+      - '--web.listen-address=:9090'
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
     networks:
       - monitoring
     ports:
-      - "9090:9090"
+      - 9090:9090
     deploy:
       mode: global
       restart_policy:
@@ -116,7 +114,7 @@ services:
     networks:
       - monitoring
     ports:
-      - "8080:8080"
+      - 8080:8080
     deploy:
       mode: global
       restart_policy:
@@ -132,6 +130,7 @@ services:
 networks:
   monitoring:
     driver: overlay
+    attachable: true
 
 volumes:
   postgres_data:

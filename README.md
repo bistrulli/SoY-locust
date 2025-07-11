@@ -20,7 +20,7 @@ The framework consists of several key components:
 ├── locust_file/             # Directory containing Locust test files
 │   └── loadshapes/         # Custom load shape definitions
 ├── sou/                     # Docker Swarm configuration files
-│   └── monotloth-v4.yml    # Main Docker Swarm stack configuration
+│   └── monolith-v4.yml    # Main Docker Swarm stack configuration
 └── results/                # Directory for test results
 ```
 
@@ -106,7 +106,7 @@ python run_load_test.py \
 ```
 
 This command will:
-1. Start a Docker Swarm stack using the configuration in `sou/monotloth-v4.yml`
+1. Start a Docker Swarm stack using the configuration in `sou/monolith-v4.yml`
 2. Launch Locust with 100 concurrent users
 3. Spawn users at a rate of 10 users per second
 4. Run the test for 5 minutes

@@ -1,59 +1,76 @@
 version: '3.7' # Supporto Swarm
 
 services:
-  node:
-    #image: gitlab.polytech.umontpellier.fr:5050/dream-team/plage/soy-v4/nodedock
-    image:  gitlab.polytech.umontpellier.fr:5050/dream-team/plage/soy-v4/nodedock@sha256:37862376bcb83795f8f3cce5dfd6f2fc59c1e3c5863f555073773edad5cae2ed
-    ports:
-      - 5001:5001
+  ms-exercise:
+    image: icws24submission/exercise_icws24
+    security_opt:
+      - no-new-privileges:true
     restart: always
     env_file:
-      - ./monotlith-v4/variables.env
-    networks:
-      - monitoring
-    # healthcheck:
-    #   test: ["CMD", "curl", "-X", "OPTIONS", "-f", "http://localhost:5001/api/exercise-production"]
-    #   interval: 5s
-    #   timeout: 3s
-    #   retries: 3
-    #   start_period: 15s
+      - monolith-v5/variables.env
     deploy:
-      replicas: 1 # Numero iniziale di repliche
+      replicas: 1
       update_config:
         parallelism: 1
         delay: 30s
       restart_policy:
         condition: none
-      resources:
-        limits:
-          cpus: "1" # Limita le risorse
-          memory: 2G
-        reservations:
-          cpus: "1"
-          memory: 512M
-
-  postgres:
-    image: icws24submission/postgres_monolith:latest
-    shm_size: 1g
-    container_name: postgres
-    restart: always
-    env_file:
-      - ./monotlith-v4/variables.env
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
     networks:
       - monitoring
+
+
+  ms-other:
+    image: icws24submission/other_icws24
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    env_file:
+      - monolith-v5/variables.env
     deploy:
-      replicas: 1 # Di solito i database non vengono scalati su Swarm
-      restart_policy:
-        condition: none
-      resources:
-        limits:
-          cpus: "3"
-          memory: 2G
-        reservations:
-          cpus: "3"
-          memory: 2G
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 30s
+    networks:
+      - monitoring
+
+  gateway:
+    image: icws24submission/gateway_icws24
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    depends_on:
+      - ms-exercise
+      - ms-other
+    ports:
+      - 5001:8080
+    env_file:
+      - monolith-v5/variables.env
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 30s
+    networks:
+      - monitoring
+
+  postgres:
+    container_name: postgres
+    image: registry.gitlab.com/inria-mpl/soy/msa-postgres:1.0.1
+    shm_size: 1g
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    env_file:
+      - monolith-v5/variables.env
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 30s
+    networks:
+      - monitoring
+
 
   node-exporter:
     image: prom/node-exporter:latest

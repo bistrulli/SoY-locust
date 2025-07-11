@@ -12,8 +12,8 @@ import time
 
 # Configura il logger
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-stackName = "monotloth-stack"
-stackPath = Path(__file__).parent / "sou" / "monotloth-v4.yml"
+stackName = "monolith-stack"
+stackPath = Path(__file__).parent / "sou" / "monolith-v4.yml"
 
 # Variabile globale per salvare il processo Locust
 locust_process = None
@@ -65,7 +65,7 @@ def initSys(args):
 
 
 def startSys(args):
-    # Avvia la specifica Docker Swarm utilizzando il file sou/monotloth-v4.yml
+    # Avvia la specifica Docker Swarm utilizzando il file sou/monolith-v4.yml
     logging.info(f"Deploying Docker Swarm stack using {stackName}")
     cmd = []
     if args.remote:
