@@ -1,0 +1,9 @@
+{
+  "monolith-stack-v4": {
+    "login": "/api/user/login",
+    "verify": "/api/user/verify",
+    "exercice": "/api/exercise-production",
+    "logout": "/api/user/logout",
+    "file": "soymono2/0046_request.json"
+  }
+}

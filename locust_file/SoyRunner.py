@@ -6,43 +6,38 @@ import gevent
 import csv
 from pathlib import Path
 import time
-from base_exp import BaseExp,resourceDir
+from base_exp import BaseExp, resourceDir
 from controller import ControlLoop
 import gevent
+import json
 
-cwd=Path(__file__).parent
+cwd = Path(__file__).parent
 
-exp_conf={ "service_name": "node",
-           "stack_name": "monolith-stack",
-           "sysfile": cwd.parent/"sou"/"monolith-v4.yml",
-           "control_widow": 1,
-           "estimation_window": 10,
-           "measurament_period":"1s",
-           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}.csv",
-           "stealth":False,
-           "init_repica":1,
-           "prediction_horizon":5,
-           "target_utilization":0.2,
-           "prometheus":{
-               "host":"192.168.3.102",
-               "port":9090
-           },
-           "remote":"192.168.3.102",
-           "remote_docker_port":2375
-           }
+with open('/tmp/xp.json') as f:
+    exp_conf = json.load(f)
+    print(exp_conf)
+
+with open(f'{resourceDir.absolute()}/paths.json') as f:
+    paths = json.load(f)
+    print(paths)
 
 
-#Qui la logica di avvio del control loop specifica per ogni locus file
-ctrlLoop=ControlLoop(config=exp_conf)
+
+# Qui la logica di avvio del control loop specifica per ogni locus file
+ctrlLoop = ControlLoop(config=exp_conf)
+
+
 @events.test_start.add_listener
 def on_locust_start(environment, **_kwargs):
     if not isinstance(environment.runner, WorkerRunner):
         gevent.spawn(ctrlLoop.loop, environment)
 
+
 @events.test_stop.add_listener
 def on_locust_stop(environment, **_kwargs):
     global ctrlLoop
     ctrlLoop.saveResults()
+
 
 class SoyMonoUser(BaseExp):
 
@@ -58,10 +53,10 @@ class SoyMonoUser(BaseExp):
         email = self.user_data['email']
         password = self.user_data['password']
         # OPTIONS before login
-        self.client.request("OPTIONS", "/api/user/login", timeout=1)
+        self.client.request("OPTIONS", paths[exp_conf["stack_name"]]["login"], timeout=1)
         # Login
         login_response = self.client.post(
-            "/api/user/login",
+            paths[exp_conf["stack_name"]]["login"],
             headers={"Content-Type": "application/json"},
             json={"email": email, "password": password},
             timeout=1
@@ -71,20 +66,20 @@ class SoyMonoUser(BaseExp):
             refresh_token = login_response.cookies.get("refresh_token")
             if access_token:
                 # OPTIONS before auth verify
-                self.client.request("OPTIONS", "/api/auth/verify", timeout=1)
+                self.client.request("OPTIONS", paths[exp_conf["stack_name"]]["verify"], timeout=1)
                 # Auth verify
                 self.client.get(
-                    "/api/auth/verify",
+                    paths[exp_conf["stack_name"]]["verify"],
                     headers={"Authorization": f"Bearer {access_token}"},
                     timeout=1
                 )
                 # OPTIONS before exercise production
-                self.client.request("OPTIONS", "/api/exercise-production", timeout=1)
+                self.client.request("OPTIONS", paths[exp_conf["stack_name"]]["exercice"], timeout=1)
                 # Exercise production
-                with open(f'{resourceDir.absolute()}/soymono2/0046_request.json') as json_file:
+                with open(f'{resourceDir.absolute()}/{paths[exp_conf["stack_name"]]["file"]}') as json_file:
                     exercise_data = json.load(json_file)
                     self.client.post(
-                        "/api/exercise-production",
+                        paths[exp_conf["stack_name"]]["exercice"],
                         headers={
                             "Authorization": f"Bearer {access_token}",
                             "Content-Type": "application/json",
@@ -93,10 +88,10 @@ class SoyMonoUser(BaseExp):
                         timeout=1
                     )
                 # OPTIONS before logout
-                self.client.request("OPTIONS", "/api/user/logout", timeout=1)
+                self.client.request("OPTIONS", paths[exp_conf["stack_name"]]["logout"], timeout=1)
                 # Logout
                 self.client.delete(
-                    "/api/user/logout",
+                    paths[exp_conf["stack_name"]]["logout"],
                     headers={"Authorization": f"Bearer {access_token}"},
                     timeout=1
                 )

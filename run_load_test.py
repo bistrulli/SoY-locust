@@ -18,7 +18,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 # Variabile globale per salvare il processo Locust
 locust_process = None
 
-
 def parse_args():
     parser = argparse.ArgumentParser(description="Perform the load test with Locust")
     parser.add_argument("--stack", type=str, default="v4", required=False,
@@ -47,6 +46,7 @@ def initSys(args):
         cmd.append("leave")
         cmd.append("--force")
         subprocess.run(cmd, check=True)
+        logging.info(" ".join(cmd))
         logging.info("Docker Swarm stack leave successfully.")
     except:
 
@@ -63,6 +63,7 @@ def initSys(args):
     cmd.append("--advertise-addr")
     cmd.append(args.remote)
     subprocess.run(cmd, check=True)
+    logging.info(" ".join(cmd))
     logging.info("Docker Swarm stack initiated successfully.")
 
 
@@ -95,6 +96,7 @@ def startSys(args):
     cmd.append(getStackName(args.stack))
 
     subprocess.run(cmd, check=True)
+    logging.info(" ".join(cmd))
     logging.info("Docker Swarm stack deployed successfully.")
 
 
@@ -111,6 +113,7 @@ def stopSys(args):
     cmd.append(getStackName(args.stack))
 
     subprocess.run(cmd, check=True)
+    logging.info(" ".join(cmd))
     logging.info("Docker Swarm stack removed successfully.")
 
 

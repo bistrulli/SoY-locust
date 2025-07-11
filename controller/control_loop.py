@@ -49,7 +49,8 @@ class ControlLoop():
             # Ottieni il tempo corrente.
             t=self.getSimTime(environment=environment)
             try:
-                self.monitor.tick(t)
+                #issue here
+                #self.monitor.tick(t)
                 print(f"### tick = {t},ctrlTick = {self.ctrlTick} ###")
 
                 # Verifica che tutte le liste abbiano almeno un elemento prima di accedervi
@@ -70,9 +71,10 @@ class ControlLoop():
                           f"Util:           {self.monitor.util[-1]}\n"
                           f"Mem:            {self.monitor.memory[-1]}")  # Corretto: memory invece di util
                 else:
-                    print(f"[WARNING] Dati del monitor non ancora disponibili o incompleti nel ciclo {self.ctrlTick}")
+                    print(f"[WARNING] Data from the monitor not yet available or incomplete in the cycle. {self.ctrlTick}")
             except Exception as e:
-                print(f"[ERROR] Errore durante il ciclo di controllo: {str(e)}")
+                print(e)
+                print(f"[ERROR] Error during the control cycle: {str(e)}")
                 # Continua l'esecuzione per provare nel prossimo ciclo
             if(self.ctrlTick>self.config["estimation_window"] and
                len(self.monitor.rts)>=self.config["estimation_window"] and

@@ -34,7 +34,7 @@ class Monitoring:
         self.has_health_check = has_health_check
         if (not Path(self.sysfile).exists()):
             raise FileNotFoundError(f"File {self.sysfile} not found")
-        self.sys = yaml.safe_load(self.sysfile.open())
+        self.sys = yaml.safe_load(self.sysfile)
         self.prom = PrometheusConnect(url=f"http://{self.promHost}:{self.promPort}", disable_ssl=True)
         self.remote = remote
         self.reset()
