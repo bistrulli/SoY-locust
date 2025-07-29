@@ -1,0 +1,11 @@
+Method,Name,Error,Occurrences
+DELETE,/api/user/logout,"ConnectionRefusedError(111, 'Connection refused')",6
+POST,/api/exercise-production,"ReadTimeout(ReadTimeoutError(""HTTPConnectionPool(host='127.0.0.1', port=5001): Read timed out. (read timeout=1)""))",34
+POST,/api/user/login,"ConnectionResetError(104, 'Connection reset by peer')",1
+OPTIONS,/api/user/login,"ConnectionRefusedError(111, 'Connection refused')",8
+GET,/api/auth/verify,"ConnectionResetError(104, 'Connection reset by peer')",1
+OPTIONS,/api/user/logout,"ConnectionRefusedError(111, 'Connection refused')",8
+DELETE,/api/user/logout,RemoteDisconnected('Remote end closed connection without response'),1
+OPTIONS,/api/auth/verify,"ConnectionResetError(104, 'Connection reset by peer')",1
+POST,/api/user/login,"ConnectionRefusedError(111, 'Connection refused')",2
+POST,/api/exercise-production,RemoteDisconnected('Remote end closed connection without response'),1

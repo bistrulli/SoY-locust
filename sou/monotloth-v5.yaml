@@ -1,0 +1,160 @@
+version: '3.7' # Supporto Swarm
+
+services:
+  ms-exercise:
+    image: icws24submission/exercise_icws24
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    env_file:
+      - monolith-v5/variables.env
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 30s
+      restart_policy:
+        condition: none
+    networks:
+      - monitoring
+
+
+  ms-other:
+    image: icws24submission/other_icws24
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    env_file:
+      - monolith-v5/variables.env
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 30s
+    networks:
+      - monitoring
+
+  gateway:
+    image: icws24submission/gateway_icws24
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    depends_on:
+      - ms-exercise
+      - ms-other
+    ports:
+      - 5001:8080
+    env_file:
+      - monolith-v5/variables.env
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 30s
+    networks:
+      - monitoring
+
+  postgres:
+    container_name: postgres
+    image: registry.gitlab.com/inria-mpl/soy/msa-postgres:1.0.1
+    shm_size: 1g
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    env_file:
+      - monolith-v5/variables.env
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 30s
+    networks:
+      - monitoring
+
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--web.listen-address=:9100'
+    networks:
+      - monitoring
+    ports:
+      - 9100:9100
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--web.listen-address=:9090'
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - monitoring
+    ports:
+      - 9090:9090
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - monitoring
+    ports:
+      - 8080:8080
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+networks:
+  monitoring:
+    driver: overlay
+    attachable: true
+
+volumes:
+  postgres_data:
+  prometheus_data:

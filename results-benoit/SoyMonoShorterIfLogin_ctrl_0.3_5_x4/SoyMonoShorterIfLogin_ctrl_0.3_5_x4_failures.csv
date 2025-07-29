@@ -1,0 +1,10 @@
+Method,Name,Error,Occurrences
+OPTIONS,/api/user/login,"ConnectionResetError(104, 'Connection reset by peer')",2
+POST,/api/user/login,"ConnectionResetError(104, 'Connection reset by peer')",3
+OPTIONS,/api/user/login,"ConnectionRefusedError(111, 'Connection refused')",11
+GET,/api/auth/verify,"ConnectionResetError(104, 'Connection reset by peer')",2
+GET,/api/auth/verify,RemoteDisconnected('Remote end closed connection without response'),1
+OPTIONS,/api/auth/verify,"ConnectionResetError(104, 'Connection reset by peer')",2
+POST,/api/user/login,"ConnectionRefusedError(111, 'Connection refused')",2
+POST,/api/exercise-production,RemoteDisconnected('Remote end closed connection without response'),9
+POST,/api/exercise-production,"ConnectionResetError(104, 'Connection reset by peer')",2
