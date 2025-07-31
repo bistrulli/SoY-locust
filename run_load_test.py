@@ -57,19 +57,13 @@ def load_config_from_locust_file(locust_file_path):
             raise ValueError(f"Could not find 'stack_name' in locust file: {locust_file_path}")
         stack_name = stack_name_match.group(1)
         
-        # Estrae sysfile usando regex
-        sysfile_match = re.search(r'"sysfile":\s*([^,}\n]+)', content)
+        # Estrae sysfile usando regex - cerca il pattern "sysfile": .../"filename"
+        sysfile_match = re.search(r'"sysfile":\s*[^/]*/[^/]*/"([^"]+)"', content)
         if not sysfile_match:
             raise ValueError(f"Could not find 'sysfile' in locust file: {locust_file_path}")
         
-        # Estrae il nome del file dal path sysfile
-        sysfile_path_str = sysfile_match.group(1).strip()
-        
-        # Rimuove eventuali virgolette e spazi
-        sysfile_path_str = sysfile_path_str.strip('"\'')
-        
-        # Estrae solo il nome del file (parte dopo l'ultimo /)
-        sysfile_name = sysfile_path_str.split('/')[-1]
+        # Estrae direttamente il nome del file (senza virgolette)
+        sysfile_name = sysfile_match.group(1)
         
         # Costruisce il path completo usando sys_base_path
         full_sysfile_path = sys_base_path / sysfile_name
