@@ -9,10 +9,12 @@ import signal
 import sys
 import os  # Nuovo import
 import time
-import importlib.util
+import re
 
 # Configura il logger
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+sys_base_path = Path(__file__).parent/"sou"
 
 # Variabili globali che verranno impostate dinamicamente
 stackName = None
@@ -24,7 +26,7 @@ locust_process = None
 
 def load_config_from_locust_file(locust_file_path):
     """
-    Carica la configurazione dal file locust specificato.
+    Carica la configurazione dal file locust specificato usando regex.
     
     Args:
         locust_file_path (str): Percorso del file locust
@@ -45,59 +47,41 @@ def load_config_from_locust_file(locust_file_path):
         if not Path(locust_file_path).is_file():
             raise ValueError(f"Path must be a file, not a directory: {locust_file_path}")
         
-        # Aggiunge temporaneamente la directory del file locust al Python path
-        locust_file_dir = str(Path(locust_file_path).parent.absolute())
-        original_sys_path = sys.path.copy()
-        if locust_file_dir not in sys.path:
-            sys.path.insert(0, locust_file_dir)
+        # Legge il contenuto del file
+        with open(locust_file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
         
-        try:
-            # Importa il file come modulo (come fa Locust)
-            spec = importlib.util.spec_from_file_location("locust_module", locust_file_path)
-            if spec is None or spec.loader is None:
-                raise ImportError(f"Failed to load locust file: {locust_file_path}")
-            
-            locust_module = importlib.util.module_from_spec(spec)
-            
-            # Imposta __file__ nel modulo (importante per i path dinamici)
-            locust_module.__file__ = locust_file_path
-            
-            # Esegue il modulo
-            spec.loader.exec_module(locust_module)
-            
-            # Verifica che exp_conf esista
-            if not hasattr(locust_module, 'exp_conf'):
-                raise ValueError(f"Locust file must contain 'exp_conf' configuration dictionary: {locust_file_path}")
-            
-            exp_conf = locust_module.exp_conf
-            
-            # Verifica che stack_name esista
-            if 'stack_name' not in exp_conf:
-                raise ValueError(f"exp_conf must contain 'stack_name' configuration in: {locust_file_path}")
-            
-            # Verifica che sysfile esista
-            if 'sysfile' not in exp_conf:
-                raise ValueError(f"exp_conf must contain 'sysfile' path configuration in: {locust_file_path}")
-            
-            stack_name = exp_conf['stack_name']
-            sysfile_path = exp_conf['sysfile']
-            
-            # Verifica che il file di sistema esista
-            if not Path(sysfile_path).exists():
-                raise ValueError(f"System file path specified in exp_conf['sysfile'] does not exist: {sysfile_path}")
-            
-            return stack_name, Path(sysfile_path)
-            
-        finally:
-            # Ripristina il Python path originale
-            sys.path = original_sys_path
+        # Estrae stack_name usando regex
+        stack_name_match = re.search(r'"stack_name":\s*"([^"]+)"', content)
+        if not stack_name_match:
+            raise ValueError(f"Could not find 'stack_name' in locust file: {locust_file_path}")
+        stack_name = stack_name_match.group(1)
+        
+        # Estrae sysfile usando regex
+        sysfile_match = re.search(r'"sysfile":\s*([^,}\n]+)', content)
+        if not sysfile_match:
+            raise ValueError(f"Could not find 'sysfile' in locust file: {locust_file_path}")
+        
+        # Estrae il nome del file dal path sysfile
+        sysfile_path_str = sysfile_match.group(1).strip()
+        
+        # Rimuove eventuali virgolette e spazi
+        sysfile_path_str = sysfile_path_str.strip('"\'')
+        
+        # Estrae solo il nome del file (parte dopo l'ultimo /)
+        sysfile_name = sysfile_path_str.split('/')[-1]
+        
+        # Costruisce il path completo usando sys_base_path
+        full_sysfile_path = sys_base_path / sysfile_name
+        
+        # Verifica che il file di sistema esista
+        if not full_sysfile_path.exists():
+            raise ValueError(f"System file does not exist: {full_sysfile_path}")
+        
+        return stack_name, full_sysfile_path
         
     except FileNotFoundError as e:
         raise e
-    except ImportError as e:
-        raise ValueError(f"Failed to import locust file {locust_file_path}: {str(e)}")
-    except SyntaxError as e:
-        raise ValueError(f"Syntax error in locust file {locust_file_path}: {str(e)}")
     except Exception as e:
         raise ValueError(f"Error loading configuration from {locust_file_path}: {str(e)}")
 
@@ -221,7 +205,7 @@ def main():
     try:
         stackName, stackPath = load_config_from_locust_file(args.locust_file)
         logging.info(f"Loaded configuration from locust file: stack_name='{stackName}', sysfile='{stackPath}'")
-    except (ValueError, FileNotFoundError, ImportError) as e:
+    except (ValueError, FileNotFoundError) as e:
         logging.error(f"Configuration error: {e}")
         sys.exit(1)
 
