@@ -48,32 +48,43 @@ def load_config_from_locust_file(locust_file_path):
         with open(locust_file_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        # Esegue il contenuto in un namespace isolato per estrarre exp_conf
-        namespace = {}
-        exec(content, namespace)
+        # Aggiunge temporaneamente la directory del file locust al Python path
+        locust_file_dir = str(Path(locust_file_path).parent.absolute())
+        original_sys_path = sys.path.copy()
+        if locust_file_dir not in sys.path:
+            sys.path.insert(0, locust_file_dir)
         
-        # Verifica che exp_conf esista
-        if 'exp_conf' not in namespace:
-            raise ValueError(f"Locust file must contain 'exp_conf' configuration dictionary: {locust_file_path}")
-        
-        exp_conf = namespace['exp_conf']
-        
-        # Verifica che stack_name esista
-        if 'stack_name' not in exp_conf:
-            raise ValueError(f"exp_conf must contain 'stack_name' configuration in: {locust_file_path}")
-        
-        # Verifica che sysfile esista
-        if 'sysfile' not in exp_conf:
-            raise ValueError(f"exp_conf must contain 'sysfile' path configuration in: {locust_file_path}")
-        
-        stack_name = exp_conf['stack_name']
-        sysfile_path = exp_conf['sysfile']
-        
-        # Verifica che il file di sistema esista
-        if not Path(sysfile_path).exists():
-            raise ValueError(f"System file path specified in exp_conf['sysfile'] does not exist: {sysfile_path}")
-        
-        return stack_name, Path(sysfile_path)
+        try:
+            # Esegue il contenuto in un namespace isolato per estrarre exp_conf
+            namespace = {}
+            exec(content, namespace)
+            
+            # Verifica che exp_conf esista
+            if 'exp_conf' not in namespace:
+                raise ValueError(f"Locust file must contain 'exp_conf' configuration dictionary: {locust_file_path}")
+            
+            exp_conf = namespace['exp_conf']
+            
+            # Verifica che stack_name esista
+            if 'stack_name' not in exp_conf:
+                raise ValueError(f"exp_conf must contain 'stack_name' configuration in: {locust_file_path}")
+            
+            # Verifica che sysfile esista
+            if 'sysfile' not in exp_conf:
+                raise ValueError(f"exp_conf must contain 'sysfile' path configuration in: {locust_file_path}")
+            
+            stack_name = exp_conf['stack_name']
+            sysfile_path = exp_conf['sysfile']
+            
+            # Verifica che il file di sistema esista
+            if not Path(sysfile_path).exists():
+                raise ValueError(f"System file path specified in exp_conf['sysfile'] does not exist: {sysfile_path}")
+            
+            return stack_name, Path(sysfile_path)
+            
+        finally:
+            # Ripristina il Python path originale
+            sys.path = original_sys_path
         
     except FileNotFoundError as e:
         raise e
