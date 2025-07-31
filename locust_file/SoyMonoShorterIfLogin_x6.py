@@ -26,9 +26,9 @@ exp_conf={ "service_name": "node",
            "prometheus":{
                "host":"192.168.3.102",
                "port":9090
-           },
-           "remote":"192.168.3.102",
-           "remote_docker_port":2375
+           }
+           #"remote":"192.168.3.102",
+           #"remote_docker_port":2375
          }
 
 #Qui la logica di avvio del control loop specifica per ogni locus file
