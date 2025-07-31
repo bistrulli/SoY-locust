@@ -9,7 +9,6 @@ import signal
 import sys
 import os  # Nuovo import
 import time
-import importlib.util
 
 # Configura il logger
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -34,22 +33,30 @@ def load_config_from_locust_file(locust_file_path):
         
     Raises:
         ValueError: Se la configurazione non è valida
-        ImportError: Se il file locust non può essere caricato
+        FileNotFoundError: Se il file locust non esiste
     """
     try:
-        # Carica il file locust come modulo
-        spec = importlib.util.spec_from_file_location("locust_module", locust_file_path)
-        if spec is None or spec.loader is None:
-            raise ImportError(f"Failed to load locust file: {locust_file_path}")
+        # Verifica che il file esista
+        if not Path(locust_file_path).exists():
+            raise FileNotFoundError(f"Locust file does not exist: {locust_file_path}")
         
-        locust_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(locust_module)
+        # Verifica che sia un file e non una directory
+        if not Path(locust_file_path).is_file():
+            raise ValueError(f"Path must be a file, not a directory: {locust_file_path}")
+        
+        # Legge il contenuto del file
+        with open(locust_file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Esegue il contenuto in un namespace isolato per estrarre exp_conf
+        namespace = {}
+        exec(content, namespace)
         
         # Verifica che exp_conf esista
-        if not hasattr(locust_module, 'exp_conf'):
+        if 'exp_conf' not in namespace:
             raise ValueError(f"Locust file must contain 'exp_conf' configuration dictionary: {locust_file_path}")
         
-        exp_conf = locust_module.exp_conf
+        exp_conf = namespace['exp_conf']
         
         # Verifica che stack_name esista
         if 'stack_name' not in exp_conf:
@@ -68,8 +75,10 @@ def load_config_from_locust_file(locust_file_path):
         
         return stack_name, Path(sysfile_path)
         
-    except ImportError as e:
-        raise ImportError(f"Failed to load locust file {locust_file_path}: {str(e)}")
+    except FileNotFoundError as e:
+        raise e
+    except SyntaxError as e:
+        raise ValueError(f"Syntax error in locust file {locust_file_path}: {str(e)}")
     except Exception as e:
         raise ValueError(f"Error loading configuration from {locust_file_path}: {str(e)}")
 
@@ -193,7 +202,7 @@ def main():
     try:
         stackName, stackPath = load_config_from_locust_file(args.locust_file)
         logging.info(f"Loaded configuration from locust file: stack_name='{stackName}', sysfile='{stackPath}'")
-    except (ValueError, ImportError) as e:
+    except (ValueError, FileNotFoundError) as e:
         logging.error(f"Configuration error: {e}")
         sys.exit(1)
 
