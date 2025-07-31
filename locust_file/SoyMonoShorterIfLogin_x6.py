@@ -14,7 +14,7 @@ cwd=Path(__file__).parent
 
 exp_conf={ "service_name": "node",
            "stack_name": "monotloth-stack",
-           "sysfile": cwd.parent/"sou"/"monotloth-v4.yml",
+           "sysfile": cwd.parent/"sou"/"monotloth-v5.yml",
            "control_widow": 15,
            "estimation_window": 10,
            "measurament_period":"1s",
