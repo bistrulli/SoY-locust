@@ -388,6 +388,8 @@ class Monitoring:
         if len(valid_data) < 5:
             # Se non abbiamo abbastanza dati validi, ritorna l'ultimo valore valido o 0
             return valid_data[-1][1] if valid_data else 0
+        else:
+            print(f"[DEBUG] Valid data: {valid_data}")
 
         # Prendi gli ultimi 5 valori validi
         recent_data = valid_data[-5:]
