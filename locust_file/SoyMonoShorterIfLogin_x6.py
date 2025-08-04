@@ -12,19 +12,19 @@ import gevent
 
 cwd=Path(__file__).parent
 
-exp_conf={ "service_name": "node",
+ms_exercise_conf={ "service_name": "ms-exercise",
            "stack_name": "monotloth-stack",
            "sysfile": cwd.parent/"sou"/"monotloth-v5.yml",
            "control_widow": 15,
            "estimation_window": 10,
            "measurament_period":"1s",
-           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}.csv",
+           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}_ms-exercise.csv",
            "stealth":True,
            "init_repica":6,
            "prediction_horizon":None,
            "target_utilization":None,
            "prometheus":{
-               "host":"192.168.3.102",
+               "host":"127.0.0.1",
                "port":9090
            },
            #"remote":"192.168.3.102",
@@ -33,17 +33,66 @@ exp_conf={ "service_name": "node",
            "remote_docker_port":None
          }
 
+ms_other_conf={ "service_name": "ms-other",
+           "stack_name": "monotloth-stack",
+           "sysfile": cwd.parent/"sou"/"monotloth-v5.yml",
+           "control_widow": 15,
+           "estimation_window": 10,
+           "measurament_period":"1s",
+           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}_ms-other.csv",
+           "stealth":True,
+           "init_repica":6,
+           "prediction_horizon":None,
+           "target_utilization":None,
+           "prometheus":{
+               "host":"127.0.0.1",
+               "port":9090
+           },
+           #"remote":"192.168.3.102",
+           #"remote_docker_port":2375
+           "remote":None,
+           "remote_docker_port":None
+         }
+
+gateway_conf={ "service_name": "gateway",
+           "stack_name": "monotloth-stack",
+           "sysfile": cwd.parent/"sou"/"monotloth-v5.yml",
+           "control_widow": 15,
+           "estimation_window": 10,
+           "measurament_period":"1s",
+           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}_gateway.csv",
+           "stealth":True,
+           "init_repica":6,
+           "prediction_horizon":None,
+           "target_utilization":None,
+           "prometheus":{
+               "host":"127.0.0.1",
+               "port":9090
+           },
+           #"remote":"192.168.3.102",
+           #"remote_docker_port":2375
+           "remote":None,
+           "remote_docker_port":None
+         } 
+
 #Qui la logica di avvio del control loop specifica per ogni locus file
-ctrlLoop=ControlLoop(config=exp_conf)
+ctrlLoop_ms_exercise=ControlLoop(config=ms_exercise_conf)
+ctrlLoop_ms_other=ControlLoop(config=ms_other_conf)
+ctrlLoop_gateway=ControlLoop(config=gateway_conf)
+
 @events.test_start.add_listener
 def on_locust_start(environment, **_kwargs):
     if not isinstance(environment.runner, WorkerRunner):
-        gevent.spawn(ctrlLoop.loop, environment)
+        gevent.spawn(ctrlLoop_ms_exercise.loop, environment)
+        gevent.spawn(ctrlLoop_ms_other.loop, environment)
+        gevent.spawn(ctrlLoop_gateway.loop, environment)
 
 @events.test_stop.add_listener
 def on_locust_stop(environment, **_kwargs):
-    global ctrlLoop
-    ctrlLoop.saveResults()
+    global ctrlLoop_ms_exercise, ctrlLoop_ms_other, ctrlLoop_gateway
+    ctrlLoop_ms_exercise.saveResults()
+    ctrlLoop_ms_other.saveResults()
+    ctrlLoop_gateway.saveResults()
 
 class SoyMonoUser(BaseExp):
 
