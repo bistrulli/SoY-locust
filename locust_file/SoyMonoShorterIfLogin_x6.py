@@ -82,7 +82,8 @@ class SoyMonoUser(BaseExp):
                 # OPTIONS before exercise production
                 self.client.request("OPTIONS", "/api/exercise-production", timeout=1)
                 # Exercise production
-                with open(f'{resourceDir.absolute()}/soymono2/0046_request.json') as json_file:
+                #with open(f'{resourceDir.absolute()}/soymono2/0046_request.json') as json_file:
+                with open(f'{resourceDir.absolute()}/soymshttp1/0049_request.json') as json_file:
                     exercise_data = json.load(json_file)
                     self.client.post(
                         "/api/exercise-production",
