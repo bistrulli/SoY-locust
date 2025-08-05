@@ -399,6 +399,7 @@ class Monitoring:
         print(f"[DEBUG] Recent data: {recent_data}")
         print(f"[DEBUG] Recent times: {recent_times}")
         print(f"[DEBUG] Recent users: {recent_users}")
+        print(f"[DEBUG] Horizon: {horizon}")
 
         # Calcola i gradienti per ogni coppia di punti consecutivi
         gradients = []
@@ -416,6 +417,13 @@ class Monitoring:
 
         # Stima il tempo per l'orizzonte di predizione (assumendo step costanti)
         avg_dt = (recent_times[-1] - recent_times[-2])
+
+        print(f"[DEBUG] Recent data: {recent_data}")
+        print(f"[DEBUG] Recent times: {recent_times}")
+        print(f"[DEBUG] Recent users: {recent_users}")
+        print(f"[DEBUG] Horizon: {horizon}")
+        print(f"[DEBUG] Avg dt: {avg_dt}")
+        
         prediction_dt = avg_dt * horizon
 
         # Predici il numero di utenti
