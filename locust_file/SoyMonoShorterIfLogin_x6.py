@@ -84,8 +84,8 @@ ctrlLoop_gateway=ControlLoop(config=gateway_conf)
 def on_locust_start(environment, **_kwargs):
     if not isinstance(environment.runner, WorkerRunner):
         gevent.spawn(ctrlLoop_ms_exercise.loop, environment)
-        #gevent.spawn(ctrlLoop_ms_other.loop, environment)
-        #gevent.spawn(ctrlLoop_gateway.loop, environment)
+        gevent.spawn(ctrlLoop_ms_other.loop, environment)
+        gevent.spawn(ctrlLoop_gateway.loop, environment)
 
 @events.test_stop.add_listener
 def on_locust_stop(environment, **_kwargs):
