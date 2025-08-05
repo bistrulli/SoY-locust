@@ -21,8 +21,8 @@ ms_exercise_conf={ "service_name": "ms-exercise",
            "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}_ms-exercise.csv",
            "stealth":True,
            "init_repica":6,
-           "prediction_horizon":None,
-           "target_utilization":None,
+           "prediction_horizon":10,
+           "target_utilization":0.2,
            "prometheus":{
                "host":"127.0.0.1",
                "port":9090
@@ -42,8 +42,8 @@ ms_other_conf={ "service_name": "ms-other",
            "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}_ms-other.csv",
            "stealth":True,
            "init_repica":6,
-           "prediction_horizon":None,
-           "target_utilization":None,
+           "prediction_horizon":10,
+           "target_utilization":0.2,
            "prometheus":{
                "host":"127.0.0.1",
                "port":9090
