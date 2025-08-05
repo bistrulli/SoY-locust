@@ -63,8 +63,8 @@ gateway_conf={ "service_name": "gateway",
            "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}_gateway.csv",
            "stealth":True,
            "init_repica":6,
-           "prediction_horizon":None,
-           "target_utilization":None,
+           "prediction_horizon":10,
+           "target_utilization":0.2,
            "prometheus":{
                "host":"127.0.0.1",
                "port":9090
