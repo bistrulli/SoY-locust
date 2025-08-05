@@ -1,6 +1,37 @@
 version: '3.7' # Supporto Swarm
 
 services:
+  traefik:
+    image: traefik:v2.10
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.swarmMode=true
+      - --providers.docker.exposedByDefault=false
+      - --metrics.prometheus=true
+      - --metrics.prometheus.addEntryPointsLabels=true
+      - --metrics.prometheus.addServicesLabels=true
+      - --entrypoints.web.address=:80
+      - --log.level=INFO
+    ports:
+      - "80:80"      # Traffico HTTP
+      - "8080:8080"  # Dashboard Traefik
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - monitoring
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
   ms-exercise:
     image: icws24submission/exercise_icws24
     security_opt:
@@ -17,7 +48,6 @@ services:
         condition: none
     networks:
       - monitoring
-
 
   ms-other:
     image: icws24submission/other_icws24
@@ -42,8 +72,6 @@ services:
     depends_on:
       - ms-exercise
       - ms-other
-    ports:
-      - 5001:8080
     env_file:
       - monolith-v5/variables.env
     deploy:
@@ -51,8 +79,16 @@ services:
       update_config:
         parallelism: 1
         delay: 30s
+      restart_policy:
+        condition: none
     networks:
       - monitoring
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gateway.rule=Host(`localhost`)"
+      - "traefik.http.services.gateway.loadbalancer.server.port=8080"
+      - "traefik.http.routers.gateway.entrypoints=web"
+      - "traefik.http.routers.gateway.tls=false"
 
   postgres:
     container_name: postgres
@@ -70,7 +106,6 @@ services:
         delay: 30s
     networks:
       - monitoring
-
 
   node-exporter:
     image: prom/node-exporter:latest

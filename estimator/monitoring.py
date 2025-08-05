@@ -50,6 +50,12 @@ class Monitoring:
         self.active_users += [self.get_active_users()]
         self.memory += [0]
         self.util += [self.get_service_cpu_utilization(stack_name=self.stack_name, service_name=self.serviceName)]
+        
+        # Aggiungi le nuove metriche Traefik
+        self.traefik_incoming += [self.getIncomingRequestsFromTraefik()]
+        self.traefik_completed += [self.getCompletedRequestsFromTraefik()]
+        self.traefik_failed += [self.getFailedRequestsFromTraefik()]
+        self.traefik_response_time += [self.getResponseTimeFromTraefik()]
 
     def getUsers(self):
         # torno il numero di utenti attivi (Little's Law)
@@ -256,14 +262,18 @@ class Monitoring:
         self.users = []
         self.time = []
         self.replica = []
-        self.ready_replica = []  # Aggiungo la lista per le repliche pronte
+        self.ready_replica = []
         self.util = []
         self.memory = []
-        # Aggiunta per il throughput
         self.last_requests = None
         self.last_timestamp = None
-        # numero di utenti attivi cosi come visti da locust
         self.active_users = []
+        
+        # Aggiungi le nuove liste per Traefik
+        self.traefik_incoming = []
+        self.traefik_completed = []
+        self.traefik_failed = []
+        self.traefik_response_time = []
 
     def save_to_csv(self, filename):
         path = Path(filename)
@@ -278,16 +288,20 @@ class Monitoring:
             "replica": len(self.replica),
             "ready_replica": len(self.ready_replica),
             "util": len(self.util),
-            "mem": len(self.memory)
+            "mem": len(self.memory),
+            "traefik_incoming": len(self.traefik_incoming),
+            "traefik_completed": len(self.traefik_completed),
+            "traefik_failed": len(self.traefik_failed),
+            "traefik_response_time": len(self.traefik_response_time)
         }
 
         print("###saving results##")
         print(f"Array lengths: {lengths}")
 
-        # Trovo la lunghezza minima comune tra tutti gli array
+        # Trovo la lunghezza minima comune
         min_length = min(lengths.values())
 
-        # Creo un dizionario di dati troncando ogni array alla lunghezza minima comune
+        # Creo un dizionario di dati
         data = {
             "cores": self.cores[:min_length],
             "rts": self.rts[:min_length],
@@ -296,7 +310,11 @@ class Monitoring:
             "replica": self.replica[:min_length],
             "ready_replica": self.ready_replica[:min_length],
             "util": self.util[:min_length],
-            "mem": self.memory[:min_length]
+            "mem": self.memory[:min_length],
+            "traefik_incoming": self.traefik_incoming[:min_length],
+            "traefik_completed": self.traefik_completed[:min_length],
+            "traefik_failed": self.traefik_failed[:min_length],
+            "traefik_response_time": self.traefik_response_time[:min_length]
         }
 
         try:
@@ -305,9 +323,6 @@ class Monitoring:
             print(f"Data saved to {filename} (truncated to {min_length} rows)")
         except Exception as e:
             print(f"Error saving data: {e}")
-            print(f"Array lengths: cores={len(self.cores)}, rts={len(self.rts)}, "
-                  f"tr={len(self.tr)}, users={len(self.active_users)}, replica={len(self.replica)}, "
-                  f"ready_replica={len(self.ready_replica)}, util={len(self.util)}, mem={len(self.memory)}")
 
     def get_active_users(self):
         """
@@ -370,6 +385,111 @@ class Monitoring:
             print(f"[ERROR CPU] Error details: {str(e)}")
             print(f"[ERROR CPU] Error type: {type(e)}")
             return 0.0
+
+    def getIncomingRequestsFromTraefik(self):
+        """
+        Recupera il numero di richieste in ingresso tramite Traefik.
+        
+        Returns:
+            float: Numero di richieste in ingresso al secondo
+        """
+        try:
+            query = 'sum(rate(traefik_service_requests_total[30s]))'
+            result = self.prom.custom_query(query=query)
+            
+            if result and len(result) > 0 and 'value' in result[0]:
+                return float(result[0]['value'][1])
+            return 0
+        except Exception as e:
+            print("Error querying Traefik incoming requests:", e)
+            return 0
+
+    def getCompletedRequestsFromTraefik(self):
+        """
+        Recupera il numero di richieste completate con successo tramite Traefik.
+        
+        Returns:
+            float: Numero di richieste completate al secondo
+        """
+        try:
+            query = 'sum(rate(traefik_service_requests_total{code=~"2..|3.."}[30s]))'
+            result = self.prom.custom_query(query=query)
+            
+            if result and len(result) > 0 and 'value' in result[0]:
+                return float(result[0]['value'][1])
+            return 0
+        except Exception as e:
+            print("Error querying Traefik completed requests:", e)
+            return 0
+
+    def getFailedRequestsFromTraefik(self):
+        """
+        Recupera il numero di richieste fallite tramite Traefik.
+        
+        Returns:
+            float: Numero di richieste fallite al secondo
+        """
+        try:
+            query = 'sum(rate(traefik_service_requests_total{code=~"4..|5.."}[30s]))'
+            result = self.prom.custom_query(query=query)
+            
+            if result and len(result) > 0 and 'value' in result[0]:
+                return float(result[0]['value'][1])
+            return 0
+        except Exception as e:
+            print("Error querying Traefik failed requests:", e)
+            return 0
+
+    def getResponseTimeFromTraefik(self):
+        """
+        Recupera il tempo di risposta medio tramite Traefik.
+        
+        Returns:
+            float: Tempo di risposta medio in secondi
+        """
+        try:
+            query = 'sum(rate(traefik_service_request_duration_seconds_sum[30s])) / sum(rate(traefik_service_request_duration_seconds_count[30s]))'
+            result = self.prom.custom_query(query=query)
+            
+            if result and len(result) > 0 and 'value' in result[0]:
+                return float(result[0]['value'][1])
+            return 0
+        except Exception as e:
+            print("Error querying Traefik response time:", e)
+            return 0
+
+    def getRequestsByService(self, service_name):
+        """
+        Recupera le metriche per un servizio specifico.
+        
+        Args:
+            service_name (str): Nome del servizio (es. 'gateway')
+        
+        Returns:
+            dict: Dizionario con metriche del servizio
+        """
+        try:
+            metrics = {}
+            
+            # Richieste totali per servizio
+            query = f'sum(rate(traefik_service_requests_total{{service="{service_name}"}}[30s]))'
+            result = self.prom.custom_query(query=query)
+            metrics['total_requests'] = float(result[0]['value'][1]) if result and len(result) > 0 else 0
+            
+            # Richieste completate per servizio
+            query = f'sum(rate(traefik_service_requests_total{{service="{service_name}",code=~"2..|3.."}}[30s]))'
+            result = self.prom.custom_query(query=query)
+            metrics['completed_requests'] = float(result[0]['value'][1]) if result and len(result) > 0 else 0
+            
+            # Tempo di risposta per servizio
+            query = f'sum(rate(traefik_service_request_duration_seconds_sum{{service="{service_name}"}}[30s])) / sum(rate(traefik_service_request_duration_seconds_count{{service="{service_name}"}}[30s]))'
+            result = self.prom.custom_query(query=query)
+            metrics['response_time'] = float(result[0]['value'][1]) if result and len(result) > 0 else 0
+            
+            return metrics
+        except Exception as e:
+            print(f"Error querying Traefik metrics for service {service_name}:", e)
+            return {'total_requests': 0, 'completed_requests': 0, 'response_time': 0}
 
     def predict_users(self, horizon=1):
         """

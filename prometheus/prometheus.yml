@@ -1,21 +1,18 @@
-
-
-
 global:
-  scrape_interval: 1s  # Frequenza di raccolta metriche
+  scrape_interval: 1s
 
 scrape_configs:
   - job_name: 'locust'
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['172.17.0.1:9646']  # Se Prometheus è in un container e Locust gira sull'host
+      - targets: ['172.17.0.1:9646']
 
-  # - job_name: 'node-exporter'
-  #   metrics_path: '/metrics'
-  #   static_configs:
-  #     - targets: ['node-exporter:9100']  # Using Docker service name for internal DNS resolution
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']
+    metrics_path: '/metrics'
 
   - job_name: 'cadvisor'
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['cadvisor:8080']  # Using Docker service name for internal DNS resolution
+      - targets: ['cadvisor:8080']
