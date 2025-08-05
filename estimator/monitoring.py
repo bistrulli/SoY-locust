@@ -396,6 +396,10 @@ class Monitoring:
         recent_times = [t for t, _ in recent_data]
         recent_users = [u for _, u in recent_data]
 
+        print(f"[DEBUG] Recent data: {recent_data}")
+        print(f"[DEBUG] Recent times: {recent_times}")
+        print(f"[DEBUG] Recent users: {recent_users}")
+
         # Calcola i gradienti per ogni coppia di punti consecutivi
         gradients = []
         for i in range(1, len(recent_users)):
