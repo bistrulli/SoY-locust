@@ -46,6 +46,13 @@ services:
         delay: 30s
       restart_policy:
         condition: none
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.ms-exercise.rule=Host(`ms-exercise.local`)"
+        - "traefik.http.routers.ms-exercise.entrypoints=web"
+        - "traefik.http.routers.ms-exercise.tls=false"
+        - "traefik.http.services.ms-exercise.loadbalancer.server.port=8080"
+        - "traefik.docker.network=ms-stack-v5_monitoring"
     networks:
       - monitoring
 
@@ -61,6 +68,13 @@ services:
       update_config:
         parallelism: 1
         delay: 30s
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.ms-other.rule=Host(`ms-other.local`)"
+        - "traefik.http.routers.ms-other.entrypoints=web"
+        - "traefik.http.routers.ms-other.tls=false"
+        - "traefik.http.services.ms-other.loadbalancer.server.port=8080"
+        - "traefik.docker.network=ms-stack-v5_monitoring"
     networks:
       - monitoring
 
@@ -87,6 +101,7 @@ services:
         - "traefik.http.services.gateway.loadbalancer.server.port=8080"
         - "traefik.http.routers.gateway.entrypoints=web"
         - "traefik.http.routers.gateway.tls=false"
+        - "traefik.docker.network=ms-stack-v5_monitoring"
     networks:
       - monitoring
 

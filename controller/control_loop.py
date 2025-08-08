@@ -83,7 +83,14 @@ class ControlLoop():
                 totalcores = np.array(self.monitor.cores[-self.config["estimation_window"]:]) * np.array(self.monitor.replica[-self.config["estimation_window"]:])
                 respnseTimes=np.array(self.monitor.rts[-self.config["estimation_window"]:])
                 wip=self.monitor.predict_users(horizon=self.prediction_horizon)
-                self.stime=self.monitor.util[-1]/self.monitor.tr[-1]
+                
+                # Protezione contro divisione per zero
+                if self.monitor.tr[-1] > 0:
+                    self.stime = self.monitor.util[-1] / self.monitor.tr[-1]
+                else:
+                    self.stime = 0.0
+                    logger.warning("%s  ⚠️ Throughput is zero, cannot calculate service time", self.service_prefix)
+                
                 stealth=self.config["stealth"]
                 logger.info("%s  → Service Time: %.4f (stealth=%s)", self.service_prefix, self.stime, stealth)
 
