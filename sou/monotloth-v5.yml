@@ -48,9 +48,15 @@ services:
         condition: none
       labels:
         - "traefik.enable=true"
-        - "traefik.http.routers.ms-exercise.rule=Host(`ms-exercise.local`)"
-        - "traefik.http.routers.ms-exercise.entrypoints=web"
-        - "traefik.http.routers.ms-exercise.tls=false"
+        # Router interno per chiamate dal gateway
+        - "traefik.http.routers.ms-exercise-internal.rule=Host(`traefik`) && PathPrefix(`/internal/ms-exercise`)"
+        - "traefik.http.routers.ms-exercise-internal.entrypoints=web"
+        - "traefik.http.routers.ms-exercise-internal.tls=false"
+        - "traefik.http.routers.ms-exercise-internal.service=ms-exercise"
+        # Strip del prefisso /internal/ms-exercise
+        - "traefik.http.routers.ms-exercise-internal.middlewares=ms-exercise-stripprefix"
+        - "traefik.http.middlewares.ms-exercise-stripprefix.stripprefix.prefixes=/internal/ms-exercise"
+        # Servizio backend
         - "traefik.http.services.ms-exercise.loadbalancer.server.port=8080"
         - "traefik.docker.network=ms-stack-v5_monitoring"
     networks:
@@ -70,9 +76,15 @@ services:
         delay: 30s
       labels:
         - "traefik.enable=true"
-        - "traefik.http.routers.ms-other.rule=Host(`ms-other.local`)"
-        - "traefik.http.routers.ms-other.entrypoints=web"
-        - "traefik.http.routers.ms-other.tls=false"
+        # Router interno per chiamate dal gateway
+        - "traefik.http.routers.ms-other-internal.rule=Host(`traefik`) && PathPrefix(`/internal/ms-other`)"
+        - "traefik.http.routers.ms-other-internal.entrypoints=web"
+        - "traefik.http.routers.ms-other-internal.tls=false"
+        - "traefik.http.routers.ms-other-internal.service=ms-other"
+        # Strip del prefisso /internal/ms-other
+        - "traefik.http.routers.ms-other-internal.middlewares=ms-other-stripprefix"
+        - "traefik.http.middlewares.ms-other-stripprefix.stripprefix.prefixes=/internal/ms-other"
+        # Servizio backend
         - "traefik.http.services.ms-other.loadbalancer.server.port=8080"
         - "traefik.docker.network=ms-stack-v5_monitoring"
     networks:
@@ -86,6 +98,11 @@ services:
     depends_on:
       - ms-exercise
       - ms-other
+    environment:
+      # Configura il gateway per usare Traefik per chiamate interne
+      - MS_EXERCISE_URL=http://traefik/internal/ms-exercise
+      - MS_OTHER_URL=http://traefik/internal/ms-other
+      - TRAEFIK_INTERNAL=true
     env_file:
       - monolith-v5/variables.env
     deploy:
