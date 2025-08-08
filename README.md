@@ -66,7 +66,7 @@ After deploying the stack, the following services are available:
 | **Prometheus** | `http://localhost:9090` | Metrics collection and querying |
 | **Locust Web UI** | `http://localhost:8089` | Load testing interface (when running) |
 | **Node Exporter** | `http://localhost:9100` | System metrics |
-| **cAdvisor** | `http://localhost:8080` | Container metrics |
+| **cAdvisor** | `http://localhost:8081` | Container metrics |
 
 ## 🎯 Running Experiments
 
