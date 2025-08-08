@@ -41,25 +41,38 @@ class Monitoring:
         self.promPort = promPort
         self.promHost = promHost
         self.sysfile = sysfile
-        if remote is not None and remote_docker_port is not None:
-            self.client = docker.DockerClient(base_url='tcp://'+remote+":"+str(remote_docker_port))
-        else:
-            self.client = docker.from_env()
+        self.remote = remote
+        self.remote_docker_port = remote_docker_port
         self.has_health_check = has_health_check
+        
+        # Lazy initialization - non creare client nel __init__ per evitare fork issues
+        self._client = None
+        self._prom = None
+        
         if (not Path(self.sysfile).exists()):
             raise FileNotFoundError(f"File {self.sysfile} not found")
         self.sys = yaml.safe_load(self.sysfile.open())
-        
-        # Create gevent-compatible Prometheus client
-        self.prom = PrometheusConnect(url=f"http://{self.promHost}:{self.promPort}", disable_ssl=True)
-        
-        # Patch the requests session to be gevent-compatible
-        if hasattr(self.prom, '_session') and self.prom._session:
-            # Disable content compression to avoid gevent threading conflicts
-            self.prom._session.headers.update({'Accept-Encoding': 'identity'})
-        
-        self.remote = remote
         self.reset()
+
+    @property
+    def client(self):
+        """Lazy initialization del Docker client per evitare problemi di fork"""
+        if self._client is None:
+            if self.remote is not None and self.remote_docker_port is not None:
+                self._client = docker.DockerClient(base_url='tcp://'+self.remote+":"+str(self.remote_docker_port))
+            else:
+                self._client = docker.from_env()
+        return self._client
+
+    @property  
+    def prom(self):
+        """Lazy initialization del Prometheus client per evitare problemi di fork"""
+        if self._prom is None:
+            self._prom = PrometheusConnect(url=f"http://{self.promHost}:{self.promPort}", disable_ssl=True)
+            # Patch per gevent compatibility
+            if hasattr(self._prom, '_session') and self._prom._session:
+                self._prom._session.headers.update({'Accept-Encoding': 'identity'})
+        return self._prom
 
     def tick(self, t):
         self.time += [t]
