@@ -26,11 +26,13 @@ def main():
     parser.add_argument('--log-level', type=str, default='INFO', 
                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
                        help='Set logging level')
+    parser.add_argument('--no-colors', action='store_true',
+                       help='Disable colored output')
     
     args = parser.parse_args()
     
-    # Inizializza il logging centralizzato
-    logger = init_logging(level=args.log_level)
+    # Inizializza il logging centralizzato (con colori per multi-controller)
+    logger = init_logging(level=args.log_level, colored=not args.no_colors)
     
     logger.info("🔧 DEBUG MODE: Launching Locust only (assuming Docker stack is running)")
     logger.info("Target: %s", args.host)

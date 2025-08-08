@@ -18,6 +18,15 @@ import subprocess
 # Configure logging for this module
 logger = logging.getLogger(__name__)
 
+def _get_service_prefix(service_name, stack_name):
+    """Helper per creare un prefisso leggibile per i log"""
+    if service_name:
+        return f"[{service_name.upper()}]"
+    elif stack_name:
+        return f"[{stack_name}]"
+    else:
+        return "[MONITOR]"
+
 
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x) / len(x),
@@ -28,6 +37,7 @@ class Monitoring:
         self.sla = sla
         self.serviceName = serviceName
         self.stack_name = stack_name
+        self.service_prefix = _get_service_prefix(serviceName, stack_name)
         self.promPort = promPort
         self.promHost = promHost
         self.sysfile = sysfile
@@ -98,7 +108,7 @@ class Monitoring:
             else:
                 return 0
         except Exception as e:
-            logger.error("Error querying Prometheus for RT: %s", e)
+            logger.error("%s Error querying Prometheus for RT: %s", self.service_prefix, e)
             return 0
 
     def getTroughput(self):
@@ -111,7 +121,7 @@ class Monitoring:
                 throughput = 0
             return throughput
         except Exception as e:
-            logger.error("Error querying throughput from Prometheus: %s", e)
+            logger.error("%s Error querying throughput from Prometheus: %s", self.service_prefix, e)
             return 0
 
     def get_replicas(self, stack_name, service_name):
@@ -135,10 +145,10 @@ class Monitoring:
             logger.debug("Number of replicas: %s", replicas)
             return replicas
         except docker.errors.NotFound:
-            logger.error("Service '%s' not found.", full_service_name)
+            logger.error("%s Service '%s' not found", self.service_prefix, full_service_name)
             return None
         except Exception as e:
-            logger.error("Error in get_replicas: %s", str(e))
+            logger.error("%s Error in get_replicas: %s", self.service_prefix, str(e))
             logger.error("Error type: %s", type(e))
             return None
 
@@ -255,7 +265,7 @@ class Monitoring:
                 return ready_count
 
         except Exception as e:
-            logger.error("Error in get_ready_replicas: %s", str(e))
+            logger.error("%s Error in get_ready_replicas: %s", self.service_prefix, str(e))
             # Fallback to nominal replica count
             return self.get_replicas(stack_name, service_name)
 
@@ -299,8 +309,8 @@ class Monitoring:
             "traefik_response_time": len(self.traefik_response_time)
         }
 
-        logger.info("Saving results")
-        logger.info("Array lengths: %s", lengths)
+        logger.info("%s Saving results", self.service_prefix)
+        logger.info("%s Array lengths: %s", self.service_prefix, lengths)
 
         # Trovo la lunghezza minima comune
         min_length = min(lengths.values())
@@ -324,9 +334,9 @@ class Monitoring:
         try:
             df = pd.DataFrame(data)
             df.to_csv(filename, index=False)
-            logger.info("Data saved to %s (truncated to %d rows)", filename, min_length)
+            logger.info("%s Data saved to %s (truncated to %d rows)", self.service_prefix, filename, min_length)
         except Exception as e:
-            logger.error("Error saving data: %s", e)
+            logger.error("%s Error saving data: %s", self.service_prefix, e)
 
     def get_active_users(self):
         """
@@ -340,7 +350,7 @@ class Monitoring:
                 return float(result[0]['value'][1])
             return None
         except Exception as e:
-            logger.error("Error fetching active users metric from Prometheus: %s", e)
+            logger.error("%s Error fetching active users metric from Prometheus: %s", self.service_prefix, e)
             return None
 
     def get_service_cpu_utilization(self, service_name=None, stack_name=None):
@@ -374,19 +384,19 @@ class Monitoring:
             logger.debug("CPU Raw Prometheus result: %s", result)
 
             if result and len(result) > 0:
-                logger.debug("CPU Result has data: %s", result[0])
+                logger.debug("%s CPU Result has data: %s", self.service_prefix, result[0])
                 if 'value' in result[0]:
                     total_cpu = float(result[0]['value'][1])
                     logger.debug("CPU Extracted CPU value: %s", total_cpu)
                     return total_cpu
                 else:
-                    logger.debug("CPU No 'value' key in result[0]")
+                    logger.debug("%s CPU No 'value' key in result[0]", self.service_prefix)
             else:
-                logger.debug("CPU Empty or null result from Prometheus")
+                logger.debug("%s CPU Empty or null result from Prometheus", self.service_prefix)
             return 0.0
         except Exception as e:
-            logger.error("CPU Error collecting CPU utilization for service %s", full_service_name)
-            logger.error("CPU Error details: %s", str(e))
+            logger.error("%s CPU Error collecting CPU utilization for service %s", self.service_prefix, full_service_name)
+            logger.error("%s CPU Error details: %s", self.service_prefix, str(e))
             logger.error("CPU Error type: %s", type(e))
             return 0.0
 

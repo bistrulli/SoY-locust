@@ -32,8 +32,8 @@ def setup_logging(level='INFO', log_to_file=False, log_file_path=None):
     # Converti il livello stringa in costante logging
     log_level = LOG_LEVELS.get(level.upper(), logging.INFO)
     
-    # Configura il formato dei messaggi
-    log_format = '%(asctime)s [%(levelname)8s] %(name)s: %(message)s'
+    # Configura il formato dei messaggi (ottimizzato per multi-controller)
+    log_format = '%(asctime)s [%(levelname)8s] %(message)s'
     date_format = '%Y-%m-%d %H:%M:%S'
     
     # Lista degli handler

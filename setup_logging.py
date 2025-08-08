@@ -5,8 +5,9 @@ Importa e usa questo modulo nei tuoi script principali.
 """
 
 from config.logging_config import setup_logging, set_log_level, get_current_log_level
+from config.colored_logging import setup_colored_logging
 
-def init_logging(level='INFO', log_to_file=False, log_file_path=None):
+def init_logging(level='INFO', log_to_file=False, log_file_path=None, colored=True):
     """
     Inizializza il sistema di logging centralizzato.
     
@@ -14,24 +15,28 @@ def init_logging(level='INFO', log_to_file=False, log_file_path=None):
         level (str): Livello di logging ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
         log_to_file (bool): Se True, salva i log anche su file
         log_file_path (str): Path del file di log (opzionale)
+        colored (bool): Se True, usa logging colorato per multi-controller (default: True)
     
     Returns:
         logging.Logger: Logger configurato
         
     Example:
-        # Logging base (solo INFO e superiori sulla console)
+        # Logging colorato per multi-controller (RACCOMANDATO)
         init_logging()
         
-        # Logging debug completo
+        # Logging debug colorato
         init_logging(level='DEBUG')
         
-        # Logging su file
+        # Logging colorato con file
         init_logging(level='INFO', log_to_file=True)
         
-        # Logging su file specifico
-        init_logging(level='DEBUG', log_to_file=True, log_file_path='my_test.log')
+        # Logging tradizionale (senza colori)
+        init_logging(level='INFO', colored=False)
     """
-    return setup_logging(level=level, log_to_file=log_to_file, log_file_path=log_file_path)
+    if colored:
+        return setup_colored_logging(level=level, log_to_file=log_to_file, log_file_path=log_file_path)
+    else:
+        return setup_logging(level=level, log_to_file=log_to_file, log_file_path=log_file_path)
 
 # Esempi di utilizzo rapido
 def setup_debug_logging():
