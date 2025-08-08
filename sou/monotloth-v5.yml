@@ -81,14 +81,14 @@ services:
         delay: 30s
       restart_policy:
         condition: none
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.gateway.rule=Host(`localhost`)"
+        - "traefik.http.services.gateway.loadbalancer.server.port=8080"
+        - "traefik.http.routers.gateway.entrypoints=web"
+        - "traefik.http.routers.gateway.tls=false"
     networks:
       - monitoring
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.gateway.rule=Host(`localhost`)"
-      - "traefik.http.services.gateway.loadbalancer.server.port=8080"
-      - "traefik.http.routers.gateway.entrypoints=web"
-      - "traefik.http.routers.gateway.tls=false"
 
   postgres:
     container_name: postgres
