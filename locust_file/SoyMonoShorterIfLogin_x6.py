@@ -13,7 +13,7 @@ import gevent
 cwd=Path(__file__).parent
 
 ms_exercise_conf={ "service_name": "ms-exercise",
-           "stack_name": "monotloth-stack",
+           "stack_name": "ms-stack-v5",
            "sysfile": cwd.parent/"sou"/"monotloth-v5.yml",
            "control_widow": 15,
            "estimation_window": 10,
@@ -34,7 +34,7 @@ ms_exercise_conf={ "service_name": "ms-exercise",
          }
 
 ms_other_conf={ "service_name": "ms-other",
-           "stack_name": "monotloth-stack",
+           "stack_name": "ms-stack-v5",
            "sysfile": cwd.parent/"sou"/"monotloth-v5.yml",
            "control_widow": 15,
            "estimation_window": 10,
@@ -55,7 +55,7 @@ ms_other_conf={ "service_name": "ms-other",
          }
 
 gateway_conf={ "service_name": "gateway",
-           "stack_name": "monotloth-stack",
+           "stack_name": "ms-stack-v5",
            "sysfile": cwd.parent/"sou"/"monotloth-v5.yml",
            "control_widow": 15,
            "estimation_window": 10,

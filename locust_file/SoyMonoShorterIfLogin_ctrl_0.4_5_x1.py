@@ -13,7 +13,7 @@ import gevent
 cwd=Path(__file__).parent
 
 exp_conf={ "service_name": "node",
-           "stack_name": "monotloth-stack",
+           "stack_name": "ms-stack-v5",
            "sysfile": cwd.parent/"sou"/"monotloth-v4.yml",
            "control_widow": 1,
            "estimation_window": 10,
