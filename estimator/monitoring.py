@@ -8,6 +8,7 @@ import yaml
 import pandas as pd
 import requests_unixsocket
 import requests
+import gevent.monkey
 import re
 import json
 import time
@@ -49,7 +50,15 @@ class Monitoring:
         if (not Path(self.sysfile).exists()):
             raise FileNotFoundError(f"File {self.sysfile} not found")
         self.sys = yaml.safe_load(self.sysfile.open())
+        
+        # Create gevent-compatible Prometheus client
         self.prom = PrometheusConnect(url=f"http://{self.promHost}:{self.promPort}", disable_ssl=True)
+        
+        # Patch the requests session to be gevent-compatible
+        if hasattr(self.prom, '_session') and self.prom._session:
+            # Disable content compression to avoid gevent threading conflicts
+            self.prom._session.headers.update({'Accept-Encoding': 'identity'})
+        
         self.remote = remote
         self.reset()
 
