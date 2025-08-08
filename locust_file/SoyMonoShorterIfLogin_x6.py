@@ -102,6 +102,9 @@ class SoyMonoUser(BaseExp):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Fix gevent/threading conflict by disabling cookies
+        import requests.cookies
+        self.client.cookies = requests.cookies.RequestsCookieJar()
 
     def userLogic(self):
         # Implementazione specifica della logica utente
@@ -117,8 +120,15 @@ class SoyMonoUser(BaseExp):
             timeout=1
         )
         if login_response.status_code == 200:
-            access_token = login_response.cookies.get("access_token")
-            refresh_token = login_response.cookies.get("refresh_token")
+            # Extract tokens from response cookies
+            access_token = None
+            refresh_token = None
+            for cookie in login_response.cookies:
+                if cookie.name == "access_token":
+                    access_token = cookie.value
+                elif cookie.name == "refresh_token":
+                    refresh_token = cookie.value
+            
             if access_token:
                 # OPTIONS before auth verify
                 self.client.request("OPTIONS", "/api/auth/verify", timeout=1)
