@@ -8,7 +8,6 @@ import yaml
 import pandas as pd
 import requests_unixsocket
 import requests
-import gevent.monkey
 import re
 import json
 import time

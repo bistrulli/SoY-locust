@@ -1,3 +1,7 @@
+# IMPORTANTE: Monkey patch PRIMA di qualsiasi altro import
+import gevent.monkey
+gevent.monkey.patch_all()
+
 from locust import HttpUser, task, between, LoadTestShape
 from locust import events
 from locust.runners import WorkerRunner
