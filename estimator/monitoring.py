@@ -116,12 +116,18 @@ class Monitoring:
 
     def getResponseTime(self):
         """
-        Calcola il tempo di risposta medio degli ultimi 60 secondi utilizzando query Prometheus rate.
+        Calcola il tempo di risposta medio del servizio specifico utilizzando Traefik.
         """
         try:
-            sum_result = self.prom.custom_query(query="sum(rate(locust_request_latency_seconds_sum[1m]))")
-            count_result = self.prom.custom_query(query="sum(rate(locust_request_latency_seconds_count[1m]))")
-            if sum_result and count_result:
+            # Usa Traefik metrics per il servizio specifico
+            service_filter = f'service="{self.serviceName}"'
+            sum_query = f'sum(rate(traefik_service_request_duration_seconds_sum{{{service_filter}}}[30s]))'
+            count_query = f'sum(rate(traefik_service_request_duration_seconds_count{{{service_filter}}}[30s]))'
+            
+            sum_result = self.prom.custom_query(query=sum_query)
+            count_result = self.prom.custom_query(query=count_query)
+            
+            if sum_result and count_result and len(sum_result) > 0 and len(count_result) > 0:
                 latency_sum = float(sum_result[0]['value'][1])
                 latency_count = float(count_result[0]['value'][1])
                 avg_latency = latency_sum / latency_count if latency_count > 0 else 0
@@ -129,20 +135,26 @@ class Monitoring:
             else:
                 return 0
         except Exception as e:
-            logger.error("%s Error querying Prometheus for RT: %s", self.service_prefix, e)
+            logger.error("%s Error querying Traefik RT for service %s: %s", self.service_prefix, self.serviceName, e)
             return 0
 
     def getTroughput(self):
-        # Modifica: utilizzare la query per il rate negli ultimi 1 minuto
+        """
+        Calcola il throughput del servizio specifico utilizzando Traefik.
+        """
         try:
-            result = self.prom.custom_query(query="sum(rate(locust_requests_total[30s]))")
+            # Usa Traefik metrics per il servizio specifico
+            service_filter = f'service="{self.serviceName}"'
+            query = f'sum(rate(traefik_service_requests_total{{{service_filter}}}[30s]))'
+            result = self.prom.custom_query(query=query)
+            
             if result and len(result) > 0 and 'value' in result[0]:
                 throughput = float(result[0]['value'][1])
             else:
                 throughput = 0
             return throughput
         except Exception as e:
-            logger.error("%s Error querying throughput from Prometheus: %s", self.service_prefix, e)
+            logger.error("%s Error querying Traefik throughput for service %s: %s", self.service_prefix, self.serviceName, e)
             return 0
 
     def get_replicas(self, stack_name, service_name):
@@ -423,20 +435,22 @@ class Monitoring:
 
     def getIncomingRequestsFromTraefik(self):
         """
-        Recupera il numero di richieste in ingresso tramite Traefik.
+        Recupera il numero di richieste in ingresso tramite Traefik per il servizio specifico.
         
         Returns:
-            float: Numero di richieste in ingresso al secondo
+            float: Numero di richieste in ingresso al secondo per questo servizio
         """
         try:
-            query = 'sum(rate(traefik_service_requests_total[30s]))'
+            # Usa Traefik metrics per il servizio specifico
+            service_filter = f'service="{self.serviceName}"'
+            query = f'sum(rate(traefik_service_requests_total{{{service_filter}}}[30s]))'
             result = self.prom.custom_query(query=query)
             
             if result and len(result) > 0 and 'value' in result[0]:
                 return float(result[0]['value'][1])
             return 0
         except Exception as e:
-            logger.error("Error querying Traefik incoming requests: %s", e)
+            logger.error("%s Error querying Traefik incoming requests for service %s: %s", self.service_prefix, self.serviceName, e)
             return 0
 
     def getCompletedRequestsFromTraefik(self):
