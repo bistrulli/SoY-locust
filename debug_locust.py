@@ -50,6 +50,7 @@ def main():
     if args.loadshape_file:
         logger.info("Load shape: %s", args.loadshape_file)
     logger.info("CSV output: %s", args.csv)
+    logger.info("📁 Locust logs: logs/locust_output.log")
     logger.info("-" * 50)
     
     # Costruisce il comando Locust
