@@ -31,8 +31,15 @@ def main():
     
     args = parser.parse_args()
     
-    # Inizializza il logging centralizzato (con colori per multi-controller)
-    logger = init_logging(level=args.log_level, colored=not args.no_colors)
+    # Per Locust, il logging verrà configurato automaticamente da base_exp.py
+    # Qui usiamo un logger semplice solo per i messaggi di debug dello script
+    import logging
+    logging.basicConfig(
+        level=getattr(logging, args.log_level),
+        format='%(asctime)s [%(levelname)5s] %(message)s',
+        datefmt='%H:%M:%S'
+    )
+    logger = logging.getLogger(__name__)
     
     logger.info("🔧 DEBUG MODE: Launching Locust only (assuming Docker stack is running)")
     logger.info("Target: %s", args.host)

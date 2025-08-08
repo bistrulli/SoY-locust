@@ -16,6 +16,10 @@ import base_exp
 from abc import ABC, abstractmethod
 from abc import ABCMeta, abstractmethod
 
+# Configure logging for Locust multi-controller
+sys.path.append(str(Path(__file__).parent.parent))
+from config.locust_logging import setup_locust_logging, configure_module_loggers
+
 # Avvia il server Prometheus su porta 9646
 start_http_server(9646)
 
@@ -34,6 +38,15 @@ users=None
 def on_locust_start(environment, **_kwargs):
     global end, users
     end = False
+    
+    # Configure enhanced logging for multi-controller setup
+    import os
+    log_level = os.getenv('SOY_LOG_LEVEL', 'INFO')
+    colored_output = os.getenv('SOY_NO_COLORS', '').lower() not in ('1', 'true', 'yes')
+    
+    setup_locust_logging(level=log_level, colored=colored_output)
+    configure_module_loggers()
+    
     # Salva il tempo di inizio in environment se non esiste
     if not hasattr(environment, "start_time"):
         environment.start_time = time.time()
