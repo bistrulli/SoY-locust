@@ -111,7 +111,7 @@ services:
         parallelism: 1
         delay: 30s
       restart_policy:
-        condition: none
+        condition: none  
       labels:
         - "traefik.enable=true"
         - "traefik.http.routers.gateway.rule=Host(`localhost`) || Host(`127.0.0.1`)"

@@ -143,13 +143,36 @@ class Monitoring:
         """
         try:
             # Usa Traefik metrics per il servizio specifico
-            service_filter = f'service="{self.serviceName}"'
-            query = f'sum(rate(traefik_service_requests_total{{{service_filter}}}[30s]))'
-            result = self.prom.custom_query(query=query)
+            # Prova prima con nome semplice, poi con stack prefix
+            service_names_to_try = [
+                self.serviceName,  # es. "gateway"
+                f"{self.stack_name}_{self.serviceName}",  # es. "ms-stack-v5_gateway" 
+                f"{self.serviceName}@docker"  # formato Traefik con provider
+            ]
             
-            if result and len(result) > 0 and 'value' in result[0]:
+            result = None
+            used_service_name = None
+            
+            for service_name in service_names_to_try:
+                service_filter = f'service="{service_name}"'
+                query = f'sum(rate(traefik_service_requests_total{{{service_filter}}}[30s]))'
+                logger.debug("%s Trying Traefik query with service name '%s': %s", self.service_prefix, service_name, query)
+                result = self.prom.custom_query(query=query)
+                logger.debug("%s Result for service '%s': %s", self.service_prefix, service_name, result)
+                
+                if result and len(result) > 0 and 'value' in result[0]:
+                    used_service_name = service_name
+                    logger.info("%s Found Traefik data using service name: %s", self.service_prefix, service_name)
+                    break
+            
+            if used_service_name and result and len(result) > 0 and 'value' in result[0]:
                 return float(result[0]['value'][1])
             else:
+                # DEBUG: Prova query senza filtro per vedere se ci sono metriche
+                debug_query = 'traefik_service_requests_total'
+                debug_result = self.prom.custom_query(query=debug_query)
+                logger.warning("%s No Traefik data found for service %s. Available services: %s", 
+                              self.service_prefix, self.serviceName, debug_result)
                 return 0
         except Exception as e:
             logger.error("%s Error querying Traefik throughput for service %s: %s", self.service_prefix, self.serviceName, e)
