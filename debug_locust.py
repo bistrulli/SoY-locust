@@ -8,6 +8,7 @@ import subprocess
 import argparse
 import sys
 from pathlib import Path
+from setup_logging import init_logging
 
 def main():
     parser = argparse.ArgumentParser(description="Debug Locust launcher - no Docker deployment")
@@ -21,18 +22,26 @@ def main():
     parser.add_argument('--locust-file', type=str, required=True, help='Locust file path')
     parser.add_argument('--loadshape-file', type=str, help='Load shape file path')
     
+    # Parametro per il logging
+    parser.add_argument('--log-level', type=str, default='INFO', 
+                       choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+                       help='Set logging level')
+    
     args = parser.parse_args()
     
-    print("🔧 DEBUG MODE: Launching Locust only (assuming Docker stack is running)")
-    print(f"Target: {args.host}")
-    print(f"Users: {args.users}")
-    print(f"Spawn rate: {args.spawn_rate}")
-    print(f"Duration: {args.run_time}")
-    print(f"Locust file: {args.locust_file}")
+    # Inizializza il logging centralizzato
+    logger = init_logging(level=args.log_level)
+    
+    logger.info("🔧 DEBUG MODE: Launching Locust only (assuming Docker stack is running)")
+    logger.info("Target: %s", args.host)
+    logger.info("Users: %d", args.users)
+    logger.info("Spawn rate: %d", args.spawn_rate)
+    logger.info("Duration: %s", args.run_time)
+    logger.info("Locust file: %s", args.locust_file)
     if args.loadshape_file:
-        print(f"Load shape: {args.loadshape_file}")
-    print(f"CSV output: {args.csv}")
-    print("-" * 50)
+        logger.info("Load shape: %s", args.loadshape_file)
+    logger.info("CSV output: %s", args.csv)
+    logger.info("-" * 50)
     
     # Costruisce il comando Locust
     cmd = [
@@ -53,25 +62,25 @@ def main():
     cmd.extend(['-f', ','.join(locust_files)])
     
     # Mostra il comando che verrà eseguito
-    print("Executing command:")
-    print(' '.join(cmd))
-    print("-" * 50)
+    logger.info("Executing command:")
+    logger.info(' '.join(cmd))
+    logger.info("-" * 50)
     
     try:
         # Esegue Locust
         result = subprocess.run(cmd, check=True)
-        print("✅ Locust completed successfully")
+        logger.info("✅ Locust completed successfully")
         
     except subprocess.CalledProcessError as e:
-        print(f"❌ Locust failed with exit code {e.returncode}")
+        logger.error("❌ Locust failed with exit code %d", e.returncode)
         sys.exit(e.returncode)
         
     except KeyboardInterrupt:
-        print("⏹️ Locust interrupted by user")
+        logger.warning("⏹️ Locust interrupted by user")
         sys.exit(130)
         
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        logger.error("❌ Unexpected error: %s", e)
         sys.exit(1)
 
 if __name__ == "__main__":

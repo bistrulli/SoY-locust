@@ -5,6 +5,10 @@ import time
 import numpy as np
 from pytimeparse.timeparse import timeparse
 import docker
+import logging
+
+# Configure logging for this module
+logger = logging.getLogger(__name__)
 
 class ControlLoop():
 
@@ -39,7 +43,7 @@ class ControlLoop():
             t=self.getSimTime(environment=environment)
             try:
                 self.monitor.tick(t)
-                print(f"### tick = {t},ctrlTick = {self.ctrlTick} ###")
+                logger.info("tick = %s, ctrlTick = %d", t, self.ctrlTick)
 
                 # Verifica che tutte le liste abbiano almeno un elemento prima di accedervi
                 if (len(self.monitor.rts) > 0 and len(self.monitor.tr) > 0 and
@@ -48,20 +52,20 @@ class ControlLoop():
                     len(self.monitor.active_users) > 0 and len(self.monitor.util) > 0):
 
                     # Stampa formattata in più righe
-                    print(f"Response Time:  {self.monitor.rts[-1]}\n"
-                          f"Throughput:     {self.monitor.tr[-1]}\n"
-                          f"Replicas:       {self.monitor.replica[-1]}\n"
-                          f"Ready Replicas: {self.monitor.ready_replica[-1]}\n"
-                          f"Cores:          {self.monitor.cores[-1]}\n"
-                          f"WIP:            {self.monitor.users[-1]}\n"
-                          f"WIP_prom:       {self.monitor.active_users[-1]}\n"
-                          f"WIP_pred:       {self.monitor.predict_users(horizon=self.prediction_horizon)}\n"
-                          f"Util:           {self.monitor.util[-1]}\n"
-                          f"Mem:            {self.monitor.memory[-1]}")  # Corretto: memory invece di util
+                    logger.info("Response Time: %s", self.monitor.rts[-1])
+                    logger.info("Throughput: %s", self.monitor.tr[-1])
+                    logger.info("Replicas: %s", self.monitor.replica[-1])
+                    logger.info("Ready Replicas: %s", self.monitor.ready_replica[-1])
+                    logger.info("Cores: %s", self.monitor.cores[-1])
+                    logger.info("WIP: %s", self.monitor.users[-1])
+                    logger.info("WIP_prom: %s", self.monitor.active_users[-1])
+                    logger.info("WIP_pred: %s", self.monitor.predict_users(horizon=self.prediction_horizon))
+                    logger.info("Util: %s", self.monitor.util[-1])
+                    logger.info("Mem: %s", self.monitor.memory[-1])  # Corretto: memory invece di util
                 else:
-                    print(f"[WARNING] Dati del monitor non ancora disponibili o incompleti nel ciclo {self.ctrlTick}")
+                    logger.warning("Dati del monitor non ancora disponibili o incompleti nel ciclo %d", self.ctrlTick)
             except Exception as e:
-                print(f"[ERROR] Errore durante il ciclo di controllo: {str(e)}")
+                logger.error("Errore durante il ciclo di controllo: %s", str(e))
                 # Continua l'esecuzione per provare nel prossimo ciclo
             if(self.ctrlTick>self.config["estimation_window"] and
                len(self.monitor.rts)>=self.config["estimation_window"]):
@@ -70,14 +74,14 @@ class ControlLoop():
                 wip=self.monitor.predict_users(horizon=self.prediction_horizon)
                 self.stime=self.monitor.util[-1]/self.monitor.tr[-1]
                 stealth=self.config["stealth"]
-                print(f"Service Time:  {self.stime} stealth={stealth}")
+                logger.info("Service Time: %s stealth=%s", self.stime, stealth)
 
             if((self.ctrlTick%self.config["control_widow"]==0) and self.stime is not None and self.stime>0):
                 wip=self.monitor.predict_users(horizon=self.prediction_horizon)
                 if(not self.config["stealth"]):
                     replicas=self.controller.OPTController(e=[self.stime], tgt=[self.config["target_utilization"]], C=[float(wip)])
                     self.addSuggestion(np.round(replicas))
-                    print(f"CTRL:          {np.round(replicas)}")
+                    logger.info("CTRL: %s", np.round(replicas))
                     self.actuate(np.round(replicas))
 
             time.sleep(timeparse(self.config["measurament_period"]))
@@ -123,11 +127,11 @@ class ControlLoop():
 
             # It's downscaling if requested replicas are less than current replicas
             is_downscaling = requested_replicas < current_replicas
-            print(f"[DEBUG] Checking scaling: requested={requested_replicas}, current={current_replicas}, isDownScale={is_downscaling}")
+            logger.debug("Checking scaling: requested=%s, current=%s, isDownScale=%s", requested_replicas, current_replicas, is_downscaling)
 
             return is_downscaling
         except Exception as e:
-            print(f"[ERROR] Error in isDownScale: {str(e)}")
+            logger.error("Error in isDownScale: %s", str(e))
             # In case of error, assume upscaling for safety
             return False
 
@@ -177,11 +181,11 @@ class ControlLoop():
         try:
             # Construct full service name
             full_service_name = f"{self.config['stack_name']}_{self.config['service_name']}"
-            print(f"[DEBUG ACTUATE] Attempting to scale service: '{full_service_name}' to {int(replicas)} replicas")
-            print(f"[DEBUG ACTUATE] Available services: {[service.name for service in self.docker_client.services.list()]}")
+            logger.debug("ACTUATE Attempting to scale service: '%s' to %d replicas", full_service_name, int(replicas))
+            logger.debug("ACTUATE Available services: %s", [service.name for service in self.docker_client.services.list()])
 
             service = self.docker_client.services.get(full_service_name)
-            print(f"[DEBUG ACTUATE] Found service: {service.name}")
+            logger.debug("ACTUATE Found service: %s", service.name)
 
             # Ottieni il numero attuale di repliche
             current_replicas = service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 1)
@@ -194,7 +198,7 @@ class ControlLoop():
                     # Calcola il massimo delle suggestioni, ma non scendere sotto il valore minimo
                     max_suggestion = max(self.suggestion)
                     target_replicas = max(1, int(max_suggestion))
-                    print(f"[DOWNSCALING] Richiesto: {int(replicas)}, Massimo suggestioni: {max_suggestion}, Target: {target_replicas}")
+                    logger.info("DOWNSCALING Richiesto: %d, Massimo suggestioni: %d, Target: %d", int(replicas), max_suggestion, target_replicas)
                     service.scale(target_replicas)
                 else:
                     # Se non abbiamo suggestioni, usiamo il valore richiesto
@@ -203,14 +207,14 @@ class ControlLoop():
                 # Per l'upscaling, rispondiamo immediatamente per garantire prestazioni
                 # Converti replicas in int per evitare errori JSON
                 service.scale(max(1, int(replicas)))
-                print(f"[UPSCALING] Updated service {full_service_name} to {int(replicas)} replicas")
+                logger.info("UPSCALING Updated service %s to %d replicas", full_service_name, int(replicas))
         except docker.errors.NotFound:
-            print(f"[ERROR ACTUATE] Service '{full_service_name}' not found")
-            print(f"[ERROR ACTUATE] Make sure both stack_name ('{self.config['stack_name']}') and service_name ('{self.config['service_name']}') are correct")
+            logger.error("ACTUATE Service '%s' not found", full_service_name)
+            logger.error("ACTUATE Make sure both stack_name ('%s') and service_name ('%s') are correct", self.config['stack_name'], self.config['service_name'])
         except Exception as e:
-            print(f"[ERROR ACTUATE] Error updating service replicas: {str(e)}")
-            print(f"[ERROR ACTUATE] Error type: {type(e)}")
-            print(f"[ERROR ACTUATE] Current config: stack_name='{self.config['stack_name']}', service_name='{self.config['service_name']}'")
+            logger.error("ACTUATE Error updating service replicas: %s", str(e))
+            logger.error("ACTUATE Error type: %s", type(e))
+            logger.error("ACTUATE Current config: stack_name='%s', service_name='%s'", self.config['stack_name'], self.config['service_name'])
 
     def saveResults(self):
         self.toStop=True

@@ -10,9 +10,9 @@ import sys
 import os  # Nuovo import
 import time
 import re
+from setup_logging import init_logging
 
-# Configura il logger
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+# Il logging verrà configurato nel main() con la configurazione centralizzata
 
 sys_base_path = Path(__file__).parent/"sou"
 
@@ -194,6 +194,10 @@ signal.signal(signal.SIGINT, handle_sigint)
 def main():
     global locust_process, stackName, stackPath
     args = parse_args()
+    
+    # Inizializza il logging centralizzato
+    # Puoi cambiare il livello qui: 'DEBUG', 'INFO', 'WARNING', 'ERROR'
+    logger = init_logging(level='INFO')
 
     # Carica la configurazione dal file locust
     try:

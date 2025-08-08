@@ -11,8 +11,12 @@ import requests
 import re
 import json
 import time
+import logging
 # Get service info using Docker CLI
 import subprocess
+
+# Configure logging for this module
+logger = logging.getLogger(__name__)
 
 
 class Monitoring:
@@ -94,7 +98,7 @@ class Monitoring:
             else:
                 return 0
         except Exception as e:
-            print("Error querying Prometheus for RT:", e)
+            logger.error("Error querying Prometheus for RT: %s", e)
             return 0
 
     def getTroughput(self):
@@ -107,7 +111,7 @@ class Monitoring:
                 throughput = 0
             return throughput
         except Exception as e:
-            print("Error querying throughput from Prometheus:", e)
+            logger.error("Error querying throughput from Prometheus: %s", e)
             return 0
 
     def get_replicas(self, stack_name, service_name):
@@ -120,22 +124,22 @@ class Monitoring:
         try:
             # Construct the full service name using stack_name and service_name
             full_service_name = f"{stack_name}_{service_name}"
-            # print(f"[DEBUG] Attempting to get replicas for service: '{full_service_name}'")
-            # print(f"[DEBUG] Available services: {[service.name for service in self.client.services.list()]}")
+            logger.debug("Attempting to get replicas for service: '%s'", full_service_name)
+            logger.debug("Available services: %s", [service.name for service in self.client.services.list()])
 
             service = self.client.services.get(full_service_name)
-            # print(f"[DEBUG] Found service: {service.name}")
-            # print(f"[DEBUG] Service attributes: {service.attrs}")
+            logger.debug("Found service: %s", service.name)
+            logger.debug("Service attributes: %s", service.attrs)
 
             replicas = service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 1)
-            # print(f"[DEBUG] Number of replicas: {replicas}")
+            logger.debug("Number of replicas: %s", replicas)
             return replicas
         except docker.errors.NotFound:
-            print(f"[ERROR] Service '{full_service_name}' not found.")
+            logger.error("Service '%s' not found.", full_service_name)
             return None
         except Exception as e:
-            print(f"[ERROR] Error in get_replicas: {str(e)}")
-            print(f"[ERROR] Error type: {type(e)}")
+            logger.error("Error in get_replicas: %s", str(e))
+            logger.error("Error type: %s", type(e))
             return None
 
     def get_ready_replicas(self, stack_name, service_name):
@@ -174,7 +178,7 @@ class Monitoring:
             # Filter lines that start with "Running" and are not empty
             ready_count = sum(1 for state in task_states if state and state.startswith("Running"))
 
-            # print(f"[DEBUG] Service {full_service_name}: found {ready_count} running replicas")
+            logger.debug("Service %s: found %d running replicas", full_service_name, ready_count)
 
             # If the service has health checks, we need to count only healthy containers
             if self.has_health_check:
@@ -234,16 +238,16 @@ class Monitoring:
 
                         try:
                             health_status = subprocess.check_output(cmd, universal_newlines=True).strip()
-                            # print(f"[DEBUG] Container {container_id[:12]}: Health status = {health_status}")
+                            logger.debug("Container %s: Health status = %s", container_id[:12], health_status)
                             if health_status == "healthy":
                                 healthy_count += 1
                         except Exception as e:
-                            print(f"[DEBUG] Error checking health for container {container_id[:12]}: {str(e)}")
+                            logger.debug("Error checking health for container %s: %s", container_id[:12], str(e))
 
-                    # print(f"[DEBUG] Service {full_service_name}: found {healthy_count} healthy containers out of {len(container_ids)} containers")
+                    logger.debug("Service %s: found %d healthy containers out of %d containers", full_service_name, healthy_count, len(container_ids))
                     return healthy_count
                 except Exception as e:
-                    print(f"[DEBUG] Error checking container health: {str(e)}")
+                    logger.debug("Error checking container health: %s", str(e))
                     # Fall back to running count
                     return ready_count
             else:
@@ -251,7 +255,7 @@ class Monitoring:
                 return ready_count
 
         except Exception as e:
-            print(f"[ERROR] Error in get_ready_replicas: {str(e)}")
+            logger.error("Error in get_ready_replicas: %s", str(e))
             # Fallback to nominal replica count
             return self.get_replicas(stack_name, service_name)
 
@@ -295,8 +299,8 @@ class Monitoring:
             "traefik_response_time": len(self.traefik_response_time)
         }
 
-        print("###saving results##")
-        print(f"Array lengths: {lengths}")
+        logger.info("Saving results")
+        logger.info("Array lengths: %s", lengths)
 
         # Trovo la lunghezza minima comune
         min_length = min(lengths.values())
@@ -320,9 +324,9 @@ class Monitoring:
         try:
             df = pd.DataFrame(data)
             df.to_csv(filename, index=False)
-            print(f"Data saved to {filename} (truncated to {min_length} rows)")
+            logger.info("Data saved to %s (truncated to %d rows)", filename, min_length)
         except Exception as e:
-            print(f"Error saving data: {e}")
+            logger.error("Error saving data: %s", e)
 
     def get_active_users(self):
         """
@@ -336,7 +340,7 @@ class Monitoring:
                 return float(result[0]['value'][1])
             return None
         except Exception as e:
-            print("Error fetching active users metric from Prometheus:", e)
+            logger.error("Error fetching active users metric from Prometheus: %s", e)
             return None
 
     def get_service_cpu_utilization(self, service_name=None, stack_name=None):
@@ -351,39 +355,39 @@ class Monitoring:
             float: The total CPU utilization as an absolute value (CPU seconds per second)
         """
         try:
-            # print(f"[DEBUG CPU] Input parameters - service_name: '{service_name}', stack_name: '{stack_name}'")
+            logger.debug("CPU Input parameters - service_name: '%s', stack_name: '%s'", service_name, stack_name)
 
             # Use provided stack_name or fall back to self.stack_name
             stack = stack_name if stack_name is not None else self.stack_name
-            # print(f"[DEBUG CPU] Using stack name: '{stack}'")
+            logger.debug("CPU Using stack name: '%s'", stack)
 
             # Construct the full service name using f-string
             full_service_name = f"{stack}_{service_name}"
-            # print(f"[DEBUG CPU] Constructed full service name: '{full_service_name}'")
+            logger.debug("CPU Constructed full service name: '%s'", full_service_name)
 
             # Query for CPU usage rate over 1 minute window, summed across all replicas
 
             query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_com_docker_swarm_service_name="{full_service_name}"}}[30s]))'
-            # print(f"[DEBUG CPU] Prometheus query: {query}")
+            logger.debug("CPU Prometheus query: %s", query)
 
             result = self.prom.custom_query(query=query)
-            # print(f"[DEBUG CPU] Raw Prometheus result: {result}")
+            logger.debug("CPU Raw Prometheus result: %s", result)
 
             if result and len(result) > 0:
-                print(f"[DEBUG CPU] Result has data: {result[0]}")
+                logger.debug("CPU Result has data: %s", result[0])
                 if 'value' in result[0]:
                     total_cpu = float(result[0]['value'][1])
-                    # print(f"[DEBUG CPU] Extracted CPU value: {total_cpu}")
+                    logger.debug("CPU Extracted CPU value: %s", total_cpu)
                     return total_cpu
                 else:
-                    print("[DEBUG CPU] No 'value' key in result[0]")
+                    logger.debug("CPU No 'value' key in result[0]")
             else:
-                print("[DEBUG CPU] Empty or null result from Prometheus")
+                logger.debug("CPU Empty or null result from Prometheus")
             return 0.0
         except Exception as e:
-            print(f"[ERROR CPU] Error collecting CPU utilization for service {full_service_name}")
-            print(f"[ERROR CPU] Error details: {str(e)}")
-            print(f"[ERROR CPU] Error type: {type(e)}")
+            logger.error("CPU Error collecting CPU utilization for service %s", full_service_name)
+            logger.error("CPU Error details: %s", str(e))
+            logger.error("CPU Error type: %s", type(e))
             return 0.0
 
     def getIncomingRequestsFromTraefik(self):
@@ -401,7 +405,7 @@ class Monitoring:
                 return float(result[0]['value'][1])
             return 0
         except Exception as e:
-            print("Error querying Traefik incoming requests:", e)
+            logger.error("Error querying Traefik incoming requests: %s", e)
             return 0
 
     def getCompletedRequestsFromTraefik(self):
@@ -419,7 +423,7 @@ class Monitoring:
                 return float(result[0]['value'][1])
             return 0
         except Exception as e:
-            print("Error querying Traefik completed requests:", e)
+            logger.error("Error querying Traefik completed requests: %s", e)
             return 0
 
     def getFailedRequestsFromTraefik(self):
@@ -437,7 +441,7 @@ class Monitoring:
                 return float(result[0]['value'][1])
             return 0
         except Exception as e:
-            print("Error querying Traefik failed requests:", e)
+            logger.error("Error querying Traefik failed requests: %s", e)
             return 0
 
     def getResponseTimeFromTraefik(self):
@@ -455,7 +459,7 @@ class Monitoring:
                 return float(result[0]['value'][1])
             return 0
         except Exception as e:
-            print("Error querying Traefik response time:", e)
+            logger.error("Error querying Traefik response time: %s", e)
             return 0
 
     def getRequestsByService(self, service_name):
@@ -488,7 +492,7 @@ class Monitoring:
             
             return metrics
         except Exception as e:
-            print(f"Error querying Traefik metrics for service {service_name}:", e)
+            logger.error("Error querying Traefik metrics for service %s: %s", service_name, e)
             return {'total_requests': 0, 'completed_requests': 0, 'response_time': 0}
 
     def predict_users(self, horizon=1):
@@ -509,7 +513,7 @@ class Monitoring:
             # Se non abbiamo abbastanza dati validi, ritorna l'ultimo valore valido o 0
             return valid_data[-1][1] if valid_data else 0
         else:
-            print(f"[DEBUG] Valid data: {valid_data}")
+            logger.debug("Valid data: %s", valid_data)
 
         # Prendi gli ultimi 5 valori validi
         recent_data = valid_data[-5:]

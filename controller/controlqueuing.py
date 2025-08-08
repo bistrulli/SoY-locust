@@ -2,6 +2,11 @@ import casadi
 import numpy as np
 import time
 import os
+import logging
+import traceback
+
+# Configure logging for this module
+logger = logging.getLogger(__name__)
 
 class OPTCTRL():
     
@@ -53,7 +58,7 @@ class OPTCTRL():
             self.model.solver('osqp',optionsOSQP) 
         
             sol = self.model.solve()
-            print(C[0],e[0],sol.value(obj),sol.value(T))
+            logger.debug("CASADI C=%s, e=%s, obj=%s, T=%s", C[0], e[0], sol.value(obj), sol.value(T))
             if(nApp==1):
                 return sol.value(S)
             else:
@@ -79,11 +84,11 @@ class OPTCTRL():
 
             # Validazione input
             if not isinstance(e, (list, np.ndarray)) or not isinstance(C, (list, np.ndarray)) or not isinstance(tgt, (list, np.ndarray)):
-                print("[ERROR SCIP] Input devono essere liste o array numpy")
+                logger.error("SCIP Input devono essere liste o array numpy")
                 return self.init_cores
                 
             if len(e) == 0 or len(C) == 0 or len(tgt) == 0:
-                print("[ERROR SCIP] Input lists non possono essere vuote")
+                logger.error("SCIP Input lists non possono essere vuote")
                 return self.init_cores
 
             if np.sum(C) <= 0:
@@ -137,19 +142,19 @@ class OPTCTRL():
             # Verifica la soluzione
             if model.getStatus() == "optimal":
                 opt_value = model.getVal(S)
-                print(f"[DEBUG] U={(e_val*model.getVal(T))/model.getVal(S)}, C={C_val}, e={e_val}, T={model.getVal(T)}, S={opt_value}, z={model.getVal(z)}")
-                print(f"[DEBUG] term1={term1}, term2={opt_value/e_val}")
-                print(f"[DEBUG] error={model.getVal(error)}, diff={model.getVal(diff)}")
+                logger.debug("U=%s, C=%s, e=%s, T=%s, S=%s, z=%s", (e_val*model.getVal(T))/model.getVal(S), C_val, e_val, model.getVal(T), opt_value, model.getVal(z))
+                logger.debug("term1=%s, term2=%s", term1, opt_value/e_val)
+                logger.debug("error=%s, diff=%s", model.getVal(error), model.getVal(diff))
                 return opt_value
             else:
-                print(f"[ERROR] Optimization failed: {model.getStatus()}")
+                logger.error("Optimization failed: %s", model.getStatus())
                 return self.init_cores
 
         except Exception as e:
-            print(f"[ERROR] Exception in optimization: {str(e)}")
-            print(f"[ERROR] Error type: {type(e)}")
+            logger.error("Exception in optimization: %s", str(e))
+            logger.error("Error type: %s", type(e))
             import traceback
-            print(f"[ERROR] Traceback: {traceback.format_exc()}")
+            logger.error("Traceback: %s", traceback.format_exc())
             return self.init_cores
 
     def __str__(self):
@@ -169,29 +174,29 @@ if __name__ == '__main__':
         ctrl = OPTCTRL(init_cores=1, min_cores=0.1, max_cores=16, st=0.8)
         
         # Test OPTControllerCasadi
-        print("\nTest OPTControllerCasadi (legacy):")
+        logger.info("Test OPTControllerCasadi (legacy):")
         start_time = time.time()
         s_casadi = ctrl.OPTControllerCasadi(e, tgt, C)
         casadi_time = time.time() - start_time
-        print(f"Tempo di esecuzione casadi: {casadi_time:.4f} secondi")
-        print(f"Risultato casadi: {s_casadi}")
+        logger.info("Tempo di esecuzione casadi: %.4f secondi", casadi_time)
+        logger.info("Risultato casadi: %s", s_casadi)
         
         # Test OPTController
-        print("\nTest OPTController (SCIP):")
+        logger.info("Test OPTController (SCIP):")
         start_time = time.time()
         s_scip = ctrl.OPTController(e, tgt, C)
         scip_time = time.time() - start_time
-        print(f"Tempo di esecuzione SCIP: {scip_time:.4f} secondi")
-        print(f"Risultato SCIP: {s_scip}")
+        logger.info("Tempo di esecuzione SCIP: %.4f secondi", scip_time)
+        logger.info("Risultato SCIP: %s", s_scip)
         
         # Confronto
-        print("\nConfronto risultati:")
+        logger.info("Confronto risultati:")
         if isinstance(s_casadi, list):
             diff = abs(s_casadi[0] - s_scip)
         else:
             diff = abs(s_casadi - s_scip)
-        print(f"Differenza assoluta: {diff:.6f}")
-        print(f"Speedup: {casadi_time/scip_time:.2f}x")
+        logger.info("Differenza assoluta: %.6f", diff)
+        logger.info("Speedup: %.2fx", casadi_time/scip_time)
 
     # Esegui i test
     test_controllers()
