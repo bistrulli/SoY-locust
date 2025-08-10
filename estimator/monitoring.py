@@ -89,9 +89,8 @@ class Monitoring:
             if n and n not in seen:
                 uniq.append(n)
                 seen.add(n)
-        # escape for regex
-        escaped = [re.escape(n) for n in uniq]
-        return "(" + "|".join(escaped) + ")"
+        # Non usare escaping: PromQL/RE2 non accetta '\-' ecc. Questi nomi non contengono metacaratteri problematici.
+        return "(" + "|".join(uniq) + ")"
 
     def tick(self, t):
         self.time += [t]
