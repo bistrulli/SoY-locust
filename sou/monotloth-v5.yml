@@ -45,7 +45,7 @@ services:
         parallelism: 1
         delay: 30s
       restart_policy:
-        condition: none
+        condition: on-failure
       labels:
         - "traefik.enable=true"
         # Router interno per chiamate dal gateway
@@ -56,9 +56,16 @@ services:
         # Strip del prefisso /internal/ms-exercise
         - "traefik.http.routers.ms-exercise-internal.middlewares=ms-exercise-stripprefix"
         - "traefik.http.middlewares.ms-exercise-stripprefix.stripprefix.prefixes=/internal/ms-exercise"
-        # Servizio backend
-        - "traefik.http.services.ms-exercise.loadbalancer.server.port=8080"
+        # Servizio backend (l'app espone 5001)
+        - "traefik.http.services.ms-exercise.loadbalancer.server.port=5001"
         - "traefik.docker.network=ms-stack-v5_monitoring"
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.1"
+          memory: 256M
     networks:
       - monitoring
 
@@ -111,7 +118,7 @@ services:
         parallelism: 1
         delay: 30s
       restart_policy:
-        condition: none  
+        condition: on-failure  
       labels:
         - "traefik.enable=true"
         - "traefik.http.routers.gateway.rule=Host(`localhost`) || Host(`127.0.0.1`)"
@@ -119,6 +126,13 @@ services:
         - "traefik.http.routers.gateway.entrypoints=web"
         - "traefik.http.routers.gateway.tls=false"
         - "traefik.docker.network=ms-stack-v5_monitoring"
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.1"
+          memory: 256M
     networks:
       - monitoring
 

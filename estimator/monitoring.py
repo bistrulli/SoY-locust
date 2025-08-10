@@ -74,6 +74,25 @@ class Monitoring:
                 self._prom._session.headers.update({'Accept-Encoding': 'identity'})
         return self._prom
 
+    def _service_label_regex(self):
+        """Costruisce una regex per il label 'service' di Traefik che copre varianti con stack e @docker."""
+        names = [
+            self.serviceName,
+            f"{self.stack_name}_{self.serviceName}",
+            f"{self.serviceName}@docker",
+            f"{self.stack_name}_{self.serviceName}@docker",
+        ]
+        # dedup
+        seen = set()
+        uniq = []
+        for n in names:
+            if n and n not in seen:
+                uniq.append(n)
+                seen.add(n)
+        # escape for regex
+        escaped = [re.escape(n) for n in uniq]
+        return "(" + "|".join(escaped) + ")"
+
     def tick(self, t):
         self.time += [t]
         self.rts += [self.getResponseTime()]
@@ -119,10 +138,10 @@ class Monitoring:
         Calcola il tempo di risposta medio del servizio specifico utilizzando Traefik.
         """
         try:
-            # Usa Traefik metrics per il servizio specifico
-            service_filter = f'service="{self.serviceName}"'
-            sum_query = f'sum(rate(traefik_service_request_duration_seconds_sum{{{service_filter}}}[30s]))'
-            count_query = f'sum(rate(traefik_service_request_duration_seconds_count{{{service_filter}}}[30s]))'
+            # Usa Traefik metrics per il servizio specifico (regex su label service)
+            service_sel = f'service=~"{self._service_label_regex()}"'
+            sum_query = f'sum(rate(traefik_service_request_duration_seconds_sum{{{service_sel}}}[30s]))'
+            count_query = f'sum(rate(traefik_service_request_duration_seconds_count{{{service_sel}}}[30s]))'
             
             sum_result = self.prom.custom_query(query=sum_query)
             count_result = self.prom.custom_query(query=count_query)
@@ -142,38 +161,17 @@ class Monitoring:
         Calcola il throughput del servizio specifico utilizzando Traefik.
         """
         try:
-            # Usa Traefik metrics per il servizio specifico
-            # Prova prima con nome semplice, poi con stack prefix
-            service_names_to_try = [
-                self.serviceName,  # es. "gateway"
-                f"{self.stack_name}_{self.serviceName}",  # es. "ms-stack-v5_gateway" 
-                f"{self.serviceName}@docker"  # formato Traefik con provider
-            ]
-            
-            result = None
-            used_service_name = None
-            
-            for service_name in service_names_to_try:
-                service_filter = f'service="{service_name}"'
-                query = f'sum(rate(traefik_service_requests_total{{{service_filter}}}[30s]))'
-                logger.debug("%s Trying Traefik query with service name '%s': %s", self.service_prefix, service_name, query)
-                result = self.prom.custom_query(query=query)
-                logger.debug("%s Result for service '%s': %s", self.service_prefix, service_name, result)
-                
-                if result and len(result) > 0 and 'value' in result[0]:
-                    used_service_name = service_name
-                    logger.info("%s Found Traefik data using service name: %s", self.service_prefix, service_name)
-                    break
-            
-            if used_service_name and result and len(result) > 0 and 'value' in result[0]:
+            service_sel = f'service=~"{self._service_label_regex()}"'
+            query = f'sum(rate(traefik_service_requests_total{{{service_sel}}}[30s]))'
+            result = self.prom.custom_query(query=query)
+            if result and len(result) > 0 and 'value' in result[0]:
                 return float(result[0]['value'][1])
-            else:
-                # DEBUG: Prova query senza filtro per vedere se ci sono metriche
-                debug_query = 'traefik_service_requests_total'
-                debug_result = self.prom.custom_query(query=debug_query)
-                logger.warning("%s No Traefik data found for service %s. Available services: %s", 
-                              self.service_prefix, self.serviceName, debug_result)
-                return 0
+            # DEBUG: Prova query senza filtro per vedere se ci sono metriche
+            debug_query = 'traefik_service_requests_total'
+            debug_result = self.prom.custom_query(query=debug_query)
+            logger.warning("%s No Traefik data found for service %s. Available services: %s", 
+                          self.service_prefix, self.serviceName, debug_result)
+            return 0
         except Exception as e:
             logger.error("%s Error querying Traefik throughput for service %s: %s", self.service_prefix, self.serviceName, e)
             return 0
@@ -462,9 +460,8 @@ class Monitoring:
             float: Numero di richieste in ingresso al secondo per questo servizio
         """
         try:
-            # Usa Traefik metrics per il servizio specifico
-            service_filter = f'service="{self.serviceName}"'
-            query = f'sum(rate(traefik_service_requests_total{{{service_filter}}}[30s]))'
+            service_sel = f'service=~"{self._service_label_regex()}"'
+            query = f'sum(rate(traefik_service_requests_total{{{service_sel}}}[30s]))'
             result = self.prom.custom_query(query=query)
             
             if result and len(result) > 0 and 'value' in result[0]:
@@ -482,9 +479,8 @@ class Monitoring:
             float: Numero di richieste completate al secondo per questo servizio
         """
         try:
-            # Usa Traefik metrics per il servizio specifico
-            service_filter = f'service="{self.serviceName}"'
-            query = f'sum(rate(traefik_service_requests_total{{{service_filter},code=~"2..|3.."}}[30s]))'
+            service_sel = f'service=~"{self._service_label_regex()}"'
+            query = f'sum(rate(traefik_service_requests_total{{{service_sel},code=~"2..|3.."}}[30s]))'
             result = self.prom.custom_query(query=query)
             
             if result and len(result) > 0 and 'value' in result[0]:
@@ -502,9 +498,8 @@ class Monitoring:
             float: Numero di richieste fallite al secondo per questo servizio
         """
         try:
-            # Usa Traefik metrics per il servizio specifico
-            service_filter = f'service="{self.serviceName}"'
-            query = f'sum(rate(traefik_service_requests_total{{{service_filter},code=~"4..|5.."}}[30s]))'
+            service_sel = f'service=~"{self._service_label_regex()}"'
+            query = f'sum(rate(traefik_service_requests_total{{{service_sel},code=~"4..|5.."}}[30s]))'
             result = self.prom.custom_query(query=query)
             
             if result and len(result) > 0 and 'value' in result[0]:
@@ -522,9 +517,8 @@ class Monitoring:
             float: Tempo di risposta medio in secondi per questo servizio
         """
         try:
-            # Usa Traefik metrics per il servizio specifico
-            service_filter = f'service="{self.serviceName}"'
-            query = f'sum(rate(traefik_service_request_duration_seconds_sum{{{service_filter}}}[30s])) / sum(rate(traefik_service_request_duration_seconds_count{{{service_filter}}}[30s]))'
+            service_sel = f'service=~"{self._service_label_regex()}"'
+            query = f'sum(rate(traefik_service_request_duration_seconds_sum{{{service_sel}}}[30s])) / sum(rate(traefik_service_request_duration_seconds_count{{{service_sel}}}[30s]))'
             result = self.prom.custom_query(query=query)
             
             if result and len(result) > 0 and 'value' in result[0]:
