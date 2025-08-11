@@ -80,9 +80,9 @@ services:
       - proxy
       - sidecar
       - --domain
-      - $(POD_NAMESPACE).svc.cluster.local
+      - default.svc.cluster.local
       - --serviceCluster
-      - gateway.$(POD_NAMESPACE)
+      - gateway.default
       - --proxyLogLevel=warning
       - --proxyComponentLogLevel=misc:error
       - --log_output_level=default:info
@@ -145,9 +145,9 @@ services:
       - proxy
       - sidecar
       - --domain
-      - $(POD_NAMESPACE).svc.cluster.local
+      - default.svc.cluster.local
       - --serviceCluster
-      - ms-exercise.$(POD_NAMESPACE)
+      - ms-exercise.default
       - --proxyLogLevel=warning
       - --proxyComponentLogLevel=misc:error
       - --log_output_level=default:info
@@ -201,9 +201,9 @@ services:
       - proxy
       - sidecar
       - --domain
-      - $(POD_NAMESPACE).svc.cluster.local
+      - default.svc.cluster.local
       - --serviceCluster
-      - ms-other.$(POD_NAMESPACE)
+      - ms-other.default
       - --proxyLogLevel=warning
       - --proxyComponentLogLevel=misc:error
       - --log_output_level=default:info
