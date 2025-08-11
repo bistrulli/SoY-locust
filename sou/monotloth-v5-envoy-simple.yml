@@ -176,17 +176,13 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    environment:
-      - STACK_NAME=ms-stack-v5
     volumes:
-      - ../prometheus/prometheus-envoy.yml:/etc/prometheus/prometheus.yml.template
+      - ../prometheus/prometheus-envoy.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     command:
-      - /bin/sh
-      - -c
-      - |
-        envsubst < /etc/prometheus/prometheus.yml.template > /etc/prometheus/prometheus.yml
-        /bin/prometheus --web.listen-address=:9090 --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus
+      - '--web.listen-address=:9090'
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
     networks:
       - monitoring
     ports:
