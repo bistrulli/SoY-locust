@@ -110,6 +110,7 @@ services:
       - MS_EXERCISE_URL=http://traefik/internal/ms-exercise
       - MS_OTHER_URL=http://traefik/internal/ms-other
       - TRAEFIK_INTERNAL=true
+      - FORCE_TRAEFIK_ROUTING=true
     env_file:
       - monolith-v5/variables.env
     deploy:
@@ -125,6 +126,8 @@ services:
         - "traefik.http.services.gateway.loadbalancer.server.port=8080"
         - "traefik.http.routers.gateway.entrypoints=web"
         - "traefik.http.routers.gateway.tls=false"
+        - "traefik.http.middlewares.gateway-headers.headers.customrequestheaders.Host=traefik"
+        - "traefik.http.routers.gateway.middlewares=gateway-headers"
         - "traefik.docker.network=ms-stack-v5_monitoring"
       resources:
         limits:
