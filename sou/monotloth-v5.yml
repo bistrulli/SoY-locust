@@ -9,10 +9,12 @@ services:
       - --providers.docker.swarmMode=true
       - --providers.docker.exposedByDefault=false
       - --metrics.prometheus=true
+      - --metrics.prometheus.addRoutersLabels=true
       - --metrics.prometheus.addEntryPointsLabels=true
       - --metrics.prometheus.addServicesLabels=true
       - --entrypoints.web.address=:80
       - --log.level=INFO
+      - --accesslog=true
     ports:
       - "80:80"      # Traffico HTTP
       - "8080:8080"  # Dashboard Traefik
@@ -20,6 +22,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - monitoring
+      - backend
     deploy:
       placement:
         constraints:
@@ -58,16 +61,16 @@ services:
         - "traefik.http.middlewares.ms-exercise-stripprefix.stripprefix.prefixes=/internal/ms-exercise"
         # Servizio backend (l'app espone 5001)
         - "traefik.http.services.ms-exercise.loadbalancer.server.port=5001"
-        - "traefik.docker.network=ms-stack-v5_monitoring"
-      resources:
-        limits:
-          cpus: "1"
-          memory: 1G
-        reservations:
-          cpus: "0.1"
-          memory: 256M
+        - "traefik.docker.network=ms-stack-v5_backend"
+    resources:
+      limits:
+        cpus: "1"
+        memory: 1G
+      reservations:
+        cpus: "0.1"
+        memory: 256M
     networks:
-      - monitoring
+      - backend
 
   ms-other:
     image: icws24submission/other_icws24
@@ -93,9 +96,9 @@ services:
         - "traefik.http.middlewares.ms-other-stripprefix.stripprefix.prefixes=/internal/ms-other"
         # Servizio backend
         - "traefik.http.services.ms-other.loadbalancer.server.port=8080"
-        - "traefik.docker.network=ms-stack-v5_monitoring"
+        - "traefik.docker.network=ms-stack-v5_backend"
     networks:
-      - monitoring
+      - backend
 
   gateway:
     image: icws24submission/gateway_icws24
@@ -236,6 +239,9 @@ services:
 
 networks:
   monitoring:
+    driver: overlay
+    attachable: true
+  backend:
     driver: overlay
     attachable: true
 
