@@ -49,7 +49,7 @@ services:
       labels:
         - "traefik.enable=true"
         # Router interno per chiamate dal gateway
-        - "traefik.http.routers.ms-exercise-internal.rule=Host(`traefik`) && PathPrefix(`/internal/ms-exercise`)"
+        - "traefik.http.routers.ms-exercise-internal.rule=PathPrefix(`/internal/ms-exercise`)"
         - "traefik.http.routers.ms-exercise-internal.entrypoints=web"
         - "traefik.http.routers.ms-exercise-internal.tls=false"
         - "traefik.http.routers.ms-exercise-internal.service=ms-exercise"
@@ -84,7 +84,7 @@ services:
       labels:
         - "traefik.enable=true"
         # Router interno per chiamate dal gateway
-        - "traefik.http.routers.ms-other-internal.rule=Host(`traefik`) && PathPrefix(`/internal/ms-other`)"
+        - "traefik.http.routers.ms-other-internal.rule=PathPrefix(`/internal/ms-other`)"
         - "traefik.http.routers.ms-other-internal.entrypoints=web"
         - "traefik.http.routers.ms-other-internal.tls=false"
         - "traefik.http.routers.ms-other-internal.service=ms-other"
