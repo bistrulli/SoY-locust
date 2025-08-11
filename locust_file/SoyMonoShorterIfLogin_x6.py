@@ -101,7 +101,7 @@ def on_locust_stop(environment, **_kwargs):
 class SoyMonoUser(BaseExp):
 
     def request(self, method, url, **kwargs):
-        kwargs.setdefault("timeout", 5)  # Timeout predefinito di 5 secondi
+        kwargs.setdefault("timeout", 15)  # Timeout predefinito di 15 secondi
         return super().request(method, url, **kwargs)
 
     def __init__(self, *args, **kwargs):
@@ -116,7 +116,7 @@ class SoyMonoUser(BaseExp):
         password = self.user_data['password']
         # OPTIONS before login
         try:
-            self.client.request("OPTIONS", "/api/user/login", timeout=5, name="(opt)/api/user/login")
+            self.client.request("OPTIONS", "/api/user/login", timeout=15, name="(opt)/api/user/login")
         except Exception:
             pass
         # Login
@@ -125,7 +125,7 @@ class SoyMonoUser(BaseExp):
             headers={"Content-Type": "application/json"},
             json={"email": email, "password": password},
             name="POST /api/user/login",
-            timeout=5
+            timeout=15
         )
         if login_response.status_code == 200:
             # Extract tokens from response cookies
@@ -155,7 +155,7 @@ class SoyMonoUser(BaseExp):
         if access_token:
             # OPTIONS before auth verify
             try:
-                self.client.request("OPTIONS", "/api/auth/verify", timeout=5, name="(opt)/api/auth/verify")
+                self.client.request("OPTIONS", "/api/auth/verify", timeout=15, name="(opt)/api/auth/verify")
             except Exception:
                 pass
             # Auth verify
@@ -163,11 +163,11 @@ class SoyMonoUser(BaseExp):
                 "/api/auth/verify",
                 headers={"Authorization": f"Bearer {access_token}"},
                 name="GET /api/auth/verify",
-                timeout=5
+                timeout=15
             )
             # OPTIONS before exercise production
             try:
-                self.client.request("OPTIONS", "/api/exercise-production", timeout=5, name="(opt)/api/exercise-production")
+                self.client.request("OPTIONS", "/api/exercise-production", timeout=15, name="(opt)/api/exercise-production")
             except Exception:
                 pass
             # Exercise production
@@ -182,11 +182,11 @@ class SoyMonoUser(BaseExp):
                     },
                     json=exercise_data,
                     name="POST /api/exercise-production",
-                    timeout=5
+                    timeout=15
                 )
             # OPTIONS before logout
             try:
-                self.client.request("OPTIONS", "/api/user/logout", timeout=5, name="(opt)/api/user/logout")
+                self.client.request("OPTIONS", "/api/user/logout", timeout=15, name="(opt)/api/user/logout")
             except Exception:
                 pass
             # Logout
@@ -194,5 +194,5 @@ class SoyMonoUser(BaseExp):
                 "/api/user/logout",
                 headers={"Authorization": f"Bearer {access_token}"},
                 name="DELETE /api/user/logout",
-                timeout=5
+                timeout=15
             )
