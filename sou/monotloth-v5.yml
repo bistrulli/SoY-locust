@@ -189,7 +189,7 @@ services:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
-      - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ../prometheus/prometheus-envoy.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     command:
       - '--web.listen-address=:9090'

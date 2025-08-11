@@ -26,6 +26,9 @@ python run_load_test.py \
 ```bash
 ./run_locust_files.sh <path_to_loadshape_file>
 # Example: ./run_locust_files.sh locust_file/loadshapes/cyclical_shape.py
+
+# Alternative batch script (updated version):
+./run_locust_files_update.sh <path_to_loadshape_file>
 ```
 
 ### Docker Swarm Management
@@ -79,7 +82,7 @@ Key dependencies include:
 
 ### Docker Stack Architecture
 
-The system uses `sou/monotloth-v5.yml` which includes:
+The system uses Docker stack files in `sou/` directory, primarily `monotloth-v5.yml` which includes:
 - **Traefik**: Reverse proxy and load balancer (ports 80, 8080)
 - **Gateway**: Main application gateway
 - **Microservices**: ms-exercise, ms-other
@@ -168,8 +171,10 @@ Key configuration parameters:
 - Define user spawn patterns over time
 
 ### Results Storage
-- Primary: `results/` directory
-- Runtime data: `runtime_data/`
+- Primary: `results/` directory for final results
+- Runtime data: `runtime_data/` for intermediate/ongoing test data
+- Historical results: `results-benoit/` for archived test results
+- Profiled data: `profiled_data/`, `profiled_data_a/`, `profiled_data_b/` for performance profiling
 - Timestamped subdirectories prevent data overwriting
 
 ## Important Service Endpoints
