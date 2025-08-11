@@ -1,0 +1,82 @@
+global:
+  scrape_interval: 1s
+
+scrape_configs:
+  # Job per Locust (mantenuto)
+  - job_name: 'locust'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['172.17.0.1:9646']
+
+  # Job per cAdvisor (mantenuto)
+  - job_name: 'cadvisor'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['ms-stack-v5_cadvisor:8080']
+
+  # Job per Node Exporter (mantenuto)
+  - job_name: 'node-exporter'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['ms-stack-v5_node-exporter:9100']
+
+  # Job per Istio Control Plane
+  - job_name: 'istio-pilot'
+    metrics_path: '/stats/prometheus'
+    static_configs:
+      - targets: ['ms-stack-v5_istio-pilot:15014']
+
+  # Job per Envoy sidecar del Gateway
+  - job_name: 'gateway-envoy'
+    metrics_path: '/stats/prometheus'
+    static_configs:
+      - targets: ['ms-stack-v5_gateway-sidecar:15090']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'envoy_.*'
+        target_label: service
+        replacement: 'gateway'
+
+  # Job per Envoy sidecar di ms-exercise  
+  - job_name: 'ms-exercise-envoy'
+    metrics_path: '/stats/prometheus'
+    static_configs:
+      - targets: ['ms-stack-v5_ms-exercise-sidecar:15090']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'envoy_.*'
+        target_label: service
+        replacement: 'ms-exercise'
+
+  # Job per Envoy sidecar di ms-other
+  - job_name: 'ms-other-envoy'
+    metrics_path: '/stats/prometheus'
+    static_configs:
+      - targets: ['ms-stack-v5_ms-other-sidecar:15090']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'envoy_.*'
+        target_label: service
+        replacement: 'ms-other'
+
+  # Job per Istio metriche aggregate (se disponibili)
+  - job_name: 'istio-mesh'
+    kubernetes_sd_configs:
+    - role: endpoints
+    relabel_configs:
+    - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+      action: keep
+      regex: istio-proxy;http-monitoring
+    - source_labels: [__address__, __meta_kubernetes_endpoint_port]
+      action: replace
+      regex: ([^:]+)(?::\d+)?;(\d+)
+      replacement: $1:$2
+      target_label: __address__
+    - action: labelmap
+      regex: __meta_kubernetes_service_label_(.+)
+    - source_labels: [__meta_kubernetes_namespace]
+      action: replace
+      target_label: namespace
+    - source_labels: [__meta_kubernetes_service_name]
+      action: replace
+      target_label: service_name

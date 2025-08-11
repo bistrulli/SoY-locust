@@ -1,0 +1,347 @@
+version: '3.7' # Supporto Swarm
+
+services:
+  # Istio Control Plane - Pilot (gestisce configurazione sidecar)
+  istio-pilot:
+    image: istio/pilot:1.19.3
+    command:
+      - discovery
+      - --meshConfig=/etc/mesh/mesh.yaml
+      - --log_output_level=default:info
+      - --domain=cluster.local
+      - --trust-domain=cluster.local
+      - --keepaliveMaxServerConnectionAge=30m
+    environment:
+      - PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION=true
+      - PILOT_ENABLE_CROSS_CLUSTER_WORKLOAD_ENTRY=true
+      - PILOT_ENABLE_REMOTE_JWKS=false
+      - PILOT_TRACE_SAMPLING=100
+      - PILOT_PUSH_THROTTLE=100
+      - PILOT_DEBOUNCE_AFTER=100ms
+      - PILOT_DEBOUNCE_MAX=10s
+      - EXTERNAL_ISTIOD=false
+    volumes:
+      - ./istio-config:/etc/mesh
+    networks:
+      - istio-system
+      - backend
+      - monitoring
+    ports:
+      - "15010:15010"  # gRPC port for Envoy
+      - "15011:15011"  # gRPC port for secure connections
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+  # Gateway con Istio sidecar
+  gateway:
+    image: icws24submission/gateway_icws24
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    depends_on:
+      - istio-pilot
+      - ms-exercise
+      - ms-other
+    environment:
+      # Rimuovo Traefik, uso service discovery diretto
+      - MS_EXERCISE_URL=http://ms-exercise:5001
+      - MS_OTHER_URL=http://ms-other:8080
+      - TRAEFIK_INTERNAL=false
+      - FORCE_TRAEFIK_ROUTING=false
+    env_file:
+      - monolith-v5/variables.env
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 30s
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+    networks:
+      - backend
+      - monitoring
+    ports:
+      - "8080:8080"  # Espongo direttamente il gateway
+
+  # Istio sidecar per Gateway
+  gateway-sidecar:
+    image: istio/proxyv2:1.19.3
+    command:
+      - proxy
+      - sidecar
+      - --domain
+      - $(POD_NAMESPACE).svc.cluster.local
+      - --serviceCluster
+      - gateway.$(POD_NAMESPACE)
+      - --proxyLogLevel=warning
+      - --proxyComponentLogLevel=misc:error
+      - --log_output_level=default:info
+      - --concurrency
+      - "2"
+    environment:
+      - POD_NAME=gateway
+      - POD_NAMESPACE=default
+      - INSTANCE_IP=127.0.0.1
+      - SERVICE_ACCOUNT=default
+      - ISTIO_META_POD_NAME=gateway
+      - ISTIO_META_CONFIG_NAMESPACE=default
+      - PILOT_CERT_PROVIDER=istiod
+      - CA_ADDR=istio-pilot:15010
+    depends_on:
+      - istio-pilot
+      - gateway
+    networks:
+      - backend
+      - monitoring
+      - istio-system
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    ports:
+      - "15000:15000"  # Envoy admin interface
+      - "15090:15090"  # Envoy metrics
+
+  ms-exercise:
+    image: icws24submission/exercise_icws24
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    env_file:
+      - monolith-v5/variables.env
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 30s
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+    networks:
+      - backend
+
+  # Istio sidecar per ms-exercise
+  ms-exercise-sidecar:
+    image: istio/proxyv2:1.19.3
+    command:
+      - proxy
+      - sidecar
+      - --domain
+      - $(POD_NAMESPACE).svc.cluster.local
+      - --serviceCluster
+      - ms-exercise.$(POD_NAMESPACE)
+      - --proxyLogLevel=warning
+      - --proxyComponentLogLevel=misc:error
+      - --log_output_level=default:info
+      - --concurrency
+      - "2"
+    environment:
+      - POD_NAME=ms-exercise
+      - POD_NAMESPACE=default
+      - INSTANCE_IP=127.0.0.1
+      - SERVICE_ACCOUNT=default
+      - ISTIO_META_POD_NAME=ms-exercise
+      - ISTIO_META_CONFIG_NAMESPACE=default
+      - PILOT_CERT_PROVIDER=istiod
+      - CA_ADDR=istio-pilot:15010
+    depends_on:
+      - istio-pilot
+      - ms-exercise
+    networks:
+      - backend
+      - istio-system
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    ports:
+      - "15001:15000"  # Envoy admin per ms-exercise
+      - "15091:15090"  # Envoy metrics per ms-exercise
+
+  ms-other:
+    image: icws24submission/other_icws24
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    env_file:
+      - monolith-v5/variables.env
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 30s
+      labels: {}  # Rimuovo tutti i labels Traefik
+    networks:
+      - backend
+
+  # Istio sidecar per ms-other
+  ms-other-sidecar:
+    image: istio/proxyv2:1.19.3
+    command:
+      - proxy
+      - sidecar
+      - --domain
+      - $(POD_NAMESPACE).svc.cluster.local
+      - --serviceCluster
+      - ms-other.$(POD_NAMESPACE)
+      - --proxyLogLevel=warning
+      - --proxyComponentLogLevel=misc:error
+      - --log_output_level=default:info
+      - --concurrency
+      - "2"
+    environment:
+      - POD_NAME=ms-other
+      - POD_NAMESPACE=default
+      - INSTANCE_IP=127.0.0.1
+      - SERVICE_ACCOUNT=default
+      - ISTIO_META_POD_NAME=ms-other
+      - ISTIO_META_CONFIG_NAMESPACE=default
+      - PILOT_CERT_PROVIDER=istiod
+      - CA_ADDR=istio-pilot:15010
+    depends_on:
+      - istio-pilot
+      - ms-other
+    networks:
+      - backend
+      - istio-system
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    ports:
+      - "15002:15000"  # Envoy admin per ms-other
+      - "15092:15090"  # Envoy metrics per ms-other
+
+  postgres:
+    container_name: postgres
+    image: registry.gitlab.com/inria-mpl/soy/msa-postgres:1.0.1
+    shm_size: 1g
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    env_file:
+      - monolith-v5/variables.env
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 30s
+    networks:
+      - monitoring
+      - backend
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--web.listen-address=:9100'
+    networks:
+      - monitoring
+    ports:
+      - 9100:9100
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ../prometheus/prometheus-istio.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--web.listen-address=:9090'
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - monitoring
+      - istio-system
+    ports:
+      - 9090:9090
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - monitoring
+    ports:
+      - 8081:8080
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+networks:
+  monitoring:
+    driver: overlay
+    attachable: true
+  backend:
+    driver: overlay
+    attachable: true
+  istio-system:
+    driver: overlay
+    attachable: true
+
+volumes:
+  postgres_data:
+  prometheus_data:
