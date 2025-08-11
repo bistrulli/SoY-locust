@@ -129,8 +129,6 @@ services:
         - "traefik.http.services.gateway.loadbalancer.server.port=8080"
         - "traefik.http.routers.gateway.entrypoints=web"
         - "traefik.http.routers.gateway.tls=false"
-        - "traefik.http.middlewares.gateway-headers.headers.customrequestheaders.Host=traefik"
-        - "traefik.http.routers.gateway.middlewares=gateway-headers"
         - "traefik.docker.network=ms-stack-v5_monitoring"
       resources:
         limits:
