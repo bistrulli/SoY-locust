@@ -40,6 +40,10 @@ defaultConfig:
   
   # Enable sampling for tracing
   sampling: 100.0
+  
+  # DISABLE TLS - Use plain text for all communication
+  # This prevents the root CA certificate error
+  controlPlaneSecurityEnabled: false
 
 # Control plane configuration  
 discoverySelectors: []

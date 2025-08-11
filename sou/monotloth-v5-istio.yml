@@ -95,8 +95,9 @@ services:
       - SERVICE_ACCOUNT=default
       - ISTIO_META_POD_NAME=gateway
       - ISTIO_META_CONFIG_NAMESPACE=default
-      - PILOT_CERT_PROVIDER=istiod
+      - PILOT_CERT_PROVIDER=none
       - CA_ADDR=istio-pilot:15010
+      - PILOT_ENABLE_TLS=false
     depends_on:
       - istio-pilot
       - gateway
@@ -160,8 +161,9 @@ services:
       - SERVICE_ACCOUNT=default
       - ISTIO_META_POD_NAME=ms-exercise
       - ISTIO_META_CONFIG_NAMESPACE=default
-      - PILOT_CERT_PROVIDER=istiod
+      - PILOT_CERT_PROVIDER=none
       - CA_ADDR=istio-pilot:15010
+      - PILOT_ENABLE_TLS=false
     depends_on:
       - istio-pilot
       - ms-exercise
@@ -216,8 +218,9 @@ services:
       - SERVICE_ACCOUNT=default
       - ISTIO_META_POD_NAME=ms-other
       - ISTIO_META_CONFIG_NAMESPACE=default
-      - PILOT_CERT_PROVIDER=istiod
+      - PILOT_CERT_PROVIDER=none
       - CA_ADDR=istio-pilot:15010
+      - PILOT_ENABLE_TLS=false
     depends_on:
       - istio-pilot
       - ms-other
