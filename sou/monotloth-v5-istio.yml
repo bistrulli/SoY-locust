@@ -11,6 +11,7 @@ services:
       - --domain=cluster.local
       - --trust-domain=cluster.local
       - --keepaliveMaxServerConnectionAge=30m
+      - --insecure=true
     environment:
       - PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION=true
       - PILOT_ENABLE_CROSS_CLUSTER_WORKLOAD_ENTRY=true
@@ -20,6 +21,9 @@ services:
       - PILOT_DEBOUNCE_AFTER=100ms
       - PILOT_DEBOUNCE_MAX=10s
       - EXTERNAL_ISTIOD=false
+      - PILOT_ENABLE_TLS=false
+      - XDS_AUTH=false
+      - PILOT_INSECURE=true
     volumes:
       - ./istio-config:/etc/mesh
     networks:
@@ -98,6 +102,8 @@ services:
       - PILOT_CERT_PROVIDER=none
       - CA_ADDR=istio-pilot:15010
       - PILOT_ENABLE_TLS=false
+      - PILOT_INSECURE=true
+      - XDS_AUTH=false
     depends_on:
       - istio-pilot
       - gateway
@@ -164,6 +170,8 @@ services:
       - PILOT_CERT_PROVIDER=none
       - CA_ADDR=istio-pilot:15010
       - PILOT_ENABLE_TLS=false
+      - PILOT_INSECURE=true
+      - XDS_AUTH=false
     depends_on:
       - istio-pilot
       - ms-exercise
@@ -221,6 +229,8 @@ services:
       - PILOT_CERT_PROVIDER=none
       - CA_ADDR=istio-pilot:15010
       - PILOT_ENABLE_TLS=false
+      - PILOT_INSECURE=true
+      - XDS_AUTH=false
     depends_on:
       - istio-pilot
       - ms-other
