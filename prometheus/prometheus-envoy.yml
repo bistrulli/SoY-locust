@@ -12,34 +12,34 @@ scrape_configs:
   # Envoy proxy metrics - Gateway
   - job_name: 'envoy-gateway'
     static_configs:
-      - targets: ['gateway-envoy:15090']
+      - targets: ['${STACK_NAME}_gateway-envoy:15090']
     scrape_interval: 1s
     metrics_path: '/stats/prometheus'
 
   # Envoy proxy metrics - ms-exercise  
   - job_name: 'envoy-ms-exercise'
     static_configs:
-      - targets: ['ms-exercise-envoy:15090']
+      - targets: ['${STACK_NAME}_ms-exercise-envoy:15090']
     scrape_interval: 1s
     metrics_path: '/stats/prometheus'
 
   # Envoy proxy metrics - ms-other
   - job_name: 'envoy-ms-other'
     static_configs:
-      - targets: ['ms-other-envoy:15090']
+      - targets: ['${STACK_NAME}_ms-other-envoy:15090']
     scrape_interval: 1s
     metrics_path: '/stats/prometheus'
 
   # cAdvisor metrics
   - job_name: 'cadvisor'
     static_configs:
-      - targets: ['cadvisor:8080']
+      - targets: ['${STACK_NAME}_cadvisor:8080']
     scrape_interval: 1s
 
   # Node exporter metrics
   - job_name: 'node-exporter'
     static_configs:
-      - targets: ['node-exporter:9100']
+      - targets: ['${STACK_NAME}_node-exporter:9100']
     scrape_interval: 1s
 
   # Prometheus metrics
