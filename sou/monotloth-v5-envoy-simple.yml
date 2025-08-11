@@ -86,6 +86,7 @@ services:
       - ./envoy-config/ms-exercise-envoy.yaml:/etc/envoy/envoy.yaml
     networks:
       - backend
+      - monitoring
     ports:
       - "15001:15000"  # Admin interface
       - "15091:15090"  # Stats/metrics  
@@ -120,6 +121,7 @@ services:
       - ./envoy-config/ms-other-envoy.yaml:/etc/envoy/envoy.yaml
     networks:
       - backend
+      - monitoring
     ports:
       - "15002:15000"  # Admin interface
       - "15092:15090"  # Stats/metrics
