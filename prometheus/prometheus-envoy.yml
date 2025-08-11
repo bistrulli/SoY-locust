@@ -12,21 +12,21 @@ scrape_configs:
   # Envoy proxy metrics - Gateway
   - job_name: 'envoy-gateway'
     static_configs:
-      - targets: ['ms-stack-v5_gateway-envoy:15090']
+      - targets: ['ms-stack-v5_gateway-envoy:15000']
     scrape_interval: 1s
     metrics_path: '/stats/prometheus'
 
   # Envoy proxy metrics - ms-exercise  
   - job_name: 'envoy-ms-exercise'
     static_configs:
-      - targets: ['ms-stack-v5_ms-exercise-envoy:15090']
+      - targets: ['ms-stack-v5_ms-exercise-envoy:15000']
     scrape_interval: 1s
     metrics_path: '/stats/prometheus'
 
   # Envoy proxy metrics - ms-other
   - job_name: 'envoy-ms-other'
     static_configs:
-      - targets: ['ms-stack-v5_ms-other-envoy:15090']
+      - targets: ['ms-stack-v5_ms-other-envoy:15000']
     scrape_interval: 1s
     metrics_path: '/stats/prometheus'
 

@@ -45,6 +45,7 @@ services:
     ports:
       - "15000:15000"  # Admin interface
       - "15090:15090"  # Stats/metrics
+      - "80:9901"      # Listener applicativo - TRAFFICO HTTP
     deploy:
       replicas: 1
       resources:
