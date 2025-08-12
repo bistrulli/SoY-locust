@@ -12,7 +12,6 @@ services:
       - MS_OTHER_URL=http://ms-other-nginx:8080
       - TRAEFIK_INTERNAL=false
       - FORCE_TRAEFIK_ROUTING=false
-      - PORT=8080
     env_file:
       - monolith-v5/variables.env
     deploy:
