@@ -1,15 +1,15 @@
 version: '3.7'
 
 services:
-  # Gateway application (renamed to gateway-app)
-  gateway-app:
+  # Gateway application
+  gateway:
     image: icws24submission/gateway_icws24
     security_opt:
       - no-new-privileges:true
     restart: always
     environment:
-      - MS_EXERCISE_URL=http://ms-exercise:5001
-      - MS_OTHER_URL=http://ms-other:8080
+      - MS_EXERCISE_URL=http://ms-exercise-nginx:5001
+      - MS_OTHER_URL=http://ms-other-nginx:8080
       - TRAEFIK_INTERNAL=false
       - FORCE_TRAEFIK_ROUTING=false
     env_file:
@@ -30,46 +30,11 @@ services:
           memory: 256M
     networks:
       - backend
-
-  # Nginx proxy for Gateway
-  gateway-nginx:
-    image: nginx:alpine
-    volumes:
-      - ./nginx-config/gateway.conf:/etc/nginx/nginx.conf:ro
-    ports:
-      - "80:80"
-    networks:
-      - backend
-      - monitoring
-    deploy:
-      replicas: 1
-      resources:
-        limits:
-          cpus: "0.2"
-          memory: 64M
-        reservations:
-          cpus: "0.1"
-          memory: 32M
-
-  # Nginx Prometheus Exporter for Gateway
-  gateway-nginx-exporter:
-    image: nginx/nginx-prometheus-exporter:latest
-    command:
-      - '--nginx.scrape-uri=http://gateway-nginx/nginx_status'
-      - '--web.listen-address=:9113'
-    networks:
       - monitoring
     ports:
-      - "9113:9113"
-    deploy:
-      replicas: 1
-      resources:
-        limits:
-          cpus: "0.1"
-          memory: 32M
+      - "80:8080"
 
-  # MS-Exercise application (renamed to ms-exercise-app)
-  ms-exercise-app:
+  ms-exercise:
     image: icws24submission/exercise_icws24
     security_opt:
       - no-new-privileges:true
@@ -93,43 +58,7 @@ services:
     networks:
       - backend
 
-  # Nginx proxy for MS-Exercise (now named ms-exercise to match hardcoded URL)
-  ms-exercise:
-    image: nginx:alpine
-    volumes:
-      - ./nginx-config/ms-exercise.conf:/etc/nginx/nginx.conf:ro
-    networks:
-      - backend
-      - monitoring
-    deploy:
-      replicas: 1
-      resources:
-        limits:
-          cpus: "0.2"
-          memory: 64M
-        reservations:
-          cpus: "0.1"
-          memory: 32M
-
-  # Nginx Prometheus Exporter for MS-Exercise
-  ms-exercise-nginx-exporter:
-    image: nginx/nginx-prometheus-exporter:latest
-    command:
-      - '--nginx.scrape-uri=http://ms-exercise/nginx_status'
-      - '--web.listen-address=:9114'
-    networks:
-      - monitoring
-    ports:
-      - "9114:9114"
-    deploy:
-      replicas: 1
-      resources:
-        limits:
-          cpus: "0.1"
-          memory: 32M
-
-  # MS-Other application (renamed to ms-other-app)
-  ms-other-app:
+  ms-other:
     image: icws24submission/other_icws24
     security_opt:
       - no-new-privileges:true
@@ -153,42 +82,6 @@ services:
     networks:
       - backend
 
-  # Nginx proxy for MS-Other (now named ms-other to match hardcoded URL)
-  ms-other:
-    image: nginx:alpine
-    volumes:
-      - ./nginx-config/ms-other.conf:/etc/nginx/nginx.conf:ro
-    networks:
-      - backend
-      - monitoring
-    deploy:
-      replicas: 1
-      resources:
-        limits:
-          cpus: "0.2"
-          memory: 64M
-        reservations:
-          cpus: "0.1"
-          memory: 32M
-
-  # Nginx Prometheus Exporter for MS-Other
-  ms-other-nginx-exporter:
-    image: nginx/nginx-prometheus-exporter:latest
-    command:
-      - '--nginx.scrape-uri=http://ms-other/nginx_status'
-      - '--web.listen-address=:9115'
-    networks:
-      - monitoring
-    ports:
-      - "9115:9115"
-    deploy:
-      replicas: 1
-      resources:
-        limits:
-          cpus: "0.1"
-          memory: 32M
-
-  # Postgres database
   postgres:
     image: registry.gitlab.com/inria-mpl/soy/msa-postgres:1.0.1
     shm_size: 1g
@@ -203,9 +96,36 @@ services:
         parallelism: 1
         delay: 30s
     networks:
+      - monitoring
       - backend
 
-  # Prometheus
+  node-exporter:
+    image: prom/node-exporter:latest
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--web.listen-address=:9100'
+    networks:
+      - monitoring
+    ports:
+      - 9100:9100
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
   prometheus:
     image: prom/prometheus:latest
     volumes:
@@ -234,6 +154,30 @@ services:
           cpus: "0.5"
           memory: 512M
 
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - monitoring
+    ports:
+      - 8081:8080
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
 networks:
   monitoring:
     driver: overlay
@@ -243,4 +187,5 @@ networks:
     attachable: true
 
 volumes:
+  postgres_data:
   prometheus_data:
