@@ -8,21 +8,12 @@ services:
       - no-new-privileges:true
     restart: always
     environment:
-      # --- Upstream Services ---
-      - MS_EXERCISE_URL=http://ms-stack-v5_ms-exercise-envoy:9901
-      - MS_OTHER_URL=http://ms-stack-v5_ms-other-envoy:9901
-      - PLAGE_ENV=http://ms-stack-v5_ms-exercise-envoy:9901
-      # --- Database ---
-      - DB_VENDOR=postgres
-      - POSTGRES_USER=plagedba
-      - POSTGRES_DB=plagedb
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PASSWORD=sacrebleu2nom2diou
-      # --- Altre variabili necessarie ---
-      - SECRET_JWT=your_default_jwt_secret_here
-      - COOKIE_SECRET=your_default_cookie_secret_here
-      - PORT=5001
-      - DEBUG=*
+      - MS_EXERCISE_URL=http://ms-exercise:5001
+      - MS_OTHER_URL=http://ms-other:8080
+      - TRAEFIK_INTERNAL=false
+      - FORCE_TRAFIK_ROUTING=false
+    env_file:
+      - monolith-v5/variables.env
     deploy:
       replicas: 1
       update_config:
