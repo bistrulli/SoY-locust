@@ -223,7 +223,7 @@ def main():
 
     initSys(args)  # Deploy Docker Swarm stack
     startSys(args)  # Deploy Docker Swarm stack
-    time.sleep(60)
+    time.sleep(10)
     logging.info("Starting Locust with command:")
 
     # Avvia il processo in un nuovo process group
