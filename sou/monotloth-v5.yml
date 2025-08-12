@@ -54,11 +54,28 @@ services:
           cpus: "0.1"
           memory: 32M
 
+  # Gateway nginx exporter
+  gateway-nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    command:
+      - '--nginx.scrape-uri=http://gateway-nginx/nginx_status'
+      - '--web.listen-address=:9113'
+    networks:
+      - monitoring
+    ports:
+      - "9113:9113"
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 32M
+
   # MS-Exercise nginx exporter
   ms-exercise-nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
     command:
-      - '--nginx.scrape-uri=http://ms-exercise-nginx/nginx_status'
+      - '--nginx.scrape-uri=http://ms-exercise/nginx_status'
       - '--web.listen-address=:9114'
     networks:
       - monitoring
@@ -120,7 +137,7 @@ services:
   ms-other-nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
     command:
-      - '--nginx.scrape-uri=http://ms-other-nginx/nginx_status'
+      - '--nginx.scrape-uri=http://ms-other/nginx_status'
       - '--web.listen-address=:9115'
     networks:
       - monitoring
