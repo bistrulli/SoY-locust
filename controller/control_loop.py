@@ -59,12 +59,12 @@ class ControlLoop():
                     len(self.monitor.replica) > 0 and len(self.monitor.ready_replica) > 0 and
                     len(self.monitor.cores) > 0 and len(self.monitor.users) > 0 and
                     len(self.monitor.active_users) > 0 and len(self.monitor.util) > 0 and
-                    len(self.monitor.traefik_incoming) > 0):
+                    len(self.monitor.envoy_incoming_rps) > 0):
 
                     # Stampa formattata in più righe
                     logger.info("%s  ├─ Response Time:  %.4f", self.service_prefix, self.monitor.rts[-1])
                     logger.info("%s  ├─ Throughput:     %.4f", self.service_prefix, self.monitor.tr[-1])
-                    logger.info("%s  ├─ Incoming Rate:  %.4f", self.service_prefix, self.monitor.traefik_incoming[-1])
+                    logger.info("%s  ├─ Incoming Rate:  %.4f", self.service_prefix, self.monitor.envoy_incoming_rps[-1])
                     logger.info("%s  ├─ Replicas:       %s", self.service_prefix, self.monitor.replica[-1])
                     logger.info("%s  ├─ Ready Replicas: %s", self.service_prefix, self.monitor.ready_replica[-1])
                     logger.info("%s  ├─ Cores:          %.2f", self.service_prefix, self.monitor.cores[-1])
