@@ -69,7 +69,8 @@ class ControlLoop():
                     logger.info("%s  ├─ Ready Replicas: %s", self.service_prefix, self.monitor.ready_replica[-1])
                     logger.info("%s  ├─ Cores:          %.2f", self.service_prefix, self.monitor.cores[-1])
                     logger.info("%s  ├─ WIP:            %.2f", self.service_prefix, self.monitor.users[-1])
-                    logger.info("%s  ├─ WIP (Prom):     %.2f", self.service_prefix, self.monitor.active_users[-1])
+                    active_users_val = self.monitor.active_users[-1] if self.monitor.active_users[-1] is not None else 0.0
+                    logger.info("%s  ├─ WIP (Prom):     %.2f", self.service_prefix, active_users_val)
                     logger.info("%s  ├─ WIP (Pred):     %.2f", self.service_prefix, self.monitor.predict_users(horizon=self.prediction_horizon))
                     logger.info("%s  ├─ Utilization:   %.4f", self.service_prefix, self.monitor.util[-1])
                     logger.info("%s  └─ Memory:         %s", self.service_prefix, self.monitor.memory[-1])  # Corretto: memory invece di util
