@@ -158,7 +158,7 @@ def configure_module_loggers():
         logger = logging.getLogger(module_name)
         logger.handlers.clear()  # Remove any existing handlers
         logger.addHandler(console_handler)  # Add console handler
-        logger.setLevel(logging.DEBUG)  # Temporary DEBUG for Traefik troubleshooting
+        logger.setLevel(logging.DEBUG)  # Temporary DEBUG for Envoy troubleshooting
         logger.propagate = False  # Don't propagate to root
     
     return our_modules

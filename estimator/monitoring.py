@@ -2,18 +2,9 @@ from pathlib import Path
 from config import locustDataDir, serviceName
 import pandas as pd
 import numpy as np
-import docker
 from prometheus_api_client import PrometheusConnect
 import yaml
-import pandas as pd
-import requests_unixsocket
-import requests
-import re
-import json
-import time
 import logging
-# Get service info using Docker CLI
-import subprocess
 
 # Configure logging for this module
 logger = logging.getLogger(__name__)
@@ -41,12 +32,9 @@ class Monitoring:
         self.promPort = promPort
         self.promHost = promHost
         self.sysfile = sysfile
-        self.remote = remote
-        self.remote_docker_port = remote_docker_port
         self.has_health_check = has_health_check
         
-        # Lazy initialization - non creare client nel __init__ per evitare fork issues
-        self._client = None
+        # Lazy initialization
         self._prom = None
         
         if (not Path(self.sysfile).exists()):
@@ -54,15 +42,6 @@ class Monitoring:
         self.sys = yaml.safe_load(self.sysfile.open())
         self.reset()
 
-    @property
-    def client(self):
-        """Lazy initialization del Docker client per evitare problemi di fork"""
-        if self._client is None:
-            if self.remote is not None and self.remote_docker_port is not None:
-                self._client = docker.DockerClient(base_url='tcp://'+self.remote+":"+str(self.remote_docker_port))
-            else:
-                self._client = docker.from_env()
-        return self._client
 
     @property  
     def prom(self):
@@ -74,23 +53,13 @@ class Monitoring:
                 self._prom._session.headers.update({'Accept-Encoding': 'identity'})
         return self._prom
 
-    def _service_label_regex(self):
-        """Costruisce una regex per il label 'service' di Traefik che copre varianti con stack e @docker."""
-        names = [
-            self.serviceName,
-            f"{self.stack_name}_{self.serviceName}",
-            f"{self.serviceName}@docker",
-            f"{self.stack_name}_{self.serviceName}@docker",
-        ]
-        # dedup
-        seen = set()
-        uniq = []
-        for n in names:
-            if n and n not in seen:
-                uniq.append(n)
-                seen.add(n)
-        # Non usare escaping: PromQL/RE2 non accetta '\-' ecc. Questi nomi non contengono metacaratteri problematici.
-        return "(" + "|".join(uniq) + ")"
+    def _get_cluster_name(self, service_name):
+        """Deriva il nome del cluster Envoy dal nome del servizio"""
+        return f"{service_name.replace('-', '_')}_cluster"
+
+    def _get_service_label_regex(self, stack_name, service_name):
+        """Costruisce una regex per cAdvisor service labels"""
+        return f"{stack_name}_{service_name}.*"
 
     def tick(self, t):
         self.time += [t]
@@ -104,11 +73,9 @@ class Monitoring:
         self.memory += [0]
         self.util += [self.get_service_cpu_utilization(stack_name=self.stack_name, service_name=self.serviceName)]
         
-        # Aggiungi le nuove metriche Traefik
-        self.traefik_incoming += [self.getIncomingRequestsFromTraefik()]
-        self.traefik_completed += [self.getCompletedRequestsFromTraefik()]
-        self.traefik_failed += [self.getFailedRequestsFromTraefik()]
-        self.traefik_response_time += [self.getResponseTimeFromTraefik()]
+        # Add Envoy metrics
+        self.envoy_incoming_rps += [self.get_incoming_rps()]
+        self.envoy_completed_rps += [self.get_completed_rps()]
 
     def getUsers(self):
         # torno il numero di utenti attivi (Little's Law)
@@ -134,191 +101,40 @@ class Monitoring:
 
     def getResponseTime(self):
         """
-        Calcola il tempo di risposta medio del servizio specifico utilizzando Traefik.
+        Calcola il tempo di risposta medio del servizio specifico utilizzando Envoy.
         """
-        try:
-            # Usa Traefik metrics per il servizio specifico (regex su label service)
-            service_sel = f'service=~"{self._service_label_regex()}"'
-            sum_query = f'sum(rate(traefik_service_request_duration_seconds_sum{{{service_sel}}}[30s]))'
-            count_query = f'sum(rate(traefik_service_request_duration_seconds_count{{{service_sel}}}[30s]))'
-            
-            sum_result = self.prom.custom_query(query=sum_query)
-            count_result = self.prom.custom_query(query=count_query)
-            
-            if sum_result and count_result and len(sum_result) > 0 and len(count_result) > 0:
-                latency_sum = float(sum_result[0]['value'][1])
-                latency_count = float(count_result[0]['value'][1])
-                return latency_sum / latency_count if latency_count > 0 else 0
-            else:
-                return 0
-        except Exception as e:
-            logger.error("%s Error querying Traefik RT for service %s: %s", self.service_prefix, self.serviceName, e)
-            return 0
+        return self.get_response_time()
 
     def getTroughput(self):
         """
-        Calcola il throughput del servizio specifico utilizzando Traefik.
+        Calcola il throughput del servizio specifico utilizzando Envoy.
         """
-        try:
-            service_sel = f'service=~"{self._service_label_regex()}"'
-            query = f'sum(rate(traefik_service_requests_total{{{service_sel}}}[30s]))'
-            result = self.prom.custom_query(query=query)
-            if result and len(result) > 0 and 'value' in result[0]:
-                return float(result[0]['value'][1])
-            # DEBUG: Prova query senza filtro per vedere se ci sono metriche
-            debug_query = 'traefik_service_requests_total'
-            debug_result = self.prom.custom_query(query=debug_query)
-            logger.warning("%s No Traefik data found for service %s. Available services: %s", 
-                          self.service_prefix, self.serviceName, debug_result)
-            return 0
-        except Exception as e:
-            logger.error("%s Error querying Traefik throughput for service %s: %s", self.service_prefix, self.serviceName, e)
-            return 0
+        return self.get_completed_rps()
 
     def get_replicas(self, stack_name, service_name):
         """
-        Gets the number of replicas for a service.
+        Gets the number of replicas for a service using cAdvisor metrics.
+        Returns the same value as get_active_replicas.
 
         Args:
+            stack_name (str): The name of the Docker Swarm stack
             service_name (str): The name of the service without stack prefix
         """
-        try:
-            # Construct the full service name using stack_name and service_name
-            full_service_name = f"{stack_name}_{service_name}"
-            logger.debug("Attempting to get replicas for service: '%s'", full_service_name)
-            logger.debug("Available services: %s", [service.name for service in self.client.services.list()])
-
-            service = self.client.services.get(full_service_name)
-            logger.debug("Found service: %s", service.name)
-            logger.debug("Service attributes: %s", service.attrs)
-
-            replicas = service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 1)
-            logger.debug("Number of replicas: %s", replicas)
-            return replicas
-        except docker.errors.NotFound:
-            logger.error("%s Service '%s' not found", self.service_prefix, full_service_name)
-            return None
-        except Exception as e:
-            logger.error("%s Error in get_replicas: %s", self.service_prefix, str(e))
-            logger.error("Error type: %s", type(e))
-            return None
+        return self.get_active_replicas(stack_name, service_name)
 
     def get_ready_replicas(self, stack_name, service_name):
         """
-        Gets the number of replicas for a service that are actually ready to process requests.
-        This means containers that are in running state and have passed health checks (if configured).
+        Gets the number of ready replicas using cAdvisor metrics.
+        Returns the same value as get_active_replicas.
 
         Args:
-            stack_name (str): The name of the stack
+            stack_name (str): The name of the Docker Swarm stack
             service_name (str): The name of the service without stack prefix
 
         Returns:
             int: Number of ready replicas
         """
-        try:
-            # Construct the full service name
-            full_service_name = f"{stack_name}_{service_name}"
-
-            # Get all tasks for this service with their status
-            # cmd = ["docker", "service", "ps", "--format", "{{.CurrentState}}", full_service_name]
-            cmd = []
-            if self.remote is not None:
-                cmd.append("ssh")
-                cmd.append(self.remote)
-            cmd.append("docker")
-            cmd.append("service")
-            cmd.append("ps")
-            cmd.append("--format")
-            cmd.append("{{.CurrentState}}")
-            cmd.append(full_service_name)
-
-            output = subprocess.check_output(cmd, universal_newlines=True)
-
-            # Count only "Running" tasks
-            task_states = output.strip().split('\n')
-            # Filter lines that start with "Running" and are not empty
-            ready_count = sum(1 for state in task_states if state and state.startswith("Running"))
-
-            logger.debug("Service %s: found %d running replicas", full_service_name, ready_count)
-
-            # If the service has health checks, we need to count only healthy containers
-            if self.has_health_check:
-                try:
-                    # Get task IDs for the service tasks
-                    # cmd = ["docker", "service", "ps", "--format", "{{.ID}}", full_service_name]
-                    cmd = []
-                    if self.remote is not None:
-                        cmd.append("ssh")
-                        cmd.append(self.remote)
-                    cmd.append("docker")
-                    cmd.append("service")
-                    cmd.append("ps")
-                    cmd.append("--format")
-                    cmd.append("{{.ID}}")
-                    cmd.append(full_service_name)
-
-                    task_ids = subprocess.check_output(cmd, universal_newlines=True).strip().split('\n')
-
-                    # Get container IDs from task IDs
-                    container_ids = []
-                    for task_id in task_ids:
-                        if not task_id:
-                            continue
-                        # Get container ID for the task
-                        #                        cmd = ["docker", "inspect", "--format", "{{.Status.ContainerStatus.ContainerID}}", task_id]
-                        cmd = []
-                        if self.remote is not None:
-                            cmd.append("ssh")
-                            cmd.append(self.remote)
-                        cmd.append("docker")
-                        cmd.append("inspect")
-                        cmd.append("--format")
-                        cmd.append("{{.Status.ContainerStatus.ContainerID}}")
-                        cmd.append(task_id)
-
-                        try:
-                            container_id = subprocess.check_output(cmd, universal_newlines=True).strip()
-                            if container_id:
-                                container_ids.append(container_id)
-                        except:
-                            pass
-
-                    healthy_count = 0
-                    for container_id in container_ids:
-                        # Get container health status
-                        #                        cmd = ["docker", "inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}", container_id]
-                        cmd = []
-                        if self.remote is not None:
-                            cmd.append("ssh")
-                            cmd.append(self.remote)
-                        cmd.append("docker")
-                        cmd.append("inspect")
-                        cmd.append("--format")
-                        cmd.append("{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}")
-                        cmd.append(container_id)
-
-                        try:
-                            health_status = subprocess.check_output(cmd, universal_newlines=True).strip()
-                            logger.debug("Container %s: Health status = %s", container_id[:12], health_status)
-                            if health_status == "healthy":
-                                healthy_count += 1
-                        except Exception as e:
-                            logger.debug("Error checking health for container %s: %s", container_id[:12], str(e))
-
-                    logger.debug("Service %s: found %d healthy containers out of %d containers", full_service_name, healthy_count, len(container_ids))
-                    return healthy_count
-                except Exception as e:
-                    logger.debug("Error checking container health: %s", str(e))
-                    # Fall back to running count
-                    return ready_count
-            else:
-                # If no health checks, return the number of running containers
-                return ready_count
-
-        except Exception as e:
-            logger.error("%s Error in get_ready_replicas: %s", self.service_prefix, str(e))
-            # Fallback to nominal replica count
-            return self.get_replicas(stack_name, service_name)
+        return self.get_active_replicas(stack_name, service_name)
 
     def reset(self):
         self.cores = []
@@ -334,11 +150,9 @@ class Monitoring:
         self.last_timestamp = None
         self.active_users = []
         
-        # Aggiungi le nuove liste per Traefik
-        self.traefik_incoming = []
-        self.traefik_completed = []
-        self.traefik_failed = []
-        self.traefik_response_time = []
+        # Add Envoy metrics lists
+        self.envoy_incoming_rps = []
+        self.envoy_completed_rps = []
 
     def save_to_csv(self, filename):
         path = Path(filename)
@@ -354,10 +168,8 @@ class Monitoring:
             "ready_replica": len(self.ready_replica),
             "util": len(self.util),
             "mem": len(self.memory),
-            "traefik_incoming": len(self.traefik_incoming),
-            "traefik_completed": len(self.traefik_completed),
-            "traefik_failed": len(self.traefik_failed),
-            "traefik_response_time": len(self.traefik_response_time)
+            "envoy_incoming_rps": len(self.envoy_incoming_rps),
+            "envoy_completed_rps": len(self.envoy_completed_rps)
         }
 
         logger.info("%s Saving results", self.service_prefix)
@@ -376,10 +188,8 @@ class Monitoring:
             "ready_replica": self.ready_replica[:min_length],
             "util": self.util[:min_length],
             "mem": self.memory[:min_length],
-            "traefik_incoming": self.traefik_incoming[:min_length],
-            "traefik_completed": self.traefik_completed[:min_length],
-            "traefik_failed": self.traefik_failed[:min_length],
-            "traefik_response_time": self.traefik_response_time[:min_length]
+            "envoy_incoming_rps": self.envoy_incoming_rps[:min_length],
+            "envoy_completed_rps": self.envoy_completed_rps[:min_length]
         }
 
         try:
@@ -406,7 +216,8 @@ class Monitoring:
 
     def get_service_cpu_utilization(self, service_name=None, stack_name=None):
         """
-        Gets the total CPU utilization for all replicas of a specific service in a stack using cAdvisor metrics.
+        Gets the total CPU utilization for all replicas of a specific service using cAdvisor metrics.
+        Query: sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_swarm_service_name=~"<STACK>_<SERVICE>.*"}[1m]))
 
         Args:
             service_name (str): The name of the service (e.g., 'node')
@@ -414,151 +225,204 @@ class Monitoring:
 
         Returns:
             float: The total CPU utilization as an absolute value (CPU seconds per second)
-        """
-        try:
-            logger.debug("CPU Input parameters - service_name: '%s', stack_name: '%s'", service_name, stack_name)
-
-            # Use provided stack_name or fall back to self.stack_name
-            stack = stack_name if stack_name is not None else self.stack_name
-            logger.debug("CPU Using stack name: '%s'", stack)
-
-            # Construct the full service name using f-string
-            full_service_name = f"{stack}_{service_name}"
-            logger.debug("CPU Constructed full service name: '%s'", full_service_name)
-
-            # Query for CPU usage rate over 1 minute window, summed across all replicas
-
-            query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_com_docker_swarm_service_name="{full_service_name}"}}[30s]))'
-            logger.debug("CPU Prometheus query: %s", query)
-
-            result = self.prom.custom_query(query=query)
-            logger.debug("CPU Raw Prometheus result: %s", result)
-
-            if result and len(result) > 0:
-                logger.debug("%s CPU Result has data: %s", self.service_prefix, result[0])
-                if 'value' in result[0]:
-                    total_cpu = float(result[0]['value'][1])
-                    logger.debug("CPU Extracted CPU value: %s", total_cpu)
-                    return total_cpu
-                else:
-                    logger.debug("%s CPU No 'value' key in result[0]", self.service_prefix)
-            else:
-                logger.debug("%s CPU Empty or null result from Prometheus", self.service_prefix)
-            return 0.0
-        except Exception as e:
-            logger.error("%s CPU Error collecting CPU utilization for service %s", self.service_prefix, full_service_name)
-            logger.error("%s CPU Error details: %s", self.service_prefix, str(e))
-            logger.error("CPU Error type: %s", type(e))
-            return 0.0
-
-    def getIncomingRequestsFromTraefik(self):
-        """
-        Recupera il numero di richieste in ingresso tramite Traefik per il servizio specifico.
         
-        Returns:
-            float: Numero di richieste in ingresso al secondo per questo servizio
+        Raises:
+            RuntimeError: If the query returns no data or invalid data
         """
+        # Use provided parameters or fall back to instance variables
+        stack = stack_name if stack_name is not None else self.stack_name
+        service = service_name if service_name is not None else self.serviceName
+        
+        if not stack or not service:
+            raise RuntimeError(f"get_service_cpu_utilization: Missing stack_name ('{stack}') or service_name ('{service}'). Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+        
+        # Construct the query using the exact format from README-ENVOY.md
+        service_label_regex = self._get_service_label_regex(stack, service)
+        query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_com_docker_swarm_service_name=~"{service_label_regex}"}}[1m]))'
+        
         try:
-            service_sel = f'service=~"{self._service_label_regex()}"'
-            query = f'sum(rate(traefik_service_requests_total{{{service_sel}}}[30s]))'
             result = self.prom.custom_query(query=query)
             
-            if result and len(result) > 0 and 'value' in result[0]:
-                return float(result[0]['value'][1])
-            return 0
-        except Exception as e:
-            logger.error("%s Error querying Traefik incoming requests for service %s: %s", self.service_prefix, self.serviceName, e)
-            return 0
-
-    def getCompletedRequestsFromTraefik(self):
-        """
-        Recupera il numero di richieste completate con successo tramite Traefik per il servizio specifico.
-        
-        Returns:
-            float: Numero di richieste completate al secondo per questo servizio
-        """
-        try:
-            service_sel = f'service=~"{self._service_label_regex()}"'
-            query = f'sum(rate(traefik_service_requests_total{{{service_sel},code=~"2..|3.."}}[30s]))'
-            result = self.prom.custom_query(query=query)
+            if not result or len(result) == 0:
+                raise RuntimeError(f"get_service_cpu_utilization: No metrics found for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
             
-            if result and len(result) > 0 and 'value' in result[0]:
-                return float(result[0]['value'][1])
-            return 0
-        except Exception as e:
-            logger.error("%s Error querying Traefik completed requests for service %s: %s", self.service_prefix, self.serviceName, e)
-            return 0
-
-    def getFailedRequestsFromTraefik(self):
-        """
-        Recupera il numero di richieste fallite tramite Traefik per il servizio specifico.
-        
-        Returns:
-            float: Numero di richieste fallite al secondo per questo servizio
-        """
-        try:
-            service_sel = f'service=~"{self._service_label_regex()}"'
-            query = f'sum(rate(traefik_service_requests_total{{{service_sel},code=~"4..|5.."}}[30s]))'
-            result = self.prom.custom_query(query=query)
+            if 'value' not in result[0]:
+                raise RuntimeError(f"get_service_cpu_utilization: Invalid result format for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
             
-            if result and len(result) > 0 and 'value' in result[0]:
-                return float(result[0]['value'][1])
-            return 0
-        except Exception as e:
-            logger.error("%s Error querying Traefik failed requests for service %s: %s", self.service_prefix, self.serviceName, e)
-            return 0
-
-    def getResponseTimeFromTraefik(self):
-        """
-        Recupera il tempo di risposta medio tramite Traefik per il servizio specifico.
-        
-        Returns:
-            float: Tempo di risposta medio in secondi per questo servizio
-        """
-        try:
-            service_sel = f'service=~"{self._service_label_regex()}"'
-            query = f'sum(rate(traefik_service_request_duration_seconds_sum{{{service_sel}}}[30s])) / sum(rate(traefik_service_request_duration_seconds_count{{{service_sel}}}[30s]))'
-            result = self.prom.custom_query(query=query)
+            total_cpu = float(result[0]['value'][1])
+            return total_cpu
             
-            if result and len(result) > 0 and 'value' in result[0]:
-                return float(result[0]['value'][1])
-            return 0
         except Exception as e:
-            logger.error("%s Error querying Traefik response time for service %s: %s", self.service_prefix, self.serviceName, e)
-            return 0
+            if isinstance(e, RuntimeError):
+                raise
+            raise RuntimeError(f"get_service_cpu_utilization: Error for service_name='{service}', stack_name='{stack}'. Query: {query}. Error: {e}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
 
-    def getRequestsByService(self, service_name):
+    def get_incoming_rps(self, service_name=None, stack_name=None):
         """
-        Recupera le metriche per un servizio specifico.
-        
+        Gets incoming request rate using Envoy metrics.
+        Query: rate(envoy_cluster_upstream_rq_total{envoy_cluster_name="<CLUSTER_NAME>"}[1m])
+
         Args:
-            service_name (str): Nome del servizio (es. 'gateway')
-        
+            service_name (str, optional): Service name. If None, uses self.serviceName
+            stack_name (str, optional): Stack name. If None, uses self.stack_name
+
         Returns:
-            dict: Dizionario con metriche del servizio
+            float: Incoming requests per second
+
+        Raises:
+            RuntimeError: If the query returns no data or invalid data
         """
+        # Use provided parameters or fall back to instance variables
+        service = service_name if service_name is not None else self.serviceName
+        stack = stack_name if stack_name is not None else self.stack_name
+        
+        if not service:
+            raise RuntimeError(f"get_incoming_rps: Missing service_name ('{service}'). Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+        
+        cluster_name = self._get_cluster_name(service)
+        query = f'rate(envoy_cluster_upstream_rq_total{{envoy_cluster_name="{cluster_name}"}}[1m])'
+        
         try:
-            metrics = {}
-            
-            # Richieste totali per servizio
-            query = f'sum(rate(traefik_service_requests_total{{service="{service_name}"}}[30s]))'
             result = self.prom.custom_query(query=query)
-            metrics['total_requests'] = float(result[0]['value'][1]) if result and len(result) > 0 else 0
             
-            # Richieste completate per servizio
-            query = f'sum(rate(traefik_service_requests_total{{service="{service_name}",code=~"2..|3.."}}[30s]))'
-            result = self.prom.custom_query(query=query)
-            metrics['completed_requests'] = float(result[0]['value'][1]) if result and len(result) > 0 else 0
+            if not result or len(result) == 0:
+                raise RuntimeError(f"get_incoming_rps: No metrics found for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
             
-            # Tempo di risposta per servizio
-            query = f'sum(rate(traefik_service_request_duration_seconds_sum{{service="{service_name}"}}[30s])) / sum(rate(traefik_service_request_duration_seconds_count{{service="{service_name}"}}[30s]))'
-            result = self.prom.custom_query(query=query)
-            metrics['response_time'] = float(result[0]['value'][1]) if result and len(result) > 0 else 0
+            if 'value' not in result[0]:
+                raise RuntimeError(f"get_incoming_rps: Invalid result format for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
             
-            return metrics
+            return float(result[0]['value'][1])
+            
         except Exception as e:
-            logger.error("Error querying Traefik metrics for service %s: %s", service_name, e)
-            return {'total_requests': 0, 'completed_requests': 0, 'response_time': 0}
+            if isinstance(e, RuntimeError):
+                raise
+            raise RuntimeError(f"get_incoming_rps: Error for service_name='{service}', stack_name='{stack}'. Query: {query}. Error: {e}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+
+    def get_completed_rps(self, service_name=None, stack_name=None):
+        """
+        Gets completed request rate using Envoy metrics.
+        Query: rate(envoy_cluster_upstream_rq_completed{envoy_cluster_name="<CLUSTER_NAME>"}[1m])
+
+        Args:
+            service_name (str, optional): Service name. If None, uses self.serviceName
+            stack_name (str, optional): Stack name. If None, uses self.stack_name
+
+        Returns:
+            float: Completed requests per second
+
+        Raises:
+            RuntimeError: If the query returns no data or invalid data
+        """
+        # Use provided parameters or fall back to instance variables
+        service = service_name if service_name is not None else self.serviceName
+        stack = stack_name if stack_name is not None else self.stack_name
+        
+        if not service:
+            raise RuntimeError(f"get_completed_rps: Missing service_name ('{service}'). Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+        
+        cluster_name = self._get_cluster_name(service)
+        query = f'rate(envoy_cluster_upstream_rq_completed{{envoy_cluster_name="{cluster_name}"}}[1m])'
+        
+        try:
+            result = self.prom.custom_query(query=query)
+            
+            if not result or len(result) == 0:
+                raise RuntimeError(f"get_completed_rps: No metrics found for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+            
+            if 'value' not in result[0]:
+                raise RuntimeError(f"get_completed_rps: Invalid result format for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+            
+            return float(result[0]['value'][1])
+            
+        except Exception as e:
+            if isinstance(e, RuntimeError):
+                raise
+            raise RuntimeError(f"get_completed_rps: Error for service_name='{service}', stack_name='{stack}'. Query: {query}. Error: {e}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+
+    def get_response_time(self, service_name=None, stack_name=None):
+        """
+        Gets average response time using Envoy metrics.
+        Query: rate(envoy_cluster_upstream_rq_time_sum{envoy_cluster_name="<CLUSTER_NAME>"}[1m]) / rate(envoy_cluster_upstream_rq_time_count{envoy_cluster_name="<CLUSTER_NAME>"}[1m])
+
+        Args:
+            service_name (str, optional): Service name. If None, uses self.serviceName
+            stack_name (str, optional): Stack name. If None, uses self.stack_name
+
+        Returns:
+            float: Average response time in seconds
+
+        Raises:
+            RuntimeError: If the query returns no data or invalid data
+        """
+        # Use provided parameters or fall back to instance variables
+        service = service_name if service_name is not None else self.serviceName
+        stack = stack_name if stack_name is not None else self.stack_name
+        
+        if not service:
+            raise RuntimeError(f"get_response_time: Missing service_name ('{service}'). Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+        
+        cluster_name = self._get_cluster_name(service)
+        query = f'rate(envoy_cluster_upstream_rq_time_sum{{envoy_cluster_name="{cluster_name}"}}[1m]) / rate(envoy_cluster_upstream_rq_time_count{{envoy_cluster_name="{cluster_name}"}}[1m])'
+        
+        try:
+            result = self.prom.custom_query(query=query)
+            
+            if not result or len(result) == 0:
+                raise RuntimeError(f"get_response_time: No metrics found for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+            
+            if 'value' not in result[0]:
+                raise RuntimeError(f"get_response_time: Invalid result format for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+            
+            response_time = float(result[0]['value'][1])
+            
+            # Check for division by zero or invalid response time
+            if response_time <= 0:
+                raise RuntimeError(f"get_response_time: Invalid response time value ({response_time}) for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+            
+            return response_time
+            
+        except Exception as e:
+            if isinstance(e, RuntimeError):
+                raise
+            raise RuntimeError(f"get_response_time: Error for service_name='{service}', stack_name='{stack}'. Query: {query}. Error: {e}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+
+    def get_active_replicas(self, stack_name, service_name):
+        """
+        Gets the number of active replicas using cAdvisor metrics.
+        Query: count(container_last_seen{container_label_com_docker_swarm_service_name=~"<STACK>_<SERVICE>.*"})
+
+        Args:
+            stack_name (str): The name of the Docker Swarm stack
+            service_name (str): The name of the service without stack prefix
+
+        Returns:
+            int: Number of active replicas
+
+        Raises:
+            RuntimeError: If the query returns no data or invalid data
+        """
+        if not stack_name or not service_name:
+            raise RuntimeError(f"get_active_replicas: Missing stack_name ('{stack_name}') or service_name ('{service_name}'). Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+        
+        service_label_regex = self._get_service_label_regex(stack_name, service_name)
+        query = f'count(container_last_seen{{container_label_com_docker_swarm_service_name=~"{service_label_regex}"}})'
+        
+        try:
+            result = self.prom.custom_query(query=query)
+            
+            if not result or len(result) == 0:
+                raise RuntimeError(f"get_active_replicas: No metrics found for service_name='{service_name}', stack_name='{stack_name}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+            
+            if 'value' not in result[0]:
+                raise RuntimeError(f"get_active_replicas: Invalid result format for service_name='{service_name}', stack_name='{stack_name}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+            
+            replica_count = int(float(result[0]['value'][1]))
+            return replica_count
+            
+        except Exception as e:
+            if isinstance(e, RuntimeError):
+                raise
+            raise RuntimeError(f"get_active_replicas: Error for service_name='{service_name}', stack_name='{stack_name}'. Query: {query}. Error: {e}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
 
     def predict_users(self, horizon=1):
         """
