@@ -28,8 +28,8 @@ services:
       - no-new-privileges:true
     restart: always
     environment:
-      - MS_EXERCISE_URL=http://ms-exercise:5001
-      - MS_OTHER_URL=http://ms-other:8080
+      - MS_EXERCISE_URL=http://tasks.ms-stack-v5_ms-exercise-nginx:5001
+      - MS_OTHER_URL=http://tasks.ms-stack-v5_ms-other-nginx:8080
       - TRAEFIK_INTERNAL=false
       - FORCE_TRAEFIK_ROUTING=false
     env_file:
