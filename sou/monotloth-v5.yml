@@ -68,8 +68,8 @@ services:
           cpus: "0.1"
           memory: 32M
 
-  # MS-Exercise application
-  ms-exercise:
+  # MS-Exercise application (renamed to ms-exercise-app)
+  ms-exercise-app:
     image: icws24submission/exercise_icws24
     security_opt:
       - no-new-privileges:true
@@ -93,11 +93,13 @@ services:
     networks:
       - backend
 
-  # Nginx proxy for MS-Exercise
-  ms-exercise-nginx:
+  # Nginx proxy for MS-Exercise (now named ms-exercise to match hardcoded URL)
+  ms-exercise:
     image: nginx:alpine
     volumes:
       - ./nginx-config/ms-exercise.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "5001:5001"
     networks:
       - backend
       - monitoring
@@ -115,7 +117,7 @@ services:
   ms-exercise-nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
     command:
-      - '--nginx.scrape-uri=http://ms-exercise-nginx/nginx_status'
+      - '--nginx.scrape-uri=http://ms-exercise/nginx_status'
       - '--web.listen-address=:9114'
     networks:
       - monitoring
@@ -128,8 +130,8 @@ services:
           cpus: "0.1"
           memory: 32M
 
-  # MS-Other application
-  ms-other:
+  # MS-Other application (renamed to ms-other-app)
+  ms-other-app:
     image: icws24submission/other_icws24
     security_opt:
       - no-new-privileges:true
@@ -153,11 +155,13 @@ services:
     networks:
       - backend
 
-  # Nginx proxy for MS-Other
-  ms-other-nginx:
+  # Nginx proxy for MS-Other (now named ms-other to match hardcoded URL)
+  ms-other:
     image: nginx:alpine
     volumes:
       - ./nginx-config/ms-other.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8080:8080"
     networks:
       - backend
       - monitoring
@@ -175,7 +179,7 @@ services:
   ms-other-nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
     command:
-      - '--nginx.scrape-uri=http://ms-other-nginx/nginx_status'
+      - '--nginx.scrape-uri=http://ms-other/nginx_status'
       - '--web.listen-address=:9115'
     networks:
       - monitoring
