@@ -1,15 +1,15 @@
 version: '3.7'
 
 services:
-  # Gateway application
-  gateway:
+  # Gateway application (renamed to gateway-app)
+  gateway-app:
     image: icws24submission/gateway_icws24
     security_opt:
       - no-new-privileges:true
     restart: always
     environment:
-      - MS_EXERCISE_URL=http://ms-exercise-nginx:5001
-      - MS_OTHER_URL=http://ms-other-nginx:8080
+      - MS_EXERCISE_URL=http://ms-exercise:5001
+      - MS_OTHER_URL=http://ms-other:8080
       - TRAEFIK_INTERNAL=false
       - FORCE_TRAEFIK_ROUTING=false
     env_file:
@@ -98,8 +98,6 @@ services:
     image: nginx:alpine
     volumes:
       - ./nginx-config/ms-exercise.conf:/etc/nginx/nginx.conf:ro
-    ports:
-      - "5001:5001"
     networks:
       - backend
       - monitoring
@@ -160,8 +158,6 @@ services:
     image: nginx:alpine
     volumes:
       - ./nginx-config/ms-other.conf:/etc/nginx/nginx.conf:ro
-    ports:
-      - "8080:8080"
     networks:
       - backend
       - monitoring
