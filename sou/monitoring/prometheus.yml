@@ -26,3 +26,23 @@ scrape_configs:
       - targets: ['cadvisor:8080']
     scrape_interval: 5s
     metrics_path: /metrics
+
+  # MS-Exercise nginx exporter
+  - job_name: 'ms-exercise-nginx'
+    static_configs:
+      - targets: ['ms-exercise-nginx-exporter:9114']
+    scrape_interval: 5s
+    metrics_path: /metrics
+    relabel_configs:
+      - target_label: service
+        replacement: ms-exercise
+
+  # MS-Other nginx exporter
+  - job_name: 'ms-other-nginx'
+    static_configs:
+      - targets: ['ms-other-nginx-exporter:9115']
+    scrape_interval: 5s
+    metrics_path: /metrics
+    relabel_configs:
+      - target_label: service
+        replacement: ms-other

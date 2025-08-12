@@ -34,7 +34,45 @@ services:
     ports:
       - "80:8080"
 
-  ms-exercise:
+  # MS-Exercise nginx proxy (takes over the ms-exercise name)
+  ms-exercise-nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx-config/ms-exercise.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      backend:
+        aliases:
+          - ms-exercise  # Gateway will find this instead of the app
+      monitoring:
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 64M
+        reservations:
+          cpus: "0.1"
+          memory: 32M
+
+  # MS-Exercise nginx exporter
+  ms-exercise-nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    command:
+      - '--nginx.scrape-uri=http://ms-exercise-nginx/nginx_status'
+      - '--web.listen-address=:9114'
+    networks:
+      - monitoring
+    ports:
+      - "9114:9114"
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 32M
+
+  # MS-Exercise app (renamed with alias)
+  ms-exercise-app:
     image: icws24submission/exercise_icws24
     security_opt:
       - no-new-privileges:true
@@ -58,7 +96,45 @@ services:
     networks:
       - backend
 
-  ms-other:
+  # MS-Other nginx proxy (takes over the ms-other name)
+  ms-other-nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx-config/ms-other.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      backend:
+        aliases:
+          - ms-other  # Gateway will find this instead of the app
+      monitoring:
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 64M
+        reservations:
+          cpus: "0.1"
+          memory: 32M
+
+  # MS-Other nginx exporter
+  ms-other-nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    command:
+      - '--nginx.scrape-uri=http://ms-other-nginx/nginx_status'
+      - '--web.listen-address=:9115'
+    networks:
+      - monitoring
+    ports:
+      - "9115:9115"
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 32M
+
+  # MS-Other app (renamed)
+  ms-other-app:
     image: icws24submission/other_icws24
     security_opt:
       - no-new-privileges:true
