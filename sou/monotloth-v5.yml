@@ -28,8 +28,8 @@ services:
       - no-new-privileges:true
     restart: always
     environment:
-      - MS_EXERCISE_URL=http://tasks.ms-stack-v5_ms-exercise-nginx:5001
-      - MS_OTHER_URL=http://tasks.ms-stack-v5_ms-other-nginx:8080
+      - MS_EXERCISE_URL=http://ms-exercise-nginx:5001
+      - MS_OTHER_URL=http://ms-other-nginx:8080
       - TRAEFIK_INTERNAL=false
       - FORCE_TRAEFIK_ROUTING=false
     env_file:
@@ -51,16 +51,14 @@ services:
     networks:
       - backend
 
-  # MS-Exercise nginx proxy (takes over the ms-exercise name)
+  # MS-Exercise nginx proxy
   ms-exercise-nginx:
     image: nginx:alpine
     volumes:
       - ./nginx-config/ms-exercise.conf:/etc/nginx/nginx.conf:ro
     networks:
-      backend:
-        aliases:
-          - ms-exercise  # Gateway will find this instead of the app
-      monitoring:
+      - backend
+      - monitoring
     deploy:
       replicas: 1
       resources:
@@ -130,16 +128,14 @@ services:
     networks:
       - backend
 
-  # MS-Other nginx proxy (takes over the ms-other name)
+  # MS-Other nginx proxy
   ms-other-nginx:
     image: nginx:alpine
     volumes:
       - ./nginx-config/ms-other.conf:/etc/nginx/nginx.conf:ro
     networks:
-      backend:
-        aliases:
-          - ms-other  # Gateway will find this instead of the app
-      monitoring:
+      - backend
+      - monitoring
     deploy:
       replicas: 1
       resources:
