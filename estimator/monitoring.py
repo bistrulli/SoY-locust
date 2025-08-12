@@ -22,7 +22,8 @@ def _get_service_prefix(service_name, stack_name):
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x) / len(x),
                  serviceName="", stack_name="", promHost="localhost",
-                 promPort=9090, sysfile="", has_health_check=False, remote=None, remote_docker_port=None):
+                 promPort=9090, sysfile="", has_health_check=False, remote=None, remote_docker_port=None,
+                 prom_rate_window: str = "10s"):
         self.reducer = reducer
         self.window = window
         self.sla = sla
@@ -33,6 +34,8 @@ class Monitoring:
         self.promHost = promHost
         self.sysfile = sysfile
         self.has_health_check = has_health_check
+        # Prometheus rate window for Envoy metrics (e.g., "10s", "30s", "1m")
+        self.prom_rate_window = prom_rate_window
         
         # Lazy initialization
         self._prom = None
@@ -287,7 +290,7 @@ class Monitoring:
         
         job_name = self._get_envoy_job_name(service)
         conn_manager_prefix = self._get_envoy_conn_manager_prefix(service)
-        query = f'rate(envoy_http_downstream_rq_total{{envoy_http_conn_manager_prefix="{conn_manager_prefix}", job="{job_name}"}}[1m])'
+        query = f'rate(envoy_http_downstream_rq_total{{envoy_http_conn_manager_prefix="{conn_manager_prefix}", job="{job_name}"}}[{self.prom_rate_window}])'
         
         try:
             result = self.prom.custom_query(query=query)
@@ -338,7 +341,7 @@ class Monitoring:
         
         job_name = self._get_envoy_job_name(service)
         conn_manager_prefix = self._get_envoy_conn_manager_prefix(service)
-        query = f'rate(envoy_http_downstream_rq_completed{{envoy_http_conn_manager_prefix="{conn_manager_prefix}", job="{job_name}"}}[1m])'
+        query = f'rate(envoy_http_downstream_rq_completed{{envoy_http_conn_manager_prefix="{conn_manager_prefix}", job="{job_name}"}}[{self.prom_rate_window}])'
         
         try:
             result = self.prom.custom_query(query=query)
@@ -389,7 +392,7 @@ class Monitoring:
         
         job_name = self._get_envoy_job_name(service)
         conn_manager_prefix = self._get_envoy_conn_manager_prefix(service)
-        query = f'rate(envoy_http_downstream_rq_time_sum{{envoy_http_conn_manager_prefix="{conn_manager_prefix}", job="{job_name}"}}[1m]) / rate(envoy_http_downstream_rq_time_count{{envoy_http_conn_manager_prefix="{conn_manager_prefix}", job="{job_name}"}}[1m])'
+        query = f'rate(envoy_http_downstream_rq_time_sum{{envoy_http_conn_manager_prefix="{conn_manager_prefix}", job="{job_name}"}}[{self.prom_rate_window}]) / rate(envoy_http_downstream_rq_time_count{{envoy_http_conn_manager_prefix="{conn_manager_prefix}", job="{job_name}"}}[{self.prom_rate_window}])'
         
         try:
             result = self.prom.custom_query(query=query)
@@ -400,10 +403,12 @@ class Monitoring:
             if 'value' not in result[0]:
                 raise RuntimeError(f"get_response_time: Invalid result format for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
             
-            response_time = float(result[0]['value'][1])
+            # Envoy reports downstream_rq_time in milliseconds; convert to seconds
+            response_time_ms = float(result[0]['value'][1])
+            response_time_s = response_time_ms / 1000.0
             
             # For response time, allow zero (means no requests processed recently)
-            return response_time
+            return response_time_s
             
         except Exception as e:
             if isinstance(e, RuntimeError):
