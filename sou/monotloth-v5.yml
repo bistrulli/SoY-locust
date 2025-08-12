@@ -1,15 +1,35 @@
 version: '3.7'
 
 services:
+  # Gateway nginx proxy
+  gateway-nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx-config/gateway.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - backend
+      - monitoring
+    ports:
+      - "80:80"
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 64M
+        reservations:
+          cpus: "0.1"
+          memory: 32M
+
   # Gateway application
-  gateway:
+  gateway-app:
     image: icws24submission/gateway_icws24
     security_opt:
       - no-new-privileges:true
     restart: always
     environment:
-      - MS_EXERCISE_URL=http://ms-exercise-nginx:5001
-      - MS_OTHER_URL=http://ms-other-nginx:8080
+      - MS_EXERCISE_URL=http://ms-exercise:5001
+      - MS_OTHER_URL=http://ms-other:8080
       - TRAEFIK_INTERNAL=false
       - FORCE_TRAEFIK_ROUTING=false
     env_file:
@@ -30,9 +50,6 @@ services:
           memory: 256M
     networks:
       - backend
-      - monitoring
-    ports:
-      - "80:8080"
 
   # MS-Exercise nginx proxy (takes over the ms-exercise name)
   ms-exercise-nginx:
@@ -58,7 +75,7 @@ services:
   gateway-nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
     command:
-      - '--nginx.scrape-uri=http://gateway-nginx/nginx_status'
+      - '--nginx.scrape-uri=http://gateway-nginx:80/nginx_status'
       - '--web.listen-address=:9113'
     networks:
       - monitoring
@@ -75,7 +92,7 @@ services:
   ms-exercise-nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
     command:
-      - '--nginx.scrape-uri=http://ms-exercise/nginx_status'
+      - '--nginx.scrape-uri=http://ms-exercise-nginx:5001/nginx_status'
       - '--web.listen-address=:9114'
     networks:
       - monitoring
@@ -137,7 +154,7 @@ services:
   ms-other-nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
     command:
-      - '--nginx.scrape-uri=http://ms-other/nginx_status'
+      - '--nginx.scrape-uri=http://ms-other-nginx:8080/nginx_status'
       - '--web.listen-address=:9115'
     networks:
       - monitoring
