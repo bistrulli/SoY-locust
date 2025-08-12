@@ -56,6 +56,15 @@ class Monitoring:
     def _get_envoy_job_name(self, service_name):
         """Deriva il nome del job Envoy dal nome del servizio"""
         return f"envoy-{service_name}"
+    
+    def _get_envoy_conn_manager_prefix(self, service_name):
+        """Deriva il connection manager prefix dal nome del servizio"""
+        service_mapping = {
+            'ms-exercise': 'ms_exercise_hcm',
+            'gateway': 'gateway_hcm', 
+            'ms-other': 'ms_other_hcm'
+        }
+        return service_mapping.get(service_name, f"{service_name}_hcm")
 
 
     def tick(self, t):
@@ -256,15 +265,15 @@ class Monitoring:
 
     def get_incoming_rps(self, service_name=None, stack_name=None):
         """
-        Gets incoming request rate using Envoy admin interface metrics.
-        Query: rate(envoy_http_downstream_rq_total{envoy_http_conn_manager_prefix="admin", job="envoy-<SERVICE>"}[1m])
+        Gets incoming request rate using Envoy connection manager metrics.
+        Query: rate(envoy_http_downstream_rq_total{envoy_http_conn_manager_prefix="<SERVICE>_hcm", job="envoy-<SERVICE>"}[1m])
 
         Args:
             service_name (str, optional): Service name (e.g., 'ms-exercise', 'gateway'). If None, uses self.serviceName
             stack_name (str, optional): Stack name. If None, uses self.stack_name
 
         Returns:
-            float: Incoming requests per second from admin interface
+            float: Incoming requests per second from service connection manager
 
         Raises:
             RuntimeError: If the query returns no data or invalid data
@@ -277,14 +286,15 @@ class Monitoring:
             raise RuntimeError(f"get_incoming_rps: Missing service_name ('{service}'). Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
         
         job_name = self._get_envoy_job_name(service)
-        query = f'rate(envoy_http_downstream_rq_total{{envoy_http_conn_manager_prefix="admin", job="{job_name}"}}[1m])'
+        conn_manager_prefix = self._get_envoy_conn_manager_prefix(service)
+        query = f'rate(envoy_http_downstream_rq_total{{envoy_http_conn_manager_prefix="{conn_manager_prefix}", job="{job_name}"}}[1m])'
         
         try:
             result = self.prom.custom_query(query=query)
             
             if not result or len(result) == 0:
                 # Check if the base metric exists (before rate())
-                base_query = f'envoy_http_downstream_rq_total{{envoy_http_conn_manager_prefix="admin", job="{job_name}"}}'
+                base_query = f'envoy_http_downstream_rq_total{{envoy_http_conn_manager_prefix="{conn_manager_prefix}", job="{job_name}"}}'
                 base_result = self.prom.custom_query(query=base_query)
                 
                 if base_result and len(base_result) > 0:
@@ -306,15 +316,15 @@ class Monitoring:
 
     def get_completed_rps(self, service_name=None, stack_name=None):
         """
-        Gets completed request rate using Envoy admin interface metrics.
-        Query: rate(envoy_http_downstream_rq_completed{envoy_http_conn_manager_prefix="admin", job="envoy-<SERVICE>"}[1m])
+        Gets completed request rate using Envoy connection manager metrics.
+        Query: rate(envoy_http_downstream_rq_completed{envoy_http_conn_manager_prefix="<SERVICE>_hcm", job="envoy-<SERVICE>"}[1m])
 
         Args:
             service_name (str, optional): Service name (e.g., 'ms-exercise', 'gateway'). If None, uses self.serviceName
             stack_name (str, optional): Stack name. If None, uses self.stack_name
 
         Returns:
-            float: Completed requests per second from admin interface
+            float: Completed requests per second from service connection manager
 
         Raises:
             RuntimeError: If the query returns no data or invalid data
@@ -327,14 +337,15 @@ class Monitoring:
             raise RuntimeError(f"get_completed_rps: Missing service_name ('{service}'). Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
         
         job_name = self._get_envoy_job_name(service)
-        query = f'rate(envoy_http_downstream_rq_completed{{envoy_http_conn_manager_prefix="admin", job="{job_name}"}}[1m])'
+        conn_manager_prefix = self._get_envoy_conn_manager_prefix(service)
+        query = f'rate(envoy_http_downstream_rq_completed{{envoy_http_conn_manager_prefix="{conn_manager_prefix}", job="{job_name}"}}[1m])'
         
         try:
             result = self.prom.custom_query(query=query)
             
             if not result or len(result) == 0:
                 # Check if the base metric exists (before rate())
-                base_query = f'envoy_http_downstream_rq_completed{{envoy_http_conn_manager_prefix="admin", job="{job_name}"}}'
+                base_query = f'envoy_http_downstream_rq_completed{{envoy_http_conn_manager_prefix="{conn_manager_prefix}", job="{job_name}"}}'
                 base_result = self.prom.custom_query(query=base_query)
                 
                 if base_result and len(base_result) > 0:
@@ -356,15 +367,15 @@ class Monitoring:
 
     def get_response_time(self, service_name=None, stack_name=None):
         """
-        Gets average response time using Envoy admin interface metrics.
-        Query: rate(envoy_http_downstream_rq_time_sum{envoy_http_conn_manager_prefix="admin", job="envoy-<SERVICE>"}[1m]) / rate(envoy_http_downstream_rq_time_count{envoy_http_conn_manager_prefix="admin", job="envoy-<SERVICE>"}[1m])
+        Gets average response time using Envoy connection manager metrics.
+        Query: rate(envoy_http_downstream_rq_time_sum{envoy_http_conn_manager_prefix="<SERVICE>_hcm", job="envoy-<SERVICE>"}[1m]) / rate(envoy_http_downstream_rq_time_count{envoy_http_conn_manager_prefix="<SERVICE>_hcm", job="envoy-<SERVICE>"}[1m])
 
         Args:
             service_name (str, optional): Service name (e.g., 'ms-exercise', 'gateway'). If None, uses self.serviceName
             stack_name (str, optional): Stack name. If None, uses self.stack_name
 
         Returns:
-            float: Average response time in seconds from admin interface
+            float: Average response time in seconds from service connection manager
 
         Raises:
             RuntimeError: If the query returns no data or invalid data
@@ -377,7 +388,8 @@ class Monitoring:
             raise RuntimeError(f"get_response_time: Missing service_name ('{service}'). Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
         
         job_name = self._get_envoy_job_name(service)
-        query = f'rate(envoy_http_downstream_rq_time_sum{{envoy_http_conn_manager_prefix="admin", job="{job_name}"}}[1m]) / rate(envoy_http_downstream_rq_time_count{{envoy_http_conn_manager_prefix="admin", job="{job_name}"}}[1m])'
+        conn_manager_prefix = self._get_envoy_conn_manager_prefix(service)
+        query = f'rate(envoy_http_downstream_rq_time_sum{{envoy_http_conn_manager_prefix="{conn_manager_prefix}", job="{job_name}"}}[1m]) / rate(envoy_http_downstream_rq_time_count{{envoy_http_conn_manager_prefix="{conn_manager_prefix}", job="{job_name}"}}[1m])'
         
         try:
             result = self.prom.custom_query(query=query)
