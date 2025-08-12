@@ -1,0 +1,88 @@
+defaultConfig:
+  # Enable metrics collection
+  proxyStatsMatcher:
+    inclusionRegexps:
+    - ".*outlier_detection.*"
+    - ".*circuit_breaker.*" 
+    - ".*upstream_rq_retry.*"
+    - ".*upstream_rq_pending.*"
+    - ".*_cx_.*"
+    exclusionRegexps:
+    - ".*osconfig.*"
+    - ".*_bucket"
+  
+  # Envoy access log configuration  
+  accessLogFile: /dev/stdout
+  accessLogFormat: |
+    [%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%"
+    %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT%
+    %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%"
+    "%REQ(USER-AGENT)%" "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"
+    %UPSTREAM_CLUSTER% %UPSTREAM_LOCAL_ADDRESS% %DOWNSTREAM_LOCAL_ADDRESS%
+    %DOWNSTREAM_REMOTE_ADDRESS% %REQUESTED_SERVER_NAME% %ROUTE_NAME%
+  
+  # Proxy configuration
+  concurrency: 2
+  configPath: "/etc/istio/proxy"
+  binaryPath: "/usr/local/bin/envoy"
+  serviceCluster: istio-proxy
+  drainDuration: 45s
+  parentShutdownDuration: 60s
+  
+  # Enable automatic protocol detection
+  proxyBootstrapTemplatePath: ""
+  
+  # Status port for health checks
+  statusPort: 15020
+  
+  # Trust domain
+  trustDomain: "cluster.local"
+  
+  # Enable sampling for tracing
+  sampling: 100.0
+  
+  # DISABLE TLS - Use plain text for all communication
+  # This prevents the root CA certificate error
+  controlPlaneSecurityEnabled: false
+
+# Control plane configuration  
+discoverySelectors: []
+extensionProviders: []
+
+# Enable default metrics
+telemetry:
+  v1:
+    enabled: true
+  v2:
+    enabled: true
+    prometheus:
+      configOverride:
+        gateway:
+          inbound_service_requests_total: true
+          outbound_service_requests_total: true
+        sidecar:
+          inbound_service_requests_total: true
+          outbound_service_requests_total: true
+
+# Default mesh network
+meshNetworks: {}
+
+# Root namespace for the mesh
+rootNamespace: istio-system
+
+# Enable locality load balancing
+localityLbSetting:
+  enabled: true
+
+# Default revision  
+revision: ""
+
+# Outbound traffic policy
+outboundTrafficPolicy:
+  mode: ALLOW_ANY
+
+# Default providers
+defaultProviders: {}
+
+# Trust domain aliases
+trustDomainAliases: []
