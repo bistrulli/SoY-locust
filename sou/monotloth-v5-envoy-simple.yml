@@ -11,7 +11,7 @@ services:
       - MS_EXERCISE_URL=http://ms-exercise:5001
       - MS_OTHER_URL=http://ms-other:8080
       - TRAEFIK_INTERNAL=false
-      - FORCE_TRAFIK_ROUTING=false
+      - FORCE_TRAEFIK_ROUTING=false
     env_file:
       - monolith-v5/variables.env
     deploy:

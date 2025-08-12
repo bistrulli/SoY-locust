@@ -1,239 +1,100 @@
-version: '3.7'
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 15000
 
-services:
-  # Gateway con Envoy semplice
-  gateway:
-    image: icws24submission/gateway_icws24
-    security_opt:
-      - no-new-privileges:true
-    restart: always
-    environment:
-      - MS_EXERCISE_URL=http://ms-exercise:5001
-      - MS_OTHER_URL=http://ms-other:8080
-      - TRAEFIK_INTERNAL=false
-      - FORCE_TRAFIK_ROUTING=false
-    env_file:
-      - monolith-v5/variables.env
-    deploy:
-      replicas: 1
-      update_config:
-        parallelism: 1
-        delay: 30s
-      restart_policy:
-        condition: on-failure
-      resources:
-        limits:
-          cpus: "1"
-          memory: 1G
-        reservations:
-          cpus: "0.1"
-          memory: 256M
-    networks:
-      - backend
-      - monitoring
-    ports:
-      - "8080:8080"
+static_resources:
+  listeners:
+  - name: ms_exercise_listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 9901
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ms_exercise_hcm
+          access_log:
+          - name: envoy.access_loggers.stdout
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: ms_exercise_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: ms_exercise_cluster
 
-  # Envoy proxy semplice per Gateway (SENZA Istio)
-  gateway-envoy:
-    image: envoyproxy/envoy:v1.27-latest
-    volumes:
-      - ./envoy-config/gateway-envoy.yaml:/etc/envoy/envoy.yaml
-    networks:
-      - backend
-      - monitoring
-    ports:
-      - "15000:15000"  # Admin interface
-      - "15090:15090"  # Stats/metrics
-      - "80:9901"      # Listener applicativo - TRAFFICO HTTP
-    deploy:
-      replicas: 1
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 256M
-        reservations:
-          cpus: "0.1"
-          memory: 128M
+  # Listener per metriche Prometheus
+  - name: stats_listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 15090
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: stats_hcm
+          route_config:
+            name: stats_route
+            virtual_hosts:
+            - name: stats_host
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/stats/prometheus"
+                route:
+                  cluster: stats_cluster
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
-  ms-exercise:
-    image: icws24submission/exercise_icws24
-    security_opt:
-      - no-new-privileges:true
-    restart: always
-    env_file:
-      - monolith-v5/variables.env
-    deploy:
-      replicas: 1
-      update_config:
-        parallelism: 1
-        delay: 30s
-      restart_policy:
-        condition: on-failure
-      resources:
-        limits:
-          cpus: "1"
-          memory: 1G
-        reservations:
-          cpus: "0.1"
-          memory: 256M
-    networks:
-      - backend
+  clusters:
+  - name: ms_exercise_cluster
+    connect_timeout: 30s
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: ms_exercise_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: ms-exercise
+                port_value: 5001
 
-  # Envoy proxy semplice per ms-exercise
-  ms-exercise-envoy:
-    image: envoyproxy/envoy:v1.27-latest
-    volumes:
-      - ./envoy-config/ms-exercise-envoy.yaml:/etc/envoy/envoy.yaml
-    networks:
-      - backend
-      - monitoring
-    ports:
-      - "15001:15000"  # Admin interface
-      - "15091:15090"  # Stats/metrics  
-    deploy:
-      replicas: 1
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 256M
+  - name: stats_cluster
+    connect_timeout: 5s
+    type: STATIC
+    load_assignment:
+      cluster_name: stats_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 15000
 
-  ms-other:
-    image: icws24submission/other_icws24
-    security_opt:
-      - no-new-privileges:true
-    restart: always
-    env_file:
-      - monolith-v5/variables.env
-    deploy:
-      replicas: 1
-      update_config:
-        parallelism: 1
-        delay: 30s
-      restart_policy:
-        condition: on-failure
-    networks:
-      - backend
-
-  # Envoy proxy semplice per ms-other
-  ms-other-envoy:
-    image: envoyproxy/envoy:v1.27-latest
-    volumes:
-      - ./envoy-config/ms-other-envoy.yaml:/etc/envoy/envoy.yaml
-    networks:
-      - backend
-      - monitoring
-    ports:
-      - "15002:15000"  # Admin interface
-      - "15092:15090"  # Stats/metrics
-    deploy:
-      replicas: 1
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 256M
-
-  postgres:
-    image: registry.gitlab.com/inria-mpl/soy/msa-postgres:1.0.1
-    shm_size: 1g
-    security_opt:
-      - no-new-privileges:true
-    restart: always
-    env_file:
-      - monolith-v5/variables.env
-    deploy:
-      replicas: 1
-      update_config:
-        parallelism: 1
-        delay: 30s
-    networks:
-      - monitoring
-      - backend
-
-  node-exporter:
-    image: prom/node-exporter:latest
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.sysfs=/host/sys'
-      - '--path.rootfs=/rootfs'
-      - '--web.listen-address=:9100'
-    networks:
-      - monitoring
-    ports:
-      - 9100:9100
-    deploy:
-      mode: global
-      restart_policy:
-        condition: any
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 512M
-        reservations:
-          cpus: "0.1"
-          memory: 128M
-
-  prometheus:
-    image: prom/prometheus:latest
-    volumes:
-      - ../prometheus/prometheus-envoy.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--web.listen-address=:9090'
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-    networks:
-      - monitoring
-    ports:
-      - 9090:9090
-    deploy:
-      mode: global
-      restart_policy:
-        condition: on-failure
-      resources:
-        limits:
-          cpus: "1"
-          memory: 1G
-        reservations:
-          cpus: "0.5"
-          memory: 512M
-
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-    networks:
-      - monitoring
-    ports:
-      - 8081:8080
-    deploy:
-      mode: global
-      restart_policy:
-        condition: on-failure
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 256M
-        reservations:
-          cpus: "0.1"
-          memory: 128M
-
-networks:
-  monitoring:
-    driver: overlay
-    attachable: true
-  backend:
-    driver: overlay
-    attachable: true
-
-volumes:
-  postgres_data:
-  prometheus_data:
+stats_config:
+  stats_tags:
+  - tag_name: cluster_name
+    regex: "^cluster\\.((.+?)\\.)"
+  - tag_name: virtual_host_name
+    regex: "^vhost\\.((.+?)\\.)"

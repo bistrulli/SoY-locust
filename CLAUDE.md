@@ -57,11 +57,6 @@ Key dependencies include:
 - Python 3.x
 - Available ports: 80, 8080, 9090, 8081, 9100, 9646
 
-**Environment setup:**
-```bash
-pip install -r requirements.txt
-```
-
 ## Architecture
 
 ### Core Components
@@ -88,27 +83,27 @@ pip install -r requirements.txt
 ### Docker Stack Architecture
 
 The system uses Docker stack files in `sou/` directory, primarily `monotloth-v5.yml` which includes:
-- **Gateway**: Main application gateway with Envoy proxy (port 8080)
+- **Traefik**: Reverse proxy and load balancer (ports 80, 8080)
+- **Gateway**: Main application gateway
 - **Microservices**: ms-exercise, ms-other
 - **Monitoring**: Prometheus (9090), cAdvisor (8081), Node Exporter (9100)
 - **Database**: PostgreSQL
-- **Envoy Proxies**: Individual service proxies for metrics collection
-
-**Note**: The v5 architecture uses Envoy instead of Traefik for service mesh capabilities.
 
 ### Metrics Collection
 
-The framework collects comprehensive metrics using exact queries:
+The framework collects comprehensive metrics:
 
-**Envoy Metrics (via specific queries):**
-- Incoming request rate: `rate(envoy_cluster_upstream_rq_total{envoy_cluster_name="<CLUSTER_NAME>"}[1m])`
-- Completed request rate: `rate(envoy_cluster_upstream_rq_completed{envoy_cluster_name="<CLUSTER_NAME>"}[1m])`
-- Average response time: `rate(envoy_cluster_upstream_rq_time_sum{...}[1m]) / rate(envoy_cluster_upstream_rq_time_count{...}[1m])`
+**Traefik Metrics:**
+- Incoming request rate
+- Completed/failed request rates
+- Response times
+- Service-specific breakdowns
 
-**cAdvisor System Metrics (via specific queries):**
-- CPU utilization per service: `sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_swarm_service_name=~"<STACK>_<SERVICE>.*"}[1m]))`
-- Active replica count: `count(container_last_seen{container_label_com_docker_swarm_service_name=~"<STACK>_<SERVICE>.*"})`
-- Memory and network usage metrics available
+**System Metrics:**
+- CPU utilization per service
+- Memory usage
+- Container resource consumption
+- Docker service replica counts
 
 **Application Metrics:**
 - Active user count (via Prometheus gauge)
@@ -136,7 +131,7 @@ The monitoring system automatically constructs service names:
 
 - Default endpoint: `http://localhost:9090`
 - Scrape interval: 1 second
-- Targets: Locust (9646), Envoy proxies, cAdvisor (8081), Node Exporter (9100)
+- Targets: Locust (9646), Traefik (8080), cAdvisor (8080)
 
 ## Control System
 
@@ -185,8 +180,8 @@ Key configuration parameters:
 ## Important Service Endpoints
 
 After stack deployment:
-- Application: `http://localhost:80` (via gateway)
-- Gateway/Envoy Admin: `http://localhost:8080`
+- Application: `http://localhost:80` (via Traefik)
+- Traefik Dashboard: `http://localhost:8080`
 - Prometheus: `http://localhost:9090`
 - Locust Web UI: `http://localhost:8089` (when running)
 - Node Exporter: `http://localhost:9100`
@@ -196,12 +191,6 @@ After stack deployment:
 
 ### Running Tests
 No explicit test framework is configured. The system is primarily tested through load test execution and validation of the Docker stack deployment.
-
-### Code Execution
-The framework uses several execution patterns:
-- **Gevent monkey patching**: Applied globally in base classes for async performance
-- **Prometheus metrics server**: Runs on port 9646 for Locust metrics export
-- **Signal handling**: Graceful shutdown handling for cleanup operations
 
 ### Development Workflow
 1. Modify locust test files or load shapes
@@ -222,18 +211,15 @@ The framework uses several execution patterns:
 **Creating new test scenarios:**
 - Extend `BaseExp` class in `locust_file/base_exp.py`
 - Follow naming convention: `SoyMonoShorterIfLogin_*.py`
-- Include embedded configuration dictionary with `stack_name` and `sysfile` paths
-- Configuration extracted via regex from locust files during runtime
+- Include embedded configuration for stack_name and sysfile
 
 **Modifying load patterns:**
 - Edit files in `locust_file/loadshapes/`
 - Available shapes: constant, cyclical, peak, rampup, step
-- Custom shapes must inherit from `LoadTestShape` and implement `tick()` method
 
 **Scaling configuration:**
 - Modify replica counts in Docker stack files (`sou/monotloth-v5.yml`)
 - Update service configuration in locust test files
-- Control system supports adaptive scaling based on CPU utilization targets
 
 ## Environment Variables
 
@@ -243,11 +229,11 @@ The framework uses several execution patterns:
 ## Important Notes for Development
 
 ### Port Migration
-The system has migrated from direct application endpoints to gateway routing:
+The system has migrated from direct application endpoints to Traefik routing:
 - **Old**: `http://localhost:5001`
 - **New**: `http://localhost:80`
 
-Update all test configurations to use port 80 for proper gateway integration.
+Update all test configurations to use port 80 for proper Traefik integration.
 
 ### Common Issues and Solutions
 
@@ -260,7 +246,7 @@ docker swarm init
 Ensure ports 80, 8080, 9090, 8081, 9100, 9646 are available before starting tests.
 
 **Service discovery issues:**
-Check gateway/Envoy admin interface at `http://localhost:8080` to verify service registration.
+Check Traefik dashboard at `http://localhost:8080` to verify service registration.
 
 **Metrics collection problems:**
 Verify Prometheus targets are healthy at `http://localhost:9090/targets`.
@@ -270,19 +256,9 @@ Verify Prometheus targets are healthy at `http://localhost:9090/targets`.
 **Control System Integration:**
 - Control loop runs automatically during load tests when enabled
 - Uses model predictive control for adaptive resource scaling
-- Replica management via Prometheus/cAdvisor metrics only (no Docker API usage)
+- Integrates with Docker API for service replica management
 
 **Monitoring Architecture:**
-- Prometheus metrics collected from multiple sources (Locust port 9646, Envoy proxies, cAdvisor port 8081)
-- Enhanced monitoring class provides service-specific metric collection methods
-- CSV output includes system, application, and service mesh metrics
-- Gevent-based asynchronous metric collection for performance
-- Strict error handling: RuntimeError raised if metrics are unavailable (no fallback to zero values)
-
-**Key Monitoring Methods (estimator/monitoring.py):**
-- `get_incoming_rps(service_name, stack_name)`: Envoy incoming request rate
-- `get_completed_rps(service_name, stack_name)`: Envoy completed request rate
-- `get_response_time(service_name, stack_name)`: Envoy average response time
-- `get_service_cpu_utilization(service_name, stack_name)`: cAdvisor CPU utilization
-- `get_active_replicas(stack_name, service_name)`: cAdvisor replica count
-- All methods raise RuntimeError if metrics are unavailable
+- Prometheus metrics collected from multiple sources (Locust port 9646, Traefik port 8080, cAdvisor port 8080)
+- Enhanced monitoring class provides Traefik-specific methods
+- CSV output includes both traditional and Traefik metrics

@@ -1,5 +1,0 @@
-services:
-  sudaapp:
-    image: bistrulli/sudaapp:0.01
-    ports:
-      - "80:80"
