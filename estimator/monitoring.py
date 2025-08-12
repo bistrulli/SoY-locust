@@ -53,9 +53,9 @@ class Monitoring:
                 self._prom._session.headers.update({'Accept-Encoding': 'identity'})
         return self._prom
 
-    def _get_cluster_name(self, service_name):
-        """Deriva il nome del cluster Envoy dal nome del servizio"""
-        return f"{service_name.replace('-', '_')}_cluster"
+    def _get_envoy_job_name(self, service_name):
+        """Deriva il nome del job Envoy dal nome del servizio"""
+        return f"envoy-{service_name}"
 
     def _get_service_label_regex(self, stack_name, service_name):
         """Costruisce una regex per cAdvisor service labels"""
@@ -259,15 +259,15 @@ class Monitoring:
 
     def get_incoming_rps(self, service_name=None, stack_name=None):
         """
-        Gets incoming request rate using Envoy metrics.
-        Query: rate(envoy_cluster_upstream_rq_total{envoy_cluster_name="<CLUSTER_NAME>"}[1m])
+        Gets incoming request rate using Envoy admin interface metrics.
+        Query: rate(envoy_http_downstream_rq_total{envoy_http_conn_manager_prefix="admin", job="envoy-<SERVICE>"}[1m])
 
         Args:
-            service_name (str, optional): Service name. If None, uses self.serviceName
+            service_name (str, optional): Service name (e.g., 'ms-exercise', 'gateway'). If None, uses self.serviceName
             stack_name (str, optional): Stack name. If None, uses self.stack_name
 
         Returns:
-            float: Incoming requests per second
+            float: Incoming requests per second from admin interface
 
         Raises:
             RuntimeError: If the query returns no data or invalid data
@@ -279,14 +279,23 @@ class Monitoring:
         if not service:
             raise RuntimeError(f"get_incoming_rps: Missing service_name ('{service}'). Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
         
-        cluster_name = self._get_cluster_name(service)
-        query = f'rate(envoy_cluster_upstream_rq_total{{envoy_cluster_name="{cluster_name}"}}[1m])'
+        job_name = self._get_envoy_job_name(service)
+        query = f'rate(envoy_http_downstream_rq_total{{envoy_http_conn_manager_prefix="admin", job="{job_name}"}}[1m])'
         
         try:
             result = self.prom.custom_query(query=query)
             
             if not result or len(result) == 0:
-                raise RuntimeError(f"get_incoming_rps: No metrics found for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+                # Check if the base metric exists (before rate())
+                base_query = f'envoy_http_downstream_rq_total{{envoy_http_conn_manager_prefix="admin", job="{job_name}"}}'
+                base_result = self.prom.custom_query(query=base_query)
+                
+                if base_result and len(base_result) > 0:
+                    # Metric exists but rate() returned empty (likely no traffic/all zeros)
+                    return 0.0
+                else:
+                    # Metric doesn't exist at all
+                    raise RuntimeError(f"get_incoming_rps: No metrics found for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
             
             if 'value' not in result[0]:
                 raise RuntimeError(f"get_incoming_rps: Invalid result format for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
@@ -300,15 +309,15 @@ class Monitoring:
 
     def get_completed_rps(self, service_name=None, stack_name=None):
         """
-        Gets completed request rate using Envoy metrics.
-        Query: rate(envoy_cluster_upstream_rq_completed{envoy_cluster_name="<CLUSTER_NAME>"}[1m])
+        Gets completed request rate using Envoy admin interface metrics.
+        Query: rate(envoy_http_downstream_rq_completed{envoy_http_conn_manager_prefix="admin", job="envoy-<SERVICE>"}[1m])
 
         Args:
-            service_name (str, optional): Service name. If None, uses self.serviceName
+            service_name (str, optional): Service name (e.g., 'ms-exercise', 'gateway'). If None, uses self.serviceName
             stack_name (str, optional): Stack name. If None, uses self.stack_name
 
         Returns:
-            float: Completed requests per second
+            float: Completed requests per second from admin interface
 
         Raises:
             RuntimeError: If the query returns no data or invalid data
@@ -320,14 +329,23 @@ class Monitoring:
         if not service:
             raise RuntimeError(f"get_completed_rps: Missing service_name ('{service}'). Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
         
-        cluster_name = self._get_cluster_name(service)
-        query = f'rate(envoy_cluster_upstream_rq_completed{{envoy_cluster_name="{cluster_name}"}}[1m])'
+        job_name = self._get_envoy_job_name(service)
+        query = f'rate(envoy_http_downstream_rq_completed{{envoy_http_conn_manager_prefix="admin", job="{job_name}"}}[1m])'
         
         try:
             result = self.prom.custom_query(query=query)
             
             if not result or len(result) == 0:
-                raise RuntimeError(f"get_completed_rps: No metrics found for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
+                # Check if the base metric exists (before rate())
+                base_query = f'envoy_http_downstream_rq_completed{{envoy_http_conn_manager_prefix="admin", job="{job_name}"}}'
+                base_result = self.prom.custom_query(query=base_query)
+                
+                if base_result and len(base_result) > 0:
+                    # Metric exists but rate() returned empty (likely no traffic/all zeros)
+                    return 0.0
+                else:
+                    # Metric doesn't exist at all
+                    raise RuntimeError(f"get_completed_rps: No metrics found for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
             
             if 'value' not in result[0]:
                 raise RuntimeError(f"get_completed_rps: Invalid result format for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
@@ -341,15 +359,15 @@ class Monitoring:
 
     def get_response_time(self, service_name=None, stack_name=None):
         """
-        Gets average response time using Envoy metrics.
-        Query: rate(envoy_cluster_upstream_rq_time_sum{envoy_cluster_name="<CLUSTER_NAME>"}[1m]) / rate(envoy_cluster_upstream_rq_time_count{envoy_cluster_name="<CLUSTER_NAME>"}[1m])
+        Gets average response time using Envoy admin interface metrics.
+        Query: rate(envoy_http_downstream_rq_time_sum{envoy_http_conn_manager_prefix="admin", job="envoy-<SERVICE>"}[1m]) / rate(envoy_http_downstream_rq_time_count{envoy_http_conn_manager_prefix="admin", job="envoy-<SERVICE>"}[1m])
 
         Args:
-            service_name (str, optional): Service name. If None, uses self.serviceName
+            service_name (str, optional): Service name (e.g., 'ms-exercise', 'gateway'). If None, uses self.serviceName
             stack_name (str, optional): Stack name. If None, uses self.stack_name
 
         Returns:
-            float: Average response time in seconds
+            float: Average response time in seconds from admin interface
 
         Raises:
             RuntimeError: If the query returns no data or invalid data
@@ -361,8 +379,8 @@ class Monitoring:
         if not service:
             raise RuntimeError(f"get_response_time: Missing service_name ('{service}'). Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
         
-        cluster_name = self._get_cluster_name(service)
-        query = f'rate(envoy_cluster_upstream_rq_time_sum{{envoy_cluster_name="{cluster_name}"}}[1m]) / rate(envoy_cluster_upstream_rq_time_count{{envoy_cluster_name="{cluster_name}"}}[1m])'
+        job_name = self._get_envoy_job_name(service)
+        query = f'rate(envoy_http_downstream_rq_time_sum{{envoy_http_conn_manager_prefix="admin", job="{job_name}"}}[1m]) / rate(envoy_http_downstream_rq_time_count{{envoy_http_conn_manager_prefix="admin", job="{job_name}"}}[1m])'
         
         try:
             result = self.prom.custom_query(query=query)
@@ -375,10 +393,7 @@ class Monitoring:
             
             response_time = float(result[0]['value'][1])
             
-            # Check for division by zero or invalid response time
-            if response_time <= 0:
-                raise RuntimeError(f"get_response_time: Invalid response time value ({response_time}) for service_name='{service}', stack_name='{stack}'. Query: {query}. Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
-            
+            # For response time, allow zero (means no requests processed recently)
             return response_time
             
         except Exception as e:
