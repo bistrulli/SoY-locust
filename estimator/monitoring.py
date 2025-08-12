@@ -57,9 +57,6 @@ class Monitoring:
         """Deriva il nome del job Envoy dal nome del servizio"""
         return f"envoy-{service_name}"
 
-    def _get_service_label_regex(self, stack_name, service_name):
-        """Costruisce una regex per cAdvisor service labels"""
-        return f"{stack_name}_{service_name}.*"
 
     def tick(self, t):
         self.time += [t]
@@ -236,9 +233,9 @@ class Monitoring:
         if not stack or not service:
             raise RuntimeError(f"get_service_cpu_utilization: Missing stack_name ('{stack}') or service_name ('{service}'). Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
         
-        # Construct the query using the exact format from README-ENVOY.md
-        service_label_regex = self._get_service_label_regex(stack, service)
-        query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_com_docker_swarm_service_name=~"{service_label_regex}"}}[1m]))'
+        # Use exact service name match for CPU utilization
+        full_service_name = f"{stack}_{service}"
+        query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_com_docker_swarm_service_name="{full_service_name}"}}[1m]))'
         
         try:
             result = self.prom.custom_query(query=query)
@@ -404,7 +401,7 @@ class Monitoring:
     def get_active_replicas(self, stack_name, service_name):
         """
         Gets the number of active replicas using cAdvisor metrics.
-        Query: count(container_last_seen{container_label_com_docker_swarm_service_name=~"<STACK>_<SERVICE>.*"})
+        Query: count(container_last_seen{container_label_com_docker_swarm_service_name="<STACK>_<SERVICE>"})
 
         Args:
             stack_name (str): The name of the Docker Swarm stack
@@ -419,8 +416,9 @@ class Monitoring:
         if not stack_name or not service_name:
             raise RuntimeError(f"get_active_replicas: Missing stack_name ('{stack_name}') or service_name ('{service_name}'). Check prometheus/prometheus-envoy.yml and README-ENVOY.md")
         
-        service_label_regex = self._get_service_label_regex(stack_name, service_name)
-        query = f'count(container_last_seen{{container_label_com_docker_swarm_service_name=~"{service_label_regex}"}})'
+        # Use exact service name match, not regex - each replica has same service_name
+        full_service_name = f"{stack_name}_{service_name}"
+        query = f'count(container_last_seen{{container_label_com_docker_swarm_service_name="{full_service_name}"}})'
         
         try:
             result = self.prom.custom_query(query=query)
