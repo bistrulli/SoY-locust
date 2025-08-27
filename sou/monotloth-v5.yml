@@ -3,7 +3,7 @@ version: '3.7'
 services:
   # Gateway application
   gateway:
-    image: icws24submission/gateway_icws24
+    image: registry.gitlab.com/inria-mpl/soy/v5-gw-mod
     security_opt:
       - no-new-privileges:true
     restart: always
