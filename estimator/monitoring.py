@@ -103,12 +103,6 @@ class Monitoring:
         self.active_users += [self.get_active_users()]
         self.memory += [0]
         self.util += [self.get_service_cpu_utilization(stack_name=self.stack_name, service_name=self.serviceName)]
-        
-        # Aggiungi le nuove metriche Traefik
-        self.traefik_incoming += [self.getIncomingRequestsFromTraefik()]
-        self.traefik_completed += [self.getCompletedRequestsFromTraefik()]
-        self.traefik_failed += [self.getFailedRequestsFromTraefik()]
-        self.traefik_response_time += [self.getResponseTimeFromTraefik()]
 
     def getUsers(self):
         # torno il numero di utenti attivi (Little's Law)
@@ -134,45 +128,32 @@ class Monitoring:
 
     def getResponseTime(self):
         """
-        Calcola il tempo di risposta medio del servizio specifico utilizzando Traefik.
+        Calcola il tempo di risposta medio del servizio.
+        NOTA: Le metriche di Nginx exporter non forniscono la latenza. Ritorna 0.
         """
-        try:
-            # Usa Traefik metrics per il servizio specifico (regex su label service)
-            service_sel = f'service=~"{self._service_label_regex()}"'
-            sum_query = f'sum(rate(traefik_service_request_duration_seconds_sum{{{service_sel}}}[30s]))'
-            count_query = f'sum(rate(traefik_service_request_duration_seconds_count{{{service_sel}}}[30s]))'
-            
-            sum_result = self.prom.custom_query(query=sum_query)
-            count_result = self.prom.custom_query(query=count_query)
-            
-            if sum_result and count_result and len(sum_result) > 0 and len(count_result) > 0:
-                latency_sum = float(sum_result[0]['value'][1])
-                latency_count = float(count_result[0]['value'][1])
-                return latency_sum / latency_count if latency_count > 0 else 0
-            else:
-                return 0
-        except Exception as e:
-            logger.error("%s Error querying Traefik RT for service %s: %s", self.service_prefix, self.serviceName, e)
-            return 0
+        # Il nginx-prometheus-exporter di base non espone metriche di latenza.
+        # Per una stima, bisognerebbe usare i log di Nginx o instrumentazione applicativa.
+        logger.debug("%s Nginx exporter does not provide response time. Returning 0.", self.service_prefix)
+        return 0
 
     def getTroughput(self):
         """
-        Calcola il throughput del servizio specifico utilizzando Traefik.
+        Calcola il throughput del servizio specifico utilizzando le metriche di Nginx.
         """
         try:
-            service_sel = f'service=~"{self._service_label_regex()}"'
-            query = f'sum(rate(traefik_service_requests_total{{{service_sel}}}[30s]))'
+            # Usa le metriche di Nginx per il servizio specifico (label 'service')
+            service_sel = f'service="{self.serviceName}"'
+            query = f'sum(rate(nginx_http_requests_total{{{service_sel}}}[30s]))'
             result = self.prom.custom_query(query=query)
             if result and len(result) > 0 and 'value' in result[0]:
                 return float(result[0]['value'][1])
-            # DEBUG: Prova query senza filtro per vedere se ci sono metriche
-            debug_query = 'traefik_service_requests_total'
-            debug_result = self.prom.custom_query(query=debug_query)
-            logger.warning("%s No Traefik data found for service %s. Available services: %s", 
-                          self.service_prefix, self.serviceName, debug_result)
+            
+            # DEBUG: Se non ci sono dati, registra un avviso.
+            logger.warning("%s No Nginx throughput data found for service %s.", 
+                          self.service_prefix, self.serviceName)
             return 0
         except Exception as e:
-            logger.error("%s Error querying Traefik throughput for service %s: %s", self.service_prefix, self.serviceName, e)
+            logger.error("%s Error querying Nginx throughput for service %s: %s", self.service_prefix, self.serviceName, e)
             return 0
 
     def get_replicas(self, stack_name, service_name):
@@ -333,12 +314,6 @@ class Monitoring:
         self.last_requests = None
         self.last_timestamp = None
         self.active_users = []
-        
-        # Aggiungi le nuove liste per Traefik
-        self.traefik_incoming = []
-        self.traefik_completed = []
-        self.traefik_failed = []
-        self.traefik_response_time = []
 
     def save_to_csv(self, filename):
         path = Path(filename)
@@ -354,17 +329,13 @@ class Monitoring:
             "ready_replica": len(self.ready_replica),
             "util": len(self.util),
             "mem": len(self.memory),
-            "traefik_incoming": len(self.traefik_incoming),
-            "traefik_completed": len(self.traefik_completed),
-            "traefik_failed": len(self.traefik_failed),
-            "traefik_response_time": len(self.traefik_response_time)
         }
 
         logger.info("%s Saving results", self.service_prefix)
         logger.info("%s Array lengths: %s", self.service_prefix, lengths)
 
         # Trovo la lunghezza minima comune
-        min_length = min(lengths.values())
+        min_length = min(lengths.values()) if lengths else 0
 
         # Creo un dizionario di dati
         data = {
@@ -376,10 +347,6 @@ class Monitoring:
             "ready_replica": self.ready_replica[:min_length],
             "util": self.util[:min_length],
             "mem": self.memory[:min_length],
-            "traefik_incoming": self.traefik_incoming[:min_length],
-            "traefik_completed": self.traefik_completed[:min_length],
-            "traefik_failed": self.traefik_failed[:min_length],
-            "traefik_response_time": self.traefik_response_time[:min_length]
         }
 
         try:
@@ -450,115 +417,6 @@ class Monitoring:
             logger.error("%s CPU Error details: %s", self.service_prefix, str(e))
             logger.error("CPU Error type: %s", type(e))
             return 0.0
-
-    def getIncomingRequestsFromTraefik(self):
-        """
-        Recupera il numero di richieste in ingresso tramite Traefik per il servizio specifico.
-        
-        Returns:
-            float: Numero di richieste in ingresso al secondo per questo servizio
-        """
-        try:
-            service_sel = f'service=~"{self._service_label_regex()}"'
-            query = f'sum(rate(traefik_service_requests_total{{{service_sel}}}[30s]))'
-            result = self.prom.custom_query(query=query)
-            
-            if result and len(result) > 0 and 'value' in result[0]:
-                return float(result[0]['value'][1])
-            return 0
-        except Exception as e:
-            logger.error("%s Error querying Traefik incoming requests for service %s: %s", self.service_prefix, self.serviceName, e)
-            return 0
-
-    def getCompletedRequestsFromTraefik(self):
-        """
-        Recupera il numero di richieste completate con successo tramite Traefik per il servizio specifico.
-        
-        Returns:
-            float: Numero di richieste completate al secondo per questo servizio
-        """
-        try:
-            service_sel = f'service=~"{self._service_label_regex()}"'
-            query = f'sum(rate(traefik_service_requests_total{{{service_sel},code=~"2..|3.."}}[30s]))'
-            result = self.prom.custom_query(query=query)
-            
-            if result and len(result) > 0 and 'value' in result[0]:
-                return float(result[0]['value'][1])
-            return 0
-        except Exception as e:
-            logger.error("%s Error querying Traefik completed requests for service %s: %s", self.service_prefix, self.serviceName, e)
-            return 0
-
-    def getFailedRequestsFromTraefik(self):
-        """
-        Recupera il numero di richieste fallite tramite Traefik per il servizio specifico.
-        
-        Returns:
-            float: Numero di richieste fallite al secondo per questo servizio
-        """
-        try:
-            service_sel = f'service=~"{self._service_label_regex()}"'
-            query = f'sum(rate(traefik_service_requests_total{{{service_sel},code=~"4..|5.."}}[30s]))'
-            result = self.prom.custom_query(query=query)
-            
-            if result and len(result) > 0 and 'value' in result[0]:
-                return float(result[0]['value'][1])
-            return 0
-        except Exception as e:
-            logger.error("%s Error querying Traefik failed requests for service %s: %s", self.service_prefix, self.serviceName, e)
-            return 0
-
-    def getResponseTimeFromTraefik(self):
-        """
-        Recupera il tempo di risposta medio tramite Traefik per il servizio specifico.
-        
-        Returns:
-            float: Tempo di risposta medio in secondi per questo servizio
-        """
-        try:
-            service_sel = f'service=~"{self._service_label_regex()}"'
-            query = f'sum(rate(traefik_service_request_duration_seconds_sum{{{service_sel}}}[30s])) / sum(rate(traefik_service_request_duration_seconds_count{{{service_sel}}}[30s]))'
-            result = self.prom.custom_query(query=query)
-            
-            if result and len(result) > 0 and 'value' in result[0]:
-                return float(result[0]['value'][1])
-            return 0
-        except Exception as e:
-            logger.error("%s Error querying Traefik response time for service %s: %s", self.service_prefix, self.serviceName, e)
-            return 0
-
-    def getRequestsByService(self, service_name):
-        """
-        Recupera le metriche per un servizio specifico.
-        
-        Args:
-            service_name (str): Nome del servizio (es. 'gateway')
-        
-        Returns:
-            dict: Dizionario con metriche del servizio
-        """
-        try:
-            metrics = {}
-            
-            # Richieste totali per servizio
-            query = f'sum(rate(traefik_service_requests_total{{service="{service_name}"}}[30s]))'
-            result = self.prom.custom_query(query=query)
-            metrics['total_requests'] = float(result[0]['value'][1]) if result and len(result) > 0 else 0
-            
-            # Richieste completate per servizio
-            query = f'sum(rate(traefik_service_requests_total{{service="{service_name}",code=~"2..|3.."}}[30s]))'
-            result = self.prom.custom_query(query=query)
-            metrics['completed_requests'] = float(result[0]['value'][1]) if result and len(result) > 0 else 0
-            
-            # Tempo di risposta per servizio
-            query = f'sum(rate(traefik_service_request_duration_seconds_sum{{service="{service_name}"}}[30s])) / sum(rate(traefik_service_request_duration_seconds_count{{service="{service_name}"}}[30s]))'
-            result = self.prom.custom_query(query=query)
-            metrics['response_time'] = float(result[0]['value'][1]) if result and len(result) > 0 else 0
-            
-            return metrics
-        except Exception as e:
-            logger.error("Error querying Traefik metrics for service %s: %s", service_name, e)
-            return {'total_requests': 0, 'completed_requests': 0, 'response_time': 0}
 
     def predict_users(self, horizon=1):
         """
