@@ -366,10 +366,10 @@ class Monitoring:
             result = self.prom.custom_query(query=query)
             if result and 'value' in result[0]:
                 return float(result[0]['value'][1])
-            return None
+            return 0.0
         except Exception as e:
             logger.error("%s Error fetching active users metric from Prometheus: %s", self.service_prefix, e)
-            return None
+            return 0.0
 
     def get_service_cpu_utilization(self, service_name=None, stack_name=None):
         """
