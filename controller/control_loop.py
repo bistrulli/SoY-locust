@@ -196,7 +196,8 @@ class ControlLoop():
                         promPort=self.config["prometheus"]["port"],
                         sysfile=self.config["sysfile"],
                           remote=self.config["remote"],
-                          remote_docker_port=self.config["remote_docker_port"],)
+                          remote_docker_port=self.config["remote_docker_port"],
+                          disable_prometheus=self.config.get("disable_prometheus", False))
 
     def getEstimator(self):
         '''

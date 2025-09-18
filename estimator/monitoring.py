@@ -31,7 +31,8 @@ def _get_service_prefix(service_name, stack_name):
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x) / len(x),
                  serviceName="", stack_name="", promHost="localhost",
-                 promPort=9090, sysfile="", has_health_check=False, remote=None, remote_docker_port=None):
+                 promPort=9090, sysfile="", has_health_check=False, remote=None, remote_docker_port=None,
+                 disable_prometheus=False):
         self.reducer = reducer
         self.window = window
         self.sla = sla
@@ -44,6 +45,7 @@ class Monitoring:
         self.remote = remote
         self.remote_docker_port = remote_docker_port
         self.has_health_check = has_health_check
+        self.disable_prometheus = disable_prometheus
         
         # Lazy initialization - non creare client nel __init__ per evitare fork issues
         self._client = None
@@ -190,6 +192,10 @@ class Monitoring:
         Calcola il tempo di risposta medio del servizio utilizzando nginx-vts metrics.
         Ritorna il response time in secondi basato su rate degli ultimi 30s.
         """
+        if self.disable_prometheus:
+            logger.debug("%s Prometheus disabled - returning mock response time", self.service_prefix)
+            return 0.1  # Mock response time
+            
         try:
             # Query per numeratore: tempo totale speso nelle richieste
             time_query = f'rate(nginx_vts_server_request_seconds_total{{service="{self.serviceName}",host="localhost"}}[30s])'
@@ -229,6 +235,10 @@ class Monitoring:
         Calcola il throughput del servizio specifico utilizzando le metriche nginx-vts.
         Ritorna il numero di richieste di successo (2xx) per secondo negli ultimi 30s.
         """
+        if self.disable_prometheus:
+            logger.debug("%s Prometheus disabled - returning mock throughput", self.service_prefix)
+            return 5.0  # Mock throughput
+            
         try:
             # Usa nginx-vts per richieste di successo (2xx) per il servizio specifico
             query = f'rate(nginx_vts_server_requests_total{{service="{self.serviceName}",code="2xx",host="localhost"}}[30s])'
@@ -482,6 +492,10 @@ class Monitoring:
         Recupera il valore attuale del Gauge 'locust_active_users' tramite una query a Prometheus.
         Assicurati che il job che espone questo metric sia correttamente configurato in Prometheus.
         """
+        if self.disable_prometheus:
+            logger.debug("%s Prometheus disabled - returning mock active users", self.service_prefix)
+            return 2.0  # Mock active users
+            
         try:
             query = 'locust_active_users'
             result = self.prom.custom_query(query=query)
@@ -504,6 +518,10 @@ class Monitoring:
         Returns:
             float: The total CPU utilization as an absolute value (CPU seconds per second)
         """
+        if self.disable_prometheus:
+            logger.debug("%s Prometheus disabled - returning mock CPU utilization", self.service_prefix)
+            return 0.5  # Mock CPU utilization
+            
         try:
             service = service_name if service_name is not None else self.serviceName
             logger.debug("CPU Input parameters - service_name: '%s'", service)
