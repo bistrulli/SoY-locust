@@ -1,6 +1,7 @@
 # IMPORTANTE: Monkey patch PRIMA di qualsiasi altro import
+# Monkey patch selettivo per evitare conflitti con Docker client threads
 import gevent.monkey
-gevent.monkey.patch_all()
+gevent.monkey.patch_all(thread=False, ssl=False)
 
 from locust import HttpUser, task, between
 from locust import events
@@ -79,14 +80,22 @@ gateway_conf={ "service_name": "gateway",
            "remote_docker_port":None
          } 
 
-#Qui la logica di avvio del control loop specifica per ogni locus file
-ctrlLoop_ms_exercise=ControlLoop(config=ms_exercise_conf)
-ctrlLoop_ms_other=ControlLoop(config=ms_other_conf)
-ctrlLoop_gateway=ControlLoop(config=gateway_conf)
+# Variabili globali per ControlLoop (inizializzate DOPO fork per evitare conflitti gevent)
+ctrlLoop_ms_exercise = None
+ctrlLoop_ms_other = None
+ctrlLoop_gateway = None
 
 @events.test_start.add_listener
 def on_locust_start(environment, **_kwargs):
+    global ctrlLoop_ms_exercise, ctrlLoop_ms_other, ctrlLoop_gateway
+    
     if not isinstance(environment.runner, WorkerRunner):
+        # Inizializza i ControlLoop DOPO il fork per evitare conflitti gevent/threading
+        ctrlLoop_ms_exercise = ControlLoop(config=ms_exercise_conf)
+        ctrlLoop_ms_other = ControlLoop(config=ms_other_conf)
+        ctrlLoop_gateway = ControlLoop(config=gateway_conf)
+        
+        # Avvia i loop di controllo
         gevent.spawn(ctrlLoop_ms_exercise.loop, environment)
         gevent.spawn(ctrlLoop_ms_other.loop, environment)
         gevent.spawn(ctrlLoop_gateway.loop, environment)
@@ -94,9 +103,14 @@ def on_locust_start(environment, **_kwargs):
 @events.test_stop.add_listener
 def on_locust_stop(environment, **_kwargs):
     global ctrlLoop_ms_exercise, ctrlLoop_ms_other, ctrlLoop_gateway
-    ctrlLoop_ms_exercise.saveResults()
-    ctrlLoop_ms_other.saveResults()
-    ctrlLoop_gateway.saveResults()
+    
+    # Verifica che i ControlLoop siano stati inizializzati prima di chiamare saveResults
+    if ctrlLoop_ms_exercise is not None:
+        ctrlLoop_ms_exercise.saveResults()
+    if ctrlLoop_ms_other is not None:
+        ctrlLoop_ms_other.saveResults()
+    if ctrlLoop_gateway is not None:
+        ctrlLoop_gateway.saveResults()
 
 class SoyMonoUser(BaseExp):
 
