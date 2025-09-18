@@ -157,6 +157,7 @@ class Monitoring:
         self.time += [t]
         self.rts += [self.getResponseTime()]
         self.tr += [self.getTroughput()]
+        self.arrival_rate += [self.getArrivalRate()]  # Nuovo: arrival rate per queuing model
         self.cores += [self.getCores()]
         self.replica += [self.get_replicas(self.stack_name, self.serviceName)]
         self.ready_replica += [self.get_ready_replicas(self.stack_name, self.serviceName)]
@@ -227,6 +228,34 @@ class Monitoring:
                 
         except Exception as e:
             logger.error("%s VTS Error calculating response time for service %s: %s", 
+                        self.service_prefix, self.serviceName, e)
+            return 0
+
+    def getArrivalRate(self):
+        """
+        Calcola l'arrival rate del servizio specifico utilizzando le metriche nginx-vts.
+        Ritorna il numero totale di richieste in arrivo per secondo negli ultimi 30s.
+        """
+        if self.disable_prometheus:
+            logger.debug("%s Prometheus disabled - returning mock arrival rate", self.service_prefix)
+            return 6.0  # Mock arrival rate
+            
+        try:
+            # Usa nginx-vts per tutte le richieste in arrivo (totali) per il servizio specifico
+            query = f'rate(nginx_vts_server_requests_total{{service="{self.serviceName}",code="total",host="localhost"}}[30s])'
+            result = self.prom.custom_query(query=query)
+            
+            if result and len(result) > 0 and 'value' in result[0]:
+                arrival_rate = float(result[0]['value'][1])
+                logger.debug("%s VTS Arrival rate calculated: %s req/s", self.service_prefix, arrival_rate)
+                return arrival_rate
+            
+            logger.warning("%s VTS No arrival rate data found for service %s", 
+                          self.service_prefix, self.serviceName)
+            return 0
+            
+        except Exception as e:
+            logger.error("%s VTS Error querying arrival rate for service %s: %s", 
                         self.service_prefix, self.serviceName, e)
             return 0
 
@@ -436,6 +465,7 @@ class Monitoring:
         self.cores = []
         self.rts = []
         self.tr = []
+        self.arrival_rate = []  # Nuovo: storico arrival rate
         self.users = []
         self.time = []
         self.replica = []
@@ -455,6 +485,7 @@ class Monitoring:
             "cores": len(self.cores),
             "rts": len(self.rts),
             "tr": len(self.tr),
+            "arrival_rate": len(self.arrival_rate),
             "users": len(self.active_users),
             "replica": len(self.replica),
             "ready_replica": len(self.ready_replica),
@@ -473,6 +504,7 @@ class Monitoring:
             "cores": self.cores[:min_length],
             "rts": self.rts[:min_length],
             "tr": self.tr[:min_length],
+            "arrival_rate": self.arrival_rate[:min_length],
             "users": self.active_users[:min_length],
             "replica": self.replica[:min_length],
             "ready_replica": self.ready_replica[:min_length],
@@ -594,6 +626,57 @@ class Monitoring:
         predicted_users = max(0, recent_users[-1] + avg_gradient * prediction_dt)
 
         return predicted_users
+
+    def predict_arrival_rate(self, horizon=1):
+        """
+        Predice l'arrival rate futuro basandosi sul gradiente medio degli ultimi 5 step.
+        Modella ogni servizio come un queuing center aperto con arrival rate variabile.
+
+        Args:
+            horizon (int): Numero di step nel futuro per la predizione (default: 1)
+
+        Returns:
+            float: Arrival rate predetto dopo 'horizon' step (richieste/secondo)
+        """
+        # Filtra i valori None/zero dalla lista degli arrival rate
+        valid_data = [(t, ar) for t, ar in zip(self.time, self.arrival_rate) if ar is not None and ar > 0]
+
+        if len(valid_data) < 5:
+            # Se non abbiamo abbastanza dati validi, ritorna l'ultimo valore valido o 0
+            return valid_data[-1][1] if valid_data else 0
+        else:
+            logger.debug("%s Arrival rate valid data: %s", self.service_prefix, valid_data[-5:])
+
+        # Prendi gli ultimi 5 valori validi
+        recent_data = valid_data[-5:]
+        recent_times = [t for t, _ in recent_data]
+        recent_arrival_rates = [ar for _, ar in recent_data]
+
+        # Calcola i gradienti per ogni coppia di punti consecutivi
+        gradients = []
+        for i in range(1, len(recent_arrival_rates)):
+            dt = recent_times[i] - recent_times[i - 1]
+            if dt > 0:  # Evita divisione per zero
+                gradient = (recent_arrival_rates[i] - recent_arrival_rates[i - 1]) / dt
+                gradients.append(gradient)
+
+        if not gradients:
+            return recent_arrival_rates[-1]  # Ritorna l'ultimo valore se non possiamo calcolare gradienti
+
+        # Calcola il gradiente medio
+        avg_gradient = sum(gradients) / len(gradients)
+
+        # Stima il tempo per l'orizzonte di predizione (assumendo step costanti)
+        avg_dt = (recent_times[-1] - recent_times[-2])
+        prediction_dt = avg_dt * horizon
+
+        # Predici l'arrival rate (non può essere negativo)
+        predicted_arrival_rate = max(0, recent_arrival_rates[-1] + avg_gradient * prediction_dt)
+
+        logger.debug("%s Predicted arrival rate: %.4f req/s (horizon=%d, gradient=%.4f)", 
+                    self.service_prefix, predicted_arrival_rate, horizon, avg_gradient)
+
+        return predicted_arrival_rate
 
     def __str__(self):
         return f"Monitoring(window={self.window}, sla={self.sla})"

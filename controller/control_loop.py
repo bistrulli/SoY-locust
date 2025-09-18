@@ -70,22 +70,23 @@ class ControlLoop():
                 logger.info("%s ━━━ TICK %d (t=%.2f) ━━━", self.service_prefix, self.ctrlTick, t)
 
                 # Verifica che tutte le liste abbiano almeno un elemento prima di accedervi
-                if (len(self.monitor.rts) > 0 and len(self.monitor.tr) > 0 and
+                if (len(self.monitor.rts) > 0 and len(self.monitor.tr) > 0 and len(self.monitor.arrival_rate) > 0 and
                     len(self.monitor.replica) > 0 and len(self.monitor.ready_replica) > 0 and
                     len(self.monitor.cores) > 0 and len(self.monitor.users) > 0 and
                     len(self.monitor.active_users) > 0 and len(self.monitor.util) > 0):
 
-                    # Stampa formattata in più righe
+                    # Stampa formattata in più righe con nuovo modello arrival rate
                     logger.info("%s  ├─ Response Time:  %.4f", self.service_prefix, self.monitor.rts[-1])
                     logger.info("%s  ├─ Throughput:     %.4f", self.service_prefix, self.monitor.tr[-1])
+                    logger.info("%s  ├─ Arrival Rate:   %.4f", self.service_prefix, self.monitor.arrival_rate[-1])
+                    logger.info("%s  ├─ Arrival (Pred): %.4f", self.service_prefix, self.monitor.predict_arrival_rate(horizon=self.prediction_horizon))
                     logger.info("%s  ├─ Replicas:       %s", self.service_prefix, self.monitor.replica[-1])
                     logger.info("%s  ├─ Ready Replicas: %s", self.service_prefix, self.monitor.ready_replica[-1])
                     logger.info("%s  ├─ Cores:          %.2f", self.service_prefix, self.monitor.cores[-1])
-                    logger.info("%s  ├─ WIP:            %.2f", self.service_prefix, self.monitor.users[-1])
+                    logger.info("%s  ├─ WIP (Little):   %.2f", self.service_prefix, self.monitor.users[-1])
                     logger.info("%s  ├─ WIP (Prom):     %.2f", self.service_prefix, self.monitor.active_users[-1])
-                    logger.info("%s  ├─ WIP (Pred):     %.2f", self.service_prefix, self.monitor.predict_users(horizon=self.prediction_horizon))
-                    logger.info("%s  ├─ Utilization:   %.4f", self.service_prefix, self.monitor.util[-1])
-                    logger.info("%s  └─ Memory:         %s", self.service_prefix, self.monitor.memory[-1])  # Corretto: memory invece di util
+                    logger.info("%s  ├─ Utilization:    %.4f", self.service_prefix, self.monitor.util[-1])
+                    logger.info("%s  └─ Memory:         %s", self.service_prefix, self.monitor.memory[-1])
                 else:
                     logger.warning("%s ⚠️  Monitor data not ready (cycle %d)", self.service_prefix, self.ctrlTick)
             except Exception as e:
@@ -108,11 +109,16 @@ class ControlLoop():
                 logger.info("%s  → Service Time: %.4f (stealth=%s)", self.service_prefix, self.stime, stealth)
 
             if((self.ctrlTick%self.config["control_widow"]==0) and self.stime is not None and self.stime>0):
-                wip=self.monitor.predict_users(horizon=self.prediction_horizon)
+                # NUOVO: Usa arrival rate predetto per queuing model invece di WIP utenti
+                predicted_arrival_rate = self.monitor.predict_arrival_rate(horizon=self.prediction_horizon)
+                
                 if(not self.config["stealth"]):
-                    replicas=self.controller.OPTController(e=[self.stime], tgt=[self.config["target_utilization"]], C=[float(wip)])
+                    # Passa arrival rate predetto al controller (temporaneamente uso il parametro C)
+                    # TODO: aggiornare controller per supportare esplicitamente arrival rate
+                    replicas=self.controller.OPTController(e=[self.stime], tgt=[self.config["target_utilization"]], C=[float(predicted_arrival_rate)])
                     self.addSuggestion(np.round(replicas))
-                    logger.info("%s  → Control Action: %.0f replicas", self.service_prefix, np.round(replicas))
+                    logger.info("%s  → Control Action: %.0f replicas (λ_pred=%.4f)", 
+                              self.service_prefix, np.round(replicas), predicted_arrival_rate)
                     self.actuate(np.round(replicas))
 
             time.sleep(timeparse(self.config["measurament_period"]))
