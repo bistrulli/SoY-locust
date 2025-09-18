@@ -27,10 +27,10 @@ class ControlLoop():
         self.stime=None
         self.ctrlTick=0
         self.prediction_horizon=config["prediction_horizon"]
-        if config["remote"] is not None and config["remote_docker_port"] is not None:
-            self.client = docker.DockerClient(base_url='tcp://'+config["remote"]+":"+str(config["remote_docker_port"]))
-        else:
-            self.client = docker.from_env()
+        
+        # Lazy initialization - no Docker client created in __init__
+        # This prevents fork issues with gevent threading
+        self._client = None
 
         self.estimator = None
         self.controller = None
@@ -38,6 +38,21 @@ class ControlLoop():
 
         self.cooldown = 3
         self.suggestion = []
+
+    @property  
+    def client(self):
+        """
+        Lazy initialization del Docker client per evitare problemi di fork con gevent.
+        Il client viene creato solo quando effettivamente necessario, dopo il fork di Locust.
+        """
+        if self._client is None:
+            logger.debug("%s Initializing Docker client (lazy)", self.service_prefix)
+            if self.config["remote"] is not None and self.config["remote_docker_port"] is not None:
+                self._client = docker.DockerClient(base_url='tcp://'+self.config["remote"]+":"+str(self.config["remote_docker_port"]))
+            else:
+                self._client = docker.from_env()
+            logger.debug("%s Docker client initialized successfully", self.service_prefix)
+        return self._client
 
     '''TODO: devo ristrutturare il condice in modo tale che le misure
             vengano prese ogni secondo, la stima fatta ogni n tick e il controllo ogni m tick
@@ -136,7 +151,7 @@ class ControlLoop():
             full_service_name = f"{self.config['stack_name']}_{self.config['service_name']}"
 
             # Get the service
-            service = self.docker_client.services.get(full_service_name)
+            service = self.client.services.get(full_service_name)
 
             # Get current number of replicas from Docker service
             current_replicas = service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 1)
@@ -198,9 +213,9 @@ class ControlLoop():
             # Construct full service name
             full_service_name = f"{self.config['stack_name']}_{self.config['service_name']}"
             logger.debug("%s Scaling '%s' to %d replicas", self.service_prefix, full_service_name, int(replicas))
-            logger.debug("%s Available services: %s", self.service_prefix, [service.name for service in self.docker_client.services.list()])
+            logger.debug("%s Available services: %s", self.service_prefix, [service.name for service in self.client.services.list()])
 
-            service = self.docker_client.services.get(full_service_name)
+            service = self.client.services.get(full_service_name)
             logger.debug("%s Found service: %s", self.service_prefix, service.name)
 
             # Ottieni il numero attuale di repliche
