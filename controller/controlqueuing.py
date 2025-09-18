@@ -4,6 +4,7 @@ import time
 import os
 import logging
 import traceback
+import math
 
 # Configure logging for this module
 logger = logging.getLogger(__name__)
@@ -156,6 +157,94 @@ class OPTCTRL():
             import traceback
             logger.error("Traceback: %s", traceback.format_exc())
             return self.init_cores
+
+
+class OpenClassCTRL:
+    """
+    Controllore per queuing centers aperti basato su teoria delle code.
+    Ogni servizio è modellato come M/M/S queue con:
+    - λ (arrival rate) misurato da nginx-vts  
+    - μ (service rate) = 1/service_time stimato
+    - S (repliche) calcolato per mantenere utilizzo target
+    
+    Formula: S = ceil(λ * service_time / target_utilization)
+    """
+    
+    def __init__(self, min_replicas=1, max_replicas=16):
+        """
+        Inizializza il controllore per queuing center aperto.
+        
+        Args:
+            min_replicas (int): Numero minimo di repliche
+            max_replicas (int): Numero massimo di repliche
+        """
+        self.min_replicas = min_replicas
+        self.max_replicas = max_replicas
+        logger.debug("OpenClassCTRL initialized: min=%d, max=%d", min_replicas, max_replicas)
+    
+    def calculate_replicas(self, arrival_rate, service_time, target_utilization):
+        """
+        Calcola il numero ottimo di repliche per queuing center aperto.
+        
+        Modello: M/M/S queue
+        - λ: arrival rate (req/sec)
+        - μ: service rate per replica = 1/service_time (req/sec/replica)  
+        - ρ: utilizzo per replica = λ/(μ*S) = λ*service_time/S
+        - Stabilità: ρ < 1 → λ < μ*S
+        
+        Formula ottima: S = ceil(λ * service_time / target_utilization)
+        
+        Args:
+            arrival_rate (float): Arrival rate predetto (richieste/secondo)
+            service_time (float): Service time stimato (secondi/richiesta)
+            target_utilization (float): Utilizzo target per replica (0.0-1.0)
+        
+        Returns:
+            int: Numero ottimo di repliche
+        """
+        try:
+            # Validazione input
+            if arrival_rate <= 0:
+                logger.debug("Arrival rate <= 0, returning min replicas")
+                return self.min_replicas
+                
+            if service_time <= 0:
+                logger.warning("Service time <= 0 (%.4f), returning min replicas", service_time)
+                return self.min_replicas
+                
+            if target_utilization <= 0 or target_utilization >= 1:
+                logger.warning("Invalid target utilization %.4f, using 0.8", target_utilization)
+                target_utilization = 0.8
+            
+            # Formula queuing theory: S = ceil(λ * service_time / target_utilization)
+            optimal_replicas_float = (arrival_rate * service_time) / target_utilization
+            optimal_replicas = math.ceil(optimal_replicas_float)
+            
+            # Applica bounds
+            bounded_replicas = max(self.min_replicas, min(optimal_replicas, self.max_replicas))
+            
+            # Calcola utilizzo effettivo con repliche scelte
+            actual_utilization = (arrival_rate * service_time) / bounded_replicas
+            service_rate_per_replica = 1.0 / service_time
+            total_service_rate = service_rate_per_replica * bounded_replicas
+            
+            logger.debug("OpenClass: λ=%.4f, μ=%.4f, service_time=%.4f, tgt_util=%.3f", 
+                        arrival_rate, service_rate_per_replica, service_time, target_utilization)
+            logger.debug("OpenClass: optimal_float=%.2f → ceil=%d → bounded=%d", 
+                        optimal_replicas_float, optimal_replicas, bounded_replicas)
+            logger.debug("OpenClass: actual_util=%.3f, stability=%.3f (λ/total_μ)", 
+                        actual_utilization, arrival_rate/total_service_rate)
+            
+            return bounded_replicas
+            
+        except Exception as e:
+            logger.error("Error in OpenClassCTRL: %s", str(e))
+            logger.error("Params: λ=%.4f, service_time=%.4f, tgt=%.3f", 
+                        arrival_rate, service_time, target_utilization)
+            return self.min_replicas
+    
+    def __str__(self):
+        return f"OpenClassCTRL(min={self.min_replicas}, max={self.max_replicas})"
 
     def __str__(self):
         return super().__str__() + " OPTCTRL: %.2f, l: %.2f h: %.2f " % (self.step, self.l, self.h)

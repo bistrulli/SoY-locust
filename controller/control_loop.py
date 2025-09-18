@@ -1,6 +1,6 @@
 from estimator import QNEstimaator
 from estimator import Monitoring
-from controller import OPTCTRL
+from controller import OPTCTRL, OpenClassCTRL
 import time
 import numpy as np
 from pytimeparse.timeparse import timeparse
@@ -109,17 +109,21 @@ class ControlLoop():
                 logger.info("%s  → Service Time: %.4f (stealth=%s)", self.service_prefix, self.stime, stealth)
 
             if((self.ctrlTick%self.config["control_widow"]==0) and self.stime is not None and self.stime>0):
-                # NUOVO: Usa arrival rate predetto per queuing model invece di WIP utenti
+                # NUOVO: Usa OpenClassCTRL con arrival rate predetto e service time stimato
                 predicted_arrival_rate = self.monitor.predict_arrival_rate(horizon=self.prediction_horizon)
                 
                 if(not self.config["stealth"]):
-                    # Passa arrival rate predetto al controller (temporaneamente uso il parametro C)
-                    # TODO: aggiornare controller per supportare esplicitamente arrival rate
-                    replicas=self.controller.OPTController(e=[self.stime], tgt=[self.config["target_utilization"]], C=[float(predicted_arrival_rate)])
-                    self.addSuggestion(np.round(replicas))
-                    logger.info("%s  → Control Action: %.0f replicas (λ_pred=%.4f)", 
-                              self.service_prefix, np.round(replicas), predicted_arrival_rate)
-                    self.actuate(np.round(replicas))
+                    # Usa nuovo controllore queuing theory con parametri espliciti
+                    replicas = self.controller.calculate_replicas(
+                        arrival_rate=predicted_arrival_rate,
+                        service_time=self.stime,
+                        target_utilization=self.config["target_utilization"]
+                    )
+                    
+                    self.addSuggestion(replicas)
+                    logger.info("%s  → Control Action: %d replicas (λ_pred=%.4f, stime=%.4f, tgt=%.2f)", 
+                              self.service_prefix, replicas, predicted_arrival_rate, self.stime, self.config["target_utilization"])
+                    self.actuate(replicas)
 
             time.sleep(timeparse(self.config["measurament_period"]))
             self.ctrlTick+=1
@@ -176,9 +180,10 @@ class ControlLoop():
     ###Il giusto monitoring e il giusto stimatore
     def getController(self):
         '''
-            TODO: parse config
+        Crea il controllore appropriato basato su queuing theory per open class systems.
+        Usa OpenClassCTRL che implementa la formula S = ceil(λ * service_time / target_utilization).
         '''
-        return OPTCTRL(init_cores=1, min_cores=0.1, max_cores=16, st=0.8)
+        return OpenClassCTRL(min_replicas=1, max_replicas=16)
 
     def getSimTime(self,environment):
          # Ottieni il tempo corrente.

@@ -12,9 +12,9 @@ import gevent
 
 cwd=Path(__file__).parent
 
-exp_conf={ "service_name": "node",
+exp_conf={ "service_name": "gateway",  # Aggiornato per nginx-vts con service specifico
            "stack_name": "ms-stack-v5",
-           "sysfile": cwd.parent/"sou"/"monotloth-v4.yml",
+           "sysfile": cwd.parent/"sou"/"monotloth-v5.yml",  # Aggiornato per nginx-vts
            "control_widow": 1,
            "estimation_window": 10,
            "measurament_period":"1s",
