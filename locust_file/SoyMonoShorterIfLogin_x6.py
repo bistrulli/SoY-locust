@@ -27,7 +27,7 @@ ms_exercise_conf={ "service_name": "ms-exercise",
            "init_repica":6,
            "prediction_horizon":10,
            "target_utilization":0.2,
-           "disable_prometheus": True,  # TEMPORANEO: disabilita Prometheus per test gevent
+           "disable_prometheus": False,  # Prometheus riattivato - errore gevent è altrove
            "prometheus":{
                "host":"127.0.0.1",
                "port":9090
@@ -49,7 +49,7 @@ ms_other_conf={ "service_name": "ms-other",
            "init_repica":6,
            "prediction_horizon":10,
            "target_utilization":0.2,
-           "disable_prometheus": True,  # TEMPORANEO: disabilita Prometheus per test gevent
+           "disable_prometheus": False,  # Prometheus riattivato - errore gevent è altrove
            "prometheus":{
                "host":"127.0.0.1",
                "port":9090
@@ -71,7 +71,7 @@ gateway_conf={ "service_name": "gateway",
            "init_repica":6,
            "prediction_horizon":10,
            "target_utilization":0.2,
-           "disable_prometheus": True,  # TEMPORANEO: disabilita Prometheus per test gevent
+           "disable_prometheus": False,  # Prometheus riattivato - errore gevent è altrove
            "prometheus":{
                "host":"127.0.0.1",
                "port":9090
