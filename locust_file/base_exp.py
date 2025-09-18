@@ -2,48 +2,13 @@
 import gevent.monkey
 gevent.monkey.patch_all()
 
-# Filtro stderr per nascondere errori gevent fastidiosi ma non funzionalmente dannosi
+# Redirect stderr su file per eliminare errori gevent fastidiosi ma non funzionali
 import sys
-import io
+import os
 
-class GeventStderrFilter(io.TextIOWrapper):
-    """
-    Filtro stderr che nasconde gli errori gevent _ForkHooks mantenendo tutti gli altri errori.
-    Gli errori gevent sono fastidiosi ma non causano problemi funzionali.
-    """
-    def __init__(self, original_stderr):
-        self._original_stderr = original_stderr
-        
-    def write(self, text):
-        # Pattern degli errori gevent da filtrare
-        gevent_patterns = [
-            "_ForkHooks.after_fork_in_child",
-            "assert not thread.is_alive()",
-            "AssertionError:",  # Solo se nella stessa riga/contesto dei pattern sopra
-        ]
-        
-        # Se il testo contiene pattern gevent, non scriverlo
-        if any(pattern in text for pattern in gevent_patterns[:2]):  # Solo primi 2 pattern principali
-            return len(text)  # Simula scrittura per compatibilità
-            
-        # Per AssertionError, controlla se è nel contesto gevent (riga precedente aveva pattern)
-        if "AssertionError:" in text and hasattr(self, '_last_was_gevent') and self._last_was_gevent:
-            return len(text)
-            
-        # Memorizza se questa riga conteneva pattern gevent per la prossima
-        self._last_was_gevent = any(pattern in text for pattern in gevent_patterns[:2])
-            
-        # Passa tutto il resto al stderr originale
-        return self._original_stderr.write(text)
-    
-    def flush(self):
-        return self._original_stderr.flush()
-    
-    def __getattr__(self, name):
-        return getattr(self._original_stderr, name)
-
-# Installa il filtro stderr
-sys.stderr = GeventStderrFilter(sys.stderr)
+# Redirect stderr su file nascosto per evitare spam nei log
+stderr_log_file = os.path.join(os.path.dirname(__file__), '.stderr.log')
+sys.stderr = open(stderr_log_file, 'a')
 
 from locust import HttpUser, task, between, LoadTestShape
 from locust import events
