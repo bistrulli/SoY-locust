@@ -34,7 +34,7 @@ services:
 
   # Nginx proxy for Gateway
   gateway-nginx:
-    image: xcgd/nginx-vts:latest
+    image: xcgd/nginx-vts:stable
     volumes:
       - ./nginx-config/gateway.conf:/etc/nginx/nginx.conf:ro
     ports:
@@ -80,7 +80,7 @@ services:
 
   # Nginx proxy for MS-Exercise
   ms-exercise-nginx:
-    image: xcgd/nginx-vts:latest
+    image: xcgd/nginx-vts:stable
     volumes:
       - ./nginx-config/ms-exercise.conf:/etc/nginx/nginx.conf:ro
     networks:
@@ -124,7 +124,7 @@ services:
 
   # Nginx proxy for MS-Other
   ms-other-nginx:
-    image: xcgd/nginx-vts:latest
+    image: xcgd/nginx-vts:stable
     volumes:
       - ./nginx-config/ms-other.conf:/etc/nginx/nginx.conf:ro
     networks:
