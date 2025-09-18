@@ -75,7 +75,7 @@ class Monitoring:
         return self._prom
 
     def _service_label_regex(self):
-        """Costruisce una regex per il label 'service' di Traefik che copre varianti con stack e @docker."""
+        """Costruisce una regex per il label 'service' che copre varianti con stack e @docker (legacy)."""
         names = [
             self.serviceName,
             f"{self.stack_name}_{self.serviceName}",
@@ -89,8 +89,51 @@ class Monitoring:
             if n and n not in seen:
                 uniq.append(n)
                 seen.add(n)
-        # Non usare escaping: PromQL/RE2 non accetta '\-' ecc. Questi nomi non contengono metacaratteri problematici.
         return "(" + "|".join(uniq) + ")"
+        
+    def get_nginx_vts_metrics_summary(self):
+        """
+        Restituisce un summary di tutte le metriche VTS disponibili per il servizio.
+        Utile per debugging e validazione dell'implementazione nginx-vts.
+        
+        Returns:
+            dict: Dictionary con le metriche VTS principali
+        """
+        try:
+            summary = {
+                'service_name': self.serviceName,
+                'stack_name': self.stack_name,
+                'throughput_2xx': 0,
+                'throughput_total': 0,
+                'response_time_seconds': 0,
+                'cpu_utilization': 0,
+                'active_replicas': 0,
+                'configured_replicas': 0
+            }
+            
+            # Throughput 2xx
+            query_2xx = f'rate(nginx_vts_server_requests_total{{service="{self.serviceName}",code="2xx",host="localhost"}}[30s])'
+            result_2xx = self.prom.custom_query(query=query_2xx)
+            if result_2xx and len(result_2xx) > 0 and 'value' in result_2xx[0]:
+                summary['throughput_2xx'] = float(result_2xx[0]['value'][1])
+                
+            # Throughput total
+            query_total = f'rate(nginx_vts_server_requests_total{{service="{self.serviceName}",code="total",host="localhost"}}[30s])'
+            result_total = self.prom.custom_query(query=query_total)
+            if result_total and len(result_total) > 0 and 'value' in result_total[0]:
+                summary['throughput_total'] = float(result_total[0]['value'][1])
+                
+            # Response time (usa i metodi esistenti)
+            summary['response_time_seconds'] = self.getResponseTime()
+            summary['cpu_utilization'] = self.get_service_cpu_utilization()
+            summary['active_replicas'] = self.get_replicas(self.stack_name, self.serviceName)
+            
+            logger.info("%s VTS Metrics Summary: %s", self.service_prefix, summary)
+            return summary
+            
+        except Exception as e:
+            logger.error("%s Error generating VTS metrics summary: %s", self.service_prefix, e)
+            return {}
 
     def tick(self, t):
         self.time += [t]
@@ -128,61 +171,123 @@ class Monitoring:
 
     def getResponseTime(self):
         """
-        Calcola il tempo di risposta medio del servizio.
-        NOTA: Le metriche di Nginx exporter non forniscono la latenza. Ritorna 0.
+        Calcola il tempo di risposta medio del servizio utilizzando nginx-vts metrics.
+        Ritorna il response time in secondi basato su rate degli ultimi 30s.
         """
-        # Il nginx-prometheus-exporter di base non espone metriche di latenza.
-        # Per una stima, bisognerebbe usare i log di Nginx o instrumentazione applicativa.
-        logger.debug("%s Nginx exporter does not provide response time. Returning 0.", self.service_prefix)
-        return 0
+        try:
+            # Query per numeratore: tempo totale speso nelle richieste
+            time_query = f'rate(nginx_vts_server_request_seconds_total{{service="{self.serviceName}",host="localhost"}}[30s])'
+            time_result = self.prom.custom_query(query=time_query)
+            
+            # Query per denominatore: numero totale di richieste
+            req_query = f'rate(nginx_vts_server_requests_total{{service="{self.serviceName}",host="localhost",code="total"}}[30s])'
+            req_result = self.prom.custom_query(query=req_query)
+            
+            # Estrae i valori
+            if (time_result and len(time_result) > 0 and 'value' in time_result[0] and
+                req_result and len(req_result) > 0 and 'value' in req_result[0]):
+                
+                total_time = float(time_result[0]['value'][1])
+                total_requests = float(req_result[0]['value'][1])
+                
+                # Calcola response time medio (evita divisione per zero)
+                if total_requests > 0:
+                    response_time = total_time / total_requests
+                    logger.debug("%s VTS Response time calculated: %s seconds", self.service_prefix, response_time)
+                    return response_time
+                else:
+                    logger.debug("%s VTS No requests found, returning 0", self.service_prefix)
+                    return 0
+            else:
+                logger.warning("%s VTS No valid response time data found for service %s", 
+                              self.service_prefix, self.serviceName)
+                return 0
+                
+        except Exception as e:
+            logger.error("%s VTS Error calculating response time for service %s: %s", 
+                        self.service_prefix, self.serviceName, e)
+            return 0
 
     def getTroughput(self):
         """
-        Calcola il throughput del servizio specifico utilizzando le metriche di Nginx.
+        Calcola il throughput del servizio specifico utilizzando le metriche nginx-vts.
+        Ritorna il numero di richieste di successo (2xx) per secondo negli ultimi 30s.
         """
         try:
-            # Usa le metriche di Nginx per il servizio specifico (label 'service')
-            service_sel = f'service="{self.serviceName}"'
-            query = f'sum(rate(nginx_http_requests_total{{{service_sel}}}[30s]))'
+            # Usa nginx-vts per richieste di successo (2xx) per il servizio specifico
+            query = f'rate(nginx_vts_server_requests_total{{service="{self.serviceName}",code="2xx",host="localhost"}}[30s])'
             result = self.prom.custom_query(query=query)
-            if result and len(result) > 0 and 'value' in result[0]:
-                return float(result[0]['value'][1])
             
-            # DEBUG: Se non ci sono dati, registra un avviso.
-            logger.warning("%s No Nginx throughput data found for service %s.", 
+            if result and len(result) > 0 and 'value' in result[0]:
+                throughput = float(result[0]['value'][1])
+                logger.debug("%s VTS Throughput calculated: %s req/s", self.service_prefix, throughput)
+                return throughput
+            
+            # Se non ci sono richieste 2xx, prova con tutte le richieste
+            fallback_query = f'rate(nginx_vts_server_requests_total{{service="{self.serviceName}",code="total",host="localhost"}}[30s])'
+            fallback_result = self.prom.custom_query(query=fallback_query)
+            
+            if fallback_result and len(fallback_result) > 0 and 'value' in fallback_result[0]:
+                throughput = float(fallback_result[0]['value'][1])
+                logger.debug("%s VTS Fallback throughput calculated: %s req/s", self.service_prefix, throughput)
+                return throughput
+            
+            logger.warning("%s VTS No throughput data found for service %s", 
                           self.service_prefix, self.serviceName)
             return 0
+            
         except Exception as e:
-            logger.error("%s Error querying Nginx throughput for service %s: %s", self.service_prefix, self.serviceName, e)
+            logger.error("%s VTS Error querying throughput for service %s: %s", 
+                        self.service_prefix, self.serviceName, e)
             return 0
 
     def get_replicas(self, stack_name, service_name):
         """
-        Gets the number of replicas for a service.
+        Gets the number of replicas for a service using both Docker API and Prometheus metrics.
+        Falls back to counting active containers if Docker API fails.
 
         Args:
+            stack_name (str): The name of the stack  
             service_name (str): The name of the service without stack prefix
+            
+        Returns:
+            int: Number of configured replicas for the service
         """
         try:
-            # Construct the full service name using stack_name and service_name
+            # Primary method: Use Docker API
             full_service_name = f"{stack_name}_{service_name}"
             logger.debug("Attempting to get replicas for service: '%s'", full_service_name)
-            logger.debug("Available services: %s", [service.name for service in self.client.services.list()])
-
+            
             service = self.client.services.get(full_service_name)
-            logger.debug("Found service: %s", service.name)
-            logger.debug("Service attributes: %s", service.attrs)
-
             replicas = service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 1)
-            logger.debug("Number of replicas: %s", replicas)
+            logger.debug("Docker API replica count: %s", replicas)
             return replicas
+            
         except docker.errors.NotFound:
-            logger.error("%s Service '%s' not found", self.service_prefix, full_service_name)
-            return None
+            logger.warning("%s Service '%s' not found via Docker API, trying Prometheus count", 
+                          self.service_prefix, full_service_name)
         except Exception as e:
-            logger.error("%s Error in get_replicas: %s", self.service_prefix, str(e))
-            logger.error("Error type: %s", type(e))
-            return None
+            logger.warning("%s Docker API error for service %s: %s, trying Prometheus count", 
+                          self.service_prefix, full_service_name, e)
+        
+        # Fallback method: Count active containers via Prometheus
+        try:
+            query = f'count(container_cpu_usage_seconds_total{{container_label_com_docker_compose_service="{service_name}"}})'
+            logger.debug("Prometheus replica count query: %s", query)
+            
+            result = self.prom.custom_query(query=query)
+            if result and len(result) > 0 and 'value' in result[0]:
+                count = int(float(result[0]['value'][1]))
+                logger.debug("Prometheus container count: %s", count)
+                return count
+            else:
+                logger.warning("%s No containers found for service %s", self.service_prefix, service_name)
+                return 0
+                
+        except Exception as e:
+            logger.error("%s Error counting replicas via Prometheus for service %s: %s", 
+                        self.service_prefix, service_name, e)
+            return 0
 
     def get_ready_replicas(self, stack_name, service_name):
         """
@@ -373,7 +478,8 @@ class Monitoring:
 
     def get_service_cpu_utilization(self, service_name=None, stack_name=None):
         """
-        Gets the total CPU utilization for all replicas of a specific service in a stack using cAdvisor metrics.
+        Gets the total CPU utilization for all replicas of a specific service using cAdvisor metrics.
+        Uses container_label_com_docker_compose_service for better compatibility.
 
         Args:
             service_name (str): The name of the service (e.g., 'node')
@@ -383,39 +489,27 @@ class Monitoring:
             float: The total CPU utilization as an absolute value (CPU seconds per second)
         """
         try:
-            logger.debug("CPU Input parameters - service_name: '%s', stack_name: '%s'", service_name, stack_name)
+            service = service_name if service_name is not None else self.serviceName
+            logger.debug("CPU Input parameters - service_name: '%s'", service)
 
-            # Use provided stack_name or fall back to self.stack_name
-            stack = stack_name if stack_name is not None else self.stack_name
-            logger.debug("CPU Using stack name: '%s'", stack)
-
-            # Construct the full service name using f-string
-            full_service_name = f"{stack}_{service_name}"
-            logger.debug("CPU Constructed full service name: '%s'", full_service_name)
-
-            # Query for CPU usage rate over 1 minute window, summed across all replicas
-
-            query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_com_docker_swarm_service_name="{full_service_name}"}}[30s]))'
+            # Query using compose service label (more reliable than swarm service name)
+            query = f'sum(rate(container_cpu_usage_seconds_total{{container_label_com_docker_compose_service="{service}"}}[30s]))'
             logger.debug("CPU Prometheus query: %s", query)
 
             result = self.prom.custom_query(query=query)
             logger.debug("CPU Raw Prometheus result: %s", result)
 
-            if result and len(result) > 0:
-                logger.debug("%s CPU Result has data: %s", self.service_prefix, result[0])
-                if 'value' in result[0]:
-                    total_cpu = float(result[0]['value'][1])
-                    logger.debug("CPU Extracted CPU value: %s", total_cpu)
-                    return total_cpu
-                else:
-                    logger.debug("%s CPU No 'value' key in result[0]", self.service_prefix)
+            if result and len(result) > 0 and 'value' in result[0]:
+                total_cpu = float(result[0]['value'][1])
+                logger.debug("%s CPU utilization calculated: %s CPU seconds/second", self.service_prefix, total_cpu)
+                return total_cpu
             else:
-                logger.debug("%s CPU Empty or null result from Prometheus", self.service_prefix)
-            return 0.0
+                logger.debug("%s CPU No CPU data found for service %s", self.service_prefix, service)
+                return 0.0
+                
         except Exception as e:
-            logger.error("%s CPU Error collecting CPU utilization for service %s", self.service_prefix, full_service_name)
-            logger.error("%s CPU Error details: %s", self.service_prefix, str(e))
-            logger.error("CPU Error type: %s", type(e))
+            logger.error("%s CPU Error collecting CPU utilization for service %s: %s", 
+                        self.service_prefix, service, e)
             return 0.0
 
     def predict_users(self, horizon=1):
