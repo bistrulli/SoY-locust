@@ -66,12 +66,28 @@ class Monitoring:
 
     @property  
     def prom(self):
-        """Lazy initialization del Prometheus client per evitare problemi di fork"""
+        """
+        Lazy initialization del Prometheus client per evitare problemi di fork.
+        Disabilita connection pooling per evitare thread persistenti.
+        """
         if self._prom is None:
             self._prom = PrometheusConnect(url=f"http://{self.promHost}:{self.promPort}", disable_ssl=True)
-            # Patch per gevent compatibility
+            
+            # Disabilita connection pooling per evitare thread persistenti
             if hasattr(self._prom, '_session') and self._prom._session:
+                # Configura session senza connection pooling
+                from requests.adapters import HTTPAdapter
+                
+                # Adapter personalizzato con pooling disabilitato
+                no_pool_adapter = HTTPAdapter(pool_connections=0, pool_maxsize=0)
+                self._prom._session.mount('http://', no_pool_adapter)
+                self._prom._session.mount('https://', no_pool_adapter)
+                
+                # Patch per gevent compatibility
                 self._prom._session.headers.update({'Accept-Encoding': 'identity'})
+                
+                logger.debug("%s Prometheus client created with connection pooling disabled", self.service_prefix)
+                
         return self._prom
 
     def _service_label_regex(self):

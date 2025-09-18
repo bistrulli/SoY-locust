@@ -1,7 +1,6 @@
 # IMPORTANTE: Monkey patch PRIMA di qualsiasi altro import
-# Monkey patch selettivo per evitare conflitti con Docker client threads
 import gevent.monkey
-gevent.monkey.patch_all(thread=False, ssl=False)
+gevent.monkey.patch_all()
 
 from locust import HttpUser, task, between, LoadTestShape
 from locust import events
