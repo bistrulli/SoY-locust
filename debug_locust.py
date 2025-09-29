@@ -43,10 +43,23 @@ def main():
     logger = logging.getLogger(__name__)
 
     # Calcolo del percorso CSV di default se non specificato
+    locust_name = Path(args.locust_file).stem
     if args.csv:
-        csv_base = args.csv
+        raw_csv = Path(args.csv)
+        # Se è una directory o termina con separatore, usa quella dir e aggiungi il nome base
+        if str(args.csv).endswith(('/', '\\')) or raw_csv.is_dir():
+            csv_dir = raw_csv
+            csv_dir.mkdir(parents=True, exist_ok=True)
+            csv_base = str(csv_dir / locust_name)
+        else:
+            # Tratta come prefisso base. Se termina con .csv, rimuovi estensione
+            if str(raw_csv).lower().endswith('.csv'):
+                raw_csv = raw_csv.with_suffix('')
+            parent_dir = raw_csv.parent
+            if str(parent_dir):
+                parent_dir.mkdir(parents=True, exist_ok=True)
+            csv_base = str(raw_csv)
     else:
-        locust_name = Path(args.locust_file).stem
         csv_dir = Path('results') / locust_name
         csv_dir.mkdir(parents=True, exist_ok=True)
         csv_base = str(csv_dir / locust_name)
