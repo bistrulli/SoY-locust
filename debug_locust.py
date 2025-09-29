@@ -18,7 +18,7 @@ def main():
     parser.add_argument('--spawn-rate', type=int, default=1, help='Spawn rate')
     parser.add_argument('--run-time', type=str, default='1m', help='Run time (e.g., 3m)')
     parser.add_argument('--host', type=str, required=True, help='Target host URL')
-    parser.add_argument('--csv', type=str, default='./', help='CSV output path')
+    parser.add_argument('--csv', type=str, default=None, help='CSV output base path (prefix). If omitted, uses results/<locust-file>/<locust-file>')
     parser.add_argument('--locust-file', type=str, required=True, help='Locust file path')
     parser.add_argument('--loadshape-file', type=str, help='Load shape file path')
     
@@ -40,6 +40,15 @@ def main():
         datefmt='%H:%M:%S'
     )
     logger = logging.getLogger(__name__)
+
+    # Calcolo del percorso CSV di default se non specificato
+    if args.csv:
+        csv_base = args.csv
+    else:
+        locust_name = Path(args.locust_file).stem
+        csv_dir = Path('results') / locust_name
+        csv_dir.mkdir(parents=True, exist_ok=True)
+        csv_base = str(csv_dir / locust_name)
     
     logger.info("🔧 DEBUG MODE: Launching Locust only (assuming Docker stack is running)")
     logger.info("Target: %s", args.host)
@@ -49,7 +58,7 @@ def main():
     logger.info("Locust file: %s", args.locust_file)
     if args.loadshape_file:
         logger.info("Load shape: %s", args.loadshape_file)
-    logger.info("CSV output: %s", args.csv)
+    logger.info("CSV output: %s", csv_base)
     logger.info("📁 Locust logs: logs/locust_output.log")
     logger.info("-" * 50)
     
@@ -61,7 +70,7 @@ def main():
         '--spawn-rate', str(args.spawn_rate),
         '--run-time', args.run_time,
         '--host', args.host,
-        '--csv', args.csv
+        '--csv', csv_base
     ]
     
     # Aggiunge i file
