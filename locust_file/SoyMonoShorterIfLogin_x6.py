@@ -23,7 +23,7 @@ ms_exercise_conf={ "service_name": "ms-exercise",
            "estimation_window": 10,
            "measurament_period":"1s",
            "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}_ms-exercise.csv",
-           "stealth":True,  # ATTIVATO: OpenClassCTRL scaling per ms-exercise
+           "stealth":False,  # ATTIVATO: OpenClassCTRL scaling per ms-exercise
            "init_repica":6,
            "prediction_horizon":10,
            "target_utilization":0.2,
@@ -45,7 +45,7 @@ ms_other_conf={ "service_name": "ms-other",
            "estimation_window": 10,
            "measurament_period":"1s",
            "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}_ms-other.csv",
-           "stealth":True,  # ATTIVATO: OpenClassCTRL scaling per ms-exercise
+           "stealth":False,  # ATTIVATO: OpenClassCTRL scaling per ms-exercise
            "init_repica":6,
            "prediction_horizon":10,
            "target_utilization":0.2,
@@ -67,7 +67,7 @@ gateway_conf={ "service_name": "gateway",
            "estimation_window": 10,
            "measurament_period":"1s",
            "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}_gateway.csv",
-           "stealth":True,  # ATTIVATO: OpenClassCTRL scaling per ms-exercise
+           "stealth":False,  # ATTIVATO: OpenClassCTRL scaling per ms-exercise
            "init_repica":6,
            "prediction_horizon":10,
            "target_utilization":0.2,
