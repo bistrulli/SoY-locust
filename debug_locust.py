@@ -21,6 +21,7 @@ def main():
     parser.add_argument('--csv', type=str, default=None, help='CSV output base path (prefix). If omitted, uses results/<locust-file>/<locust-file>')
     parser.add_argument('--locust-file', type=str, required=True, help='Locust file path')
     parser.add_argument('--loadshape-file', type=str, help='Load shape file path')
+    parser.add_argument('--logfile', type=str, default=None, help='Locust logfile path. If omitted, uses results/<locust-file>/<locust-file>.log')
     
     # Parametro per il logging
     parser.add_argument('--log-level', type=str, default='INFO', 
@@ -49,6 +50,14 @@ def main():
         csv_dir = Path('results') / locust_name
         csv_dir.mkdir(parents=True, exist_ok=True)
         csv_base = str(csv_dir / locust_name)
+    # Calcolo del logfile di default se non specificato
+    if args.logfile:
+        logfile_path = args.logfile
+    else:
+        locust_name = Path(args.locust_file).stem
+        log_dir = Path('results') / locust_name
+        log_dir.mkdir(parents=True, exist_ok=True)
+        logfile_path = str(log_dir / f"{locust_name}.log")
     
     logger.info("🔧 DEBUG MODE: Launching Locust only (assuming Docker stack is running)")
     logger.info("Target: %s", args.host)
@@ -59,7 +68,7 @@ def main():
     if args.loadshape_file:
         logger.info("Load shape: %s", args.loadshape_file)
     logger.info("CSV output: %s", csv_base)
-    logger.info("📁 Locust logs: logs/locust_output.log")
+    logger.info("📁 Locust logs: %s", logfile_path)
     logger.info("-" * 50)
     
     # Costruisce il comando Locust
@@ -70,7 +79,9 @@ def main():
         '--spawn-rate', str(args.spawn_rate),
         '--run-time', args.run_time,
         '--host', args.host,
-        '--csv', csv_base
+        '--csv', csv_base,
+        '--loglevel', args.log_level,
+        '--logfile', logfile_path
     ]
     
     # Aggiunge i file
@@ -86,12 +97,23 @@ def main():
     logger.info("-" * 50)
     
     try:
-        # Esegue Locust
-        result = subprocess.run(cmd, check=True)
+        # Esegue Locust e cattura output per diagnosi in caso di errore
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
         logger.info("✅ Locust completed successfully")
+        if result.stdout:
+            logger.debug(result.stdout)
+        if result.stderr:
+            logger.debug(result.stderr)
         
     except subprocess.CalledProcessError as e:
         logger.error("❌ Locust failed with exit code %d", e.returncode)
+        try:
+            if e.stdout:
+                logger.error("[locust stdout]\n%s", e.stdout)
+            if e.stderr:
+                logger.error("[locust stderr]\n%s", e.stderr)
+        except Exception:
+            pass
         sys.exit(e.returncode)
         
     except KeyboardInterrupt:
