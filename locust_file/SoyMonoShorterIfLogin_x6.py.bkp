@@ -1,20 +1,105 @@
 # IMPORTANTE: Monkey patch PRIMA di qualsiasi altro import
+import gevent.monkey
+gevent.monkey.patch_all()
 
-from locust import HttpUser, task, between, events
+from locust import HttpUser, task, between
+from locust import events
+from locust.runners import WorkerRunner
 import json
+import gevent
+import csv
 from pathlib import Path
+import time
 from base_exp import BaseExp,resourceDir
-
+from controller import ControlLoop
+import gevent
 
 cwd=Path(__file__).parent
 
+ms_exercise_conf={ "service_name": "ms-exercise",
+           "stack_name": "ms-stack-v5",
+           "sysfile": cwd.parent/"sou"/"monotloth-v5.yml",
+           "control_widow": 60,
+           "estimation_window": 60,
+           "measurament_period":"1s",
+           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}_ms-exercise.csv",
+           "stealth":False,  # ATTIVATO: OpenClassCTRL scaling per ms-exercise
+           "init_repica":6,
+           "prediction_horizon":10,
+           "target_utilization":0.2,
+           "disable_prometheus": False,  # Prometheus riattivato - errore gevent è altrove
+           "prometheus":{
+               "host":"127.0.0.1",
+               "port":9090
+           },
+           #"remote":"192.168.3.102",
+           #"remote_docker_port":2375
+           "remote":None,
+           "remote_docker_port":None
+         }
 
-@events.init_command_line_parser.add_listener
-def _(parser):
-    parser.add_argument("--ramp_duration", type=int, env_var="RAMP_DURATION", default=10, help="ramp_duration")
-    parser.add_argument("--pause_duration", type=int, env_var="PAUSE_DURATION", default=5, help="pause_duration")
+ms_other_conf={ "service_name": "ms-other",
+           "stack_name": "ms-stack-v5",
+           "sysfile": cwd.parent/"sou"/"monotloth-v5.yml",
+           "control_widow": 60,
+           "estimation_window": 60,
+           "measurament_period":"1s",
+           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}_ms-other.csv",
+           "stealth":False,  # ATTIVATO: OpenClassCTRL scaling per ms-exercise
+           "init_repica":6,
+           "prediction_horizon":10,
+           "target_utilization":0.2,
+           "disable_prometheus": False,  # Prometheus riattivato - errore gevent è altrove
+           "prometheus":{
+               "host":"127.0.0.1",
+               "port":9090
+           },
+           #"remote":"192.168.3.102",
+           #"remote_docker_port":2375
+           "remote":None,
+           "remote_docker_port":None
+         }
 
+gateway_conf={ "service_name": "gateway",
+           "stack_name": "ms-stack-v5",
+           "sysfile": cwd.parent/"sou"/"monotloth-v5.yml",
+           "control_widow": 60,
+           "estimation_window": 60,
+           "measurament_period":"1s",
+           "outfile":cwd.parent/"results"/f"{Path(__file__).stem}"/f"{Path(__file__).stem}_gateway.csv",
+           "stealth":False,  # ATTIVATO: OpenClassCTRL scaling per ms-exercise
+           "init_repica":6,
+           "prediction_horizon":10,
+           "target_utilization":0.2,
+           "disable_prometheus": False,  # Prometheus riattivato - errore gevent è altrove
+           "prometheus":{
+               "host":"127.0.0.1",
+               "port":9090
+           },
+           #"remote":"192.168.3.102",
+           #"remote_docker_port":2375
+           "remote":None,
+           "remote_docker_port":None
+         } 
 
+#Qui la logica di avvio del control loop specifica per ogni locus file
+ctrlLoop_ms_exercise=ControlLoop(config=ms_exercise_conf)
+ctrlLoop_ms_other=ControlLoop(config=ms_other_conf)
+ctrlLoop_gateway=ControlLoop(config=gateway_conf)
+
+@events.test_start.add_listener
+def on_locust_start(environment, **_kwargs):
+    if not isinstance(environment.runner, WorkerRunner):
+        gevent.spawn(ctrlLoop_ms_exercise.loop, environment)
+        gevent.spawn(ctrlLoop_ms_other.loop, environment)
+        gevent.spawn(ctrlLoop_gateway.loop, environment)
+
+@events.test_stop.add_listener
+def on_locust_stop(environment, **_kwargs):
+    global ctrlLoop_ms_exercise, ctrlLoop_ms_other, ctrlLoop_gateway
+    ctrlLoop_ms_exercise.saveResults()
+    ctrlLoop_ms_other.saveResults()
+    ctrlLoop_gateway.saveResults()
 
 class SoyMonoUser(BaseExp):
 
@@ -23,7 +108,6 @@ class SoyMonoUser(BaseExp):
         return super().request(method, url, **kwargs)
 
     def __init__(self, *args, **kwargs):
-        print("Initializing SoyMonoUser...")
         super().__init__(*args, **kwargs)
         # Fix gevent/threading conflict by disabling cookies
         import requests.cookies
@@ -55,7 +139,7 @@ class SoyMonoUser(BaseExp):
                     access_token = cookie.value
                 elif cookie.name == "refresh_token":
                     refresh_token = cookie.value
-
+            
         else:
             # Log debug info for non-200 responses and stop this user iteration
             try:
