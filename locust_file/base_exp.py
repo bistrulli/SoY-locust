@@ -50,19 +50,19 @@ users=None
 def on_locust_start(environment, **_kwargs):
     global end, users
     end = False
-    
+
     # Configure enhanced logging for multi-controller setup
     import os
     log_level = os.getenv('SOY_LOG_LEVEL', 'INFO')
     colored_output = os.getenv('SOY_NO_COLORS', '').lower() not in ('1', 'true', 'yes')
-    
+
     setup_locust_logging(level=log_level, colored=colored_output)
     configure_module_loggers()
-    
+
     # Salva il tempo di inizio in environment se non esiste
     if not hasattr(environment, "start_time"):
         environment.start_time = time.time()
-    
+
     # Carica gli utenti dal file CSV solo se non sono già stati caricati
     with open(f'{resourceDir.absolute()}/soymono2/users.csv') as csv_file:
         reader = csv.DictReader(csv_file)
@@ -75,12 +75,13 @@ class CombinedMeta(ABCMeta, type(HttpUser)):
 # Utilizza CombinedMeta come metaclasse e imposta abstract=True per evitare che Locust istanzi questa classe
 class BaseExp(HttpUser, metaclass=CombinedMeta):
     abstract = True  # Locust ignorerà questa classe
-    
+
     wait_time = between(1, 1)
     user_index = 0  # Static variable to keep track of user index
 
     def on_start(self):
         global users
+
         # Assegna un ID univoco incrementale per ogni utente
         self.user_data = users[self.__class__.user_index % len(users)]
         self.__class__.user_index += 1

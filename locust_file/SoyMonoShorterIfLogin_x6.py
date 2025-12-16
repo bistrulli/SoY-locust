@@ -15,6 +15,14 @@ def _(parser):
     parser.add_argument("--pause_duration", type=int, env_var="PAUSE_DURATION", default=5, help="pause_duration")
 
 
+@events.test_start.add_listener
+def on_locust_start(environment, **_kwargs):
+    print("events.test_start.add_listener")
+
+@events.test_stop.add_listener
+def on_locust_stop(environment, **_kwargs):
+    print("events.test_stop.add_listener")
+
 
 class SoyMonoUser(BaseExp):
 
@@ -30,6 +38,7 @@ class SoyMonoUser(BaseExp):
         self.client.cookies = requests.cookies.RequestsCookieJar()
 
     def userLogic(self):
+        print("UserLogic")
         # Implementazione specifica della logica utente
         email = self.user_data['email']
         password = self.user_data['password']

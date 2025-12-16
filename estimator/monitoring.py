@@ -18,6 +18,7 @@ import subprocess
 # Configure logging for this module
 logger = logging.getLogger(__name__)
 
+
 def _get_service_prefix(service_name, stack_name):
     """Helper per creare un prefisso leggibile per i log"""
     if service_name:
@@ -31,7 +32,7 @@ def _get_service_prefix(service_name, stack_name):
 class Monitoring:
     def __init__(self, window, sla, reducer=lambda x: sum(x) / len(x),
                  serviceName="", stack_name="", promHost="localhost",
-                 promPort=9090, sysfile="", has_health_check=False, remote=None, remote_docker_port=None,
+                 promPort=9090, sysfile="", has_health_check=False, remote_docker_host=None, remote_docker_port=None,
                  disable_prometheus=False):
         self.reducer = reducer
         self.window = window
@@ -41,18 +42,19 @@ class Monitoring:
         self.service_prefix = _get_service_prefix(serviceName, stack_name)
         self.promPort = promPort
         self.promHost = promHost
-        self.sysfile = sysfile
-        self.remote = remote
+        self.sysfile = Path(sysfile)
+        self.remote_docker_host = remote_docker_host
         self.remote_docker_port = remote_docker_port
         self.has_health_check = has_health_check
         self.disable_prometheus = disable_prometheus
-        
+
         # Lazy initialization - non creare client nel __init__ per evitare fork issues
         self._client = None
         self._prom = None
-        
+
         if (not Path(self.sysfile).exists()):
             raise FileNotFoundError(f"File {self.sysfile} not found")
+
         self.sys = yaml.safe_load(self.sysfile.open())
         self.reset()
 
@@ -60,13 +62,14 @@ class Monitoring:
     def client(self):
         """Lazy initialization del Docker client per evitare problemi di fork"""
         if self._client is None:
-            if self.remote is not None and self.remote_docker_port is not None:
-                self._client = docker.DockerClient(base_url='tcp://'+self.remote+":"+str(self.remote_docker_port))
+            if self.remote_docker_host is not None and self.remote_docker_port is not None:
+                self._client = docker.DockerClient(
+                    base_url='tcp://' + self.remote_docker_host + ":" + str(self.remote_docker_port))
             else:
                 self._client = docker.from_env()
         return self._client
 
-    @property  
+    @property
     def prom(self):
         """
         Lazy initialization del Prometheus client per evitare problemi di fork.
@@ -74,22 +77,22 @@ class Monitoring:
         """
         if self._prom is None:
             self._prom = PrometheusConnect(url=f"http://{self.promHost}:{self.promPort}", disable_ssl=True)
-            
+
             # Disabilita connection pooling per evitare thread persistenti
             if hasattr(self._prom, '_session') and self._prom._session:
                 # Configura session senza connection pooling
                 from requests.adapters import HTTPAdapter
-                
+
                 # Adapter personalizzato con pooling disabilitato
                 no_pool_adapter = HTTPAdapter(pool_connections=0, pool_maxsize=0)
                 self._prom._session.mount('http://', no_pool_adapter)
                 self._prom._session.mount('https://', no_pool_adapter)
-                
+
                 # Patch per gevent compatibility
                 self._prom._session.headers.update({'Accept-Encoding': 'identity'})
-                
+
                 logger.debug("%s Prometheus client created with connection pooling disabled", self.service_prefix)
-                
+
         return self._prom
 
     def _service_label_regex(self):
@@ -108,12 +111,12 @@ class Monitoring:
                 uniq.append(n)
                 seen.add(n)
         return "(" + "|".join(uniq) + ")"
-        
+
     def get_nginx_vts_metrics_summary(self):
         """
         Restituisce un summary di tutte le metriche VTS disponibili per il servizio.
         Utile per debugging e validazione dell'implementazione nginx-vts.
-        
+
         Returns:
             dict: Dictionary con le metriche VTS principali
         """
@@ -128,27 +131,27 @@ class Monitoring:
                 'active_replicas': 0,
                 'configured_replicas': 0
             }
-            
+
             # Throughput 2xx
             query_2xx = f'rate(nginx_vts_server_requests_total{{service="{self.serviceName}",code="2xx",host="localhost"}}[30s])'
             result_2xx = self.prom.custom_query(query=query_2xx)
             if result_2xx and len(result_2xx) > 0 and 'value' in result_2xx[0]:
                 summary['throughput_2xx'] = float(result_2xx[0]['value'][1])
-                
+
             # Throughput total
             query_total = f'rate(nginx_vts_server_requests_total{{service="{self.serviceName}",code="total",host="localhost"}}[30s])'
             result_total = self.prom.custom_query(query=query_total)
             if result_total and len(result_total) > 0 and 'value' in result_total[0]:
                 summary['throughput_total'] = float(result_total[0]['value'][1])
-                
+
             # Response time (usa i metodi esistenti)
             summary['response_time_seconds'] = self.getResponseTime()
             summary['cpu_utilization'] = self.get_service_cpu_utilization()
             summary['active_replicas'] = self.get_replicas(self.stack_name, self.serviceName)
-            
+
             logger.info("%s VTS Metrics Summary: %s", self.service_prefix, summary)
             return summary
-            
+
         except Exception as e:
             logger.error("%s Error generating VTS metrics summary: %s", self.service_prefix, e)
             return {}
@@ -196,23 +199,23 @@ class Monitoring:
         if self.disable_prometheus:
             logger.debug("%s Prometheus disabled - returning mock response time", self.service_prefix)
             return 0.1  # Mock response time
-            
+
         try:
             # Query per numeratore: tempo totale speso nelle richieste
             time_query = f'rate(nginx_vts_server_request_seconds_total{{service="{self.serviceName}",host="localhost"}}[30s])'
             time_result = self.prom.custom_query(query=time_query)
-            
+
             # Query per denominatore: numero totale di richieste
             req_query = f'rate(nginx_vts_server_requests_total{{service="{self.serviceName}",host="localhost",code="total"}}[30s])'
             req_result = self.prom.custom_query(query=req_query)
-            
+
             # Estrae i valori
             if (time_result and len(time_result) > 0 and 'value' in time_result[0] and
-                req_result and len(req_result) > 0 and 'value' in req_result[0]):
-                
+                    req_result and len(req_result) > 0 and 'value' in req_result[0]):
+
                 total_time = float(time_result[0]['value'][1])
                 total_requests = float(req_result[0]['value'][1])
-                
+
                 # Calcola response time medio (evita divisione per zero)
                 if total_requests > 0:
                     response_time = total_time / total_requests
@@ -222,13 +225,13 @@ class Monitoring:
                     logger.debug("%s VTS No requests found, returning 0", self.service_prefix)
                     return 0
             else:
-                logger.warning("%s VTS No valid response time data found for service %s", 
-                              self.service_prefix, self.serviceName)
+                logger.warning("%s VTS No valid response time data found for service %s",
+                               self.service_prefix, self.serviceName)
                 return 0
-                
+
         except Exception as e:
-            logger.error("%s VTS Error calculating response time for service %s: %s", 
-                        self.service_prefix, self.serviceName, e)
+            logger.error("%s VTS Error calculating response time for service %s: %s",
+                         self.service_prefix, self.serviceName, e)
             return 0
 
     def getArrivalRate(self):
@@ -239,24 +242,24 @@ class Monitoring:
         if self.disable_prometheus:
             logger.debug("%s Prometheus disabled - returning mock arrival rate", self.service_prefix)
             return 6.0  # Mock arrival rate
-            
+
         try:
             # Usa nginx-vts per tutte le richieste in arrivo (totali) per il servizio specifico
             query = f'rate(nginx_vts_server_requests_total{{service="{self.serviceName}",code="total",host="localhost"}}[30s])'
             result = self.prom.custom_query(query=query)
-            
+
             if result and len(result) > 0 and 'value' in result[0]:
                 arrival_rate = float(result[0]['value'][1])
                 logger.debug("%s VTS Arrival rate calculated: %s req/s", self.service_prefix, arrival_rate)
                 return arrival_rate
-            
-            logger.warning("%s VTS No arrival rate data found for service %s", 
-                          self.service_prefix, self.serviceName)
+
+            logger.warning("%s VTS No arrival rate data found for service %s",
+                           self.service_prefix, self.serviceName)
             return 0
-            
+
         except Exception as e:
-            logger.error("%s VTS Error querying arrival rate for service %s: %s", 
-                        self.service_prefix, self.serviceName, e)
+            logger.error("%s VTS Error querying arrival rate for service %s: %s",
+                         self.service_prefix, self.serviceName, e)
             return 0
 
     def getTroughput(self):
@@ -267,33 +270,33 @@ class Monitoring:
         if self.disable_prometheus:
             logger.debug("%s Prometheus disabled - returning mock throughput", self.service_prefix)
             return 5.0  # Mock throughput
-            
+
         try:
             # Usa nginx-vts per richieste di successo (2xx) per il servizio specifico
             query = f'rate(nginx_vts_server_requests_total{{service="{self.serviceName}",code="2xx",host="localhost"}}[30s])'
             result = self.prom.custom_query(query=query)
-            
+
             if result and len(result) > 0 and 'value' in result[0]:
                 throughput = float(result[0]['value'][1])
                 logger.debug("%s VTS Throughput calculated: %s req/s", self.service_prefix, throughput)
                 return throughput
-            
+
             # Se non ci sono richieste 2xx, prova con tutte le richieste
             fallback_query = f'rate(nginx_vts_server_requests_total{{service="{self.serviceName}",code="total",host="localhost"}}[30s])'
             fallback_result = self.prom.custom_query(query=fallback_query)
-            
+
             if fallback_result and len(fallback_result) > 0 and 'value' in fallback_result[0]:
                 throughput = float(fallback_result[0]['value'][1])
                 logger.debug("%s VTS Fallback throughput calculated: %s req/s", self.service_prefix, throughput)
                 return throughput
-            
-            logger.warning("%s VTS No throughput data found for service %s", 
-                          self.service_prefix, self.serviceName)
+
+            logger.warning("%s VTS No throughput data found for service %s",
+                           self.service_prefix, self.serviceName)
             return 0
-            
+
         except Exception as e:
-            logger.error("%s VTS Error querying throughput for service %s: %s", 
-                        self.service_prefix, self.serviceName, e)
+            logger.error("%s VTS Error querying throughput for service %s: %s",
+                         self.service_prefix, self.serviceName, e)
             return 0
 
     def get_replicas(self, stack_name, service_name):
@@ -302,9 +305,9 @@ class Monitoring:
         Falls back to counting active containers if Docker API fails.
 
         Args:
-            stack_name (str): The name of the stack  
+            stack_name (str): The name of the stack
             service_name (str): The name of the service without stack prefix
-            
+
         Returns:
             int: Number of configured replicas for the service
         """
@@ -312,24 +315,24 @@ class Monitoring:
             # Primary method: Use Docker API
             full_service_name = f"{stack_name}_{service_name}"
             logger.debug("Attempting to get replicas for service: '%s'", full_service_name)
-            
+
             service = self.client.services.get(full_service_name)
             replicas = service.attrs['Spec']['Mode'].get('Replicated', {}).get('Replicas', 1)
             logger.debug("Docker API replica count: %s", replicas)
             return replicas
-            
+
         except docker.errors.NotFound:
-            logger.warning("%s Service '%s' not found via Docker API, trying Prometheus count", 
-                          self.service_prefix, full_service_name)
+            logger.warning("%s Service '%s' not found via Docker API, trying Prometheus count",
+                           self.service_prefix, full_service_name)
         except Exception as e:
-            logger.warning("%s Docker API error for service %s: %s, trying Prometheus count", 
-                          self.service_prefix, full_service_name, e)
-        
+            logger.warning("%s Docker API error for service %s: %s, trying Prometheus count",
+                           self.service_prefix, full_service_name, e)
+
         # Fallback method: Count active containers via Prometheus
         try:
             query = f'count(container_cpu_usage_seconds_total{{container_label_com_docker_compose_service="{service_name}"}})'
             logger.debug("Prometheus replica count query: %s", query)
-            
+
             result = self.prom.custom_query(query=query)
             if result and len(result) > 0 and 'value' in result[0]:
                 count = int(float(result[0]['value'][1]))
@@ -338,10 +341,10 @@ class Monitoring:
             else:
                 logger.warning("%s No containers found for service %s", self.service_prefix, service_name)
                 return 0
-                
+
         except Exception as e:
-            logger.error("%s Error counting replicas via Prometheus for service %s: %s", 
-                        self.service_prefix, service_name, e)
+            logger.error("%s Error counting replicas via Prometheus for service %s: %s",
+                         self.service_prefix, service_name, e)
             return 0
 
     def get_ready_replicas(self, stack_name, service_name):
@@ -363,17 +366,18 @@ class Monitoring:
             # Get all tasks for this service with their status
             # cmd = ["docker", "service", "ps", "--format", "{{.CurrentState}}", full_service_name]
             cmd = []
-            if self.remote is not None:
-                cmd.append("ssh")
-                cmd.append(self.remote)
+            env = {}
+            if self.remote_docker_host is not None:
+                env["DOCKER_HOST"] = "tcp://" + self.remote_docker_host + ":" + str(self.remote_docker_port)
             cmd.append("docker")
             cmd.append("service")
             cmd.append("ps")
             cmd.append("--format")
             cmd.append("{{.CurrentState}}")
             cmd.append(full_service_name)
+            print(cmd)
 
-            output = subprocess.check_output(cmd, universal_newlines=True)
+            output = subprocess.check_output(cmd, env=env, universal_newlines=True)
 
             # Count only "Running" tasks
             task_states = output.strip().split('\n')
@@ -388,17 +392,18 @@ class Monitoring:
                     # Get task IDs for the service tasks
                     # cmd = ["docker", "service", "ps", "--format", "{{.ID}}", full_service_name]
                     cmd = []
-                    if self.remote is not None:
-                        cmd.append("ssh")
-                        cmd.append(self.remote)
+                    env = {}
+                    if self.remote_docker_host is not None:
+                        env["DOCKER_HOST"] = "tcp://" + self.remote_docker_host + ":" + str(self.remote_docker_port)
                     cmd.append("docker")
                     cmd.append("service")
                     cmd.append("ps")
                     cmd.append("--format")
                     cmd.append("{{.ID}}")
                     cmd.append(full_service_name)
+                    print(cmd)
 
-                    task_ids = subprocess.check_output(cmd, universal_newlines=True).strip().split('\n')
+                    task_ids = subprocess.check_output(cmd, env=env, universal_newlines=True).strip().split('\n')
 
                     # Get container IDs from task IDs
                     container_ids = []
@@ -408,9 +413,9 @@ class Monitoring:
                         # Get container ID for the task
                         #                        cmd = ["docker", "inspect", "--format", "{{.Status.ContainerStatus.ContainerID}}", task_id]
                         cmd = []
-                        if self.remote is not None:
-                            cmd.append("ssh")
-                            cmd.append(self.remote)
+                        env = {}
+                        if self.remote_docker_host is not None:
+                            env["DOCKER_HOST"] = "tcp://" + self.remote_docker_host + ":" + str(self.remote_docker_port)
                         cmd.append("docker")
                         cmd.append("inspect")
                         cmd.append("--format")
@@ -418,7 +423,7 @@ class Monitoring:
                         cmd.append(task_id)
 
                         try:
-                            container_id = subprocess.check_output(cmd, universal_newlines=True).strip()
+                            container_id = subprocess.check_output(cmd, env=env, universal_newlines=True).strip()
                             if container_id:
                                 container_ids.append(container_id)
                         except:
@@ -429,13 +434,13 @@ class Monitoring:
                         # Get container health status
                         #                        cmd = ["docker", "inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}", container_id]
                         cmd = []
-                        if self.remote is not None:
-                            cmd.append("ssh")
-                            cmd.append(self.remote)
+                        env = {}
+                        if self.remote_docker_host is not None:
+                            env["DOCKER_HOST"] = "tcp://" + self.remote_docker_host + ":" + str(self.remote_docker_port)
                         cmd.append("docker")
                         cmd.append("inspect")
                         cmd.append("--format")
-                        cmd.append("{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}")
+                        cmd.append("{{ifw .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}")
                         cmd.append(container_id)
 
                         try:
@@ -446,7 +451,8 @@ class Monitoring:
                         except Exception as e:
                             logger.debug("Error checking health for container %s: %s", container_id[:12], str(e))
 
-                    logger.debug("Service %s: found %d healthy containers out of %d containers", full_service_name, healthy_count, len(container_ids))
+                    logger.debug("Service %s: found %d healthy containers out of %d containers", full_service_name,
+                                 healthy_count, len(container_ids))
                     return healthy_count
                 except Exception as e:
                     logger.debug("Error checking container health: %s", str(e))
@@ -527,7 +533,7 @@ class Monitoring:
         if self.disable_prometheus:
             logger.debug("%s Prometheus disabled - returning mock active users", self.service_prefix)
             return 2.0  # Mock active users
-            
+
         try:
             query = 'locust_active_users'
             result = self.prom.custom_query(query=query)
@@ -553,7 +559,7 @@ class Monitoring:
         if self.disable_prometheus:
             logger.debug("%s Prometheus disabled - returning mock CPU utilization", self.service_prefix)
             return 0.5  # Mock CPU utilization
-            
+
         try:
             service = service_name if service_name is not None else self.serviceName
             logger.debug("CPU Input parameters - service_name: '%s'", service)
@@ -572,10 +578,10 @@ class Monitoring:
             else:
                 logger.debug("%s CPU No CPU data found for service %s", self.service_prefix, service)
                 return 0.0
-                
+
         except Exception as e:
-            logger.error("%s CPU Error collecting CPU utilization for service %s: %s", 
-                        self.service_prefix, service, e)
+            logger.error("%s CPU Error collecting CPU utilization for service %s: %s",
+                         self.service_prefix, service, e)
             return 0.0
 
     def predict_users(self, horizon=1):
@@ -673,8 +679,8 @@ class Monitoring:
         # Predici l'arrival rate (non può essere negativo)
         predicted_arrival_rate = max(0, recent_arrival_rates[-1] + avg_gradient * prediction_dt)
 
-        logger.debug("%s Predicted arrival rate: %.4f req/s (horizon=%d, gradient=%.4f)", 
-                    self.service_prefix, predicted_arrival_rate, horizon, avg_gradient)
+        logger.debug("%s Predicted arrival rate: %.4f req/s (horizon=%d, gradient=%.4f)",
+                     self.service_prefix, predicted_arrival_rate, horizon, avg_gradient)
 
         return predicted_arrival_rate
 

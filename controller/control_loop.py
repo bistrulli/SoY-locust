@@ -10,6 +10,7 @@ import logging
 # Configure logging for this module
 logger = logging.getLogger(__name__)
 
+
 def _get_controller_prefix(config):
     """Helper per creare un prefisso leggibile per i log del controller"""
     service_name = config.get('service_name', '')
@@ -18,16 +19,16 @@ def _get_controller_prefix(config):
     else:
         return "[CONTROLLER]"
 
+
 class ControlLoop():
 
-    def __init__(self,config=None):
-        self.toStop=False
-        self.config=config
+    def __init__(self, config=None):
+        self.config = config
         self.service_prefix = _get_controller_prefix(config)
-        self.stime=None
-        self.ctrlTick=0
-        self.prediction_horizon=config["prediction_horizon"]
-        
+        self.stime = None
+        self.ctrlTick = 0
+        self.prediction_horizon = config["prediction_horizon"]
+
         # Lazy initialization - no Docker client created in __init__
         # This prevents fork issues with gevent threading
         self._client = None
@@ -38,8 +39,9 @@ class ControlLoop():
 
         self.cooldown = 3
         self.suggestion = []
+        logger.info(config)
 
-    @property  
+    @property
     def client(self):
         """
         Lazy initialization del Docker client per evitare problemi di fork con gevent.
@@ -47,8 +49,9 @@ class ControlLoop():
         """
         if self._client is None:
             logger.debug("%s Initializing Docker client (lazy)", self.service_prefix)
-            if self.config["remote"] is not None and self.config["remote_docker_port"] is not None:
-                self._client = docker.DockerClient(base_url='tcp://'+self.config["remote"]+":"+str(self.config["remote_docker_port"]))
+            if self.config["remote_docker_host"] is not None and self.config["remote_docker_port"] is not None:
+                self._client = docker.DockerClient(
+                    base_url='tcp://' + self.config["remote_docker_host"] + ":" + str(self.config["remote_docker_port"]))
             else:
                 self._client = docker.from_env()
             logger.debug("%s Docker client initialized successfully", self.service_prefix)
@@ -57,29 +60,33 @@ class ControlLoop():
     '''TODO: devo ristrutturare il condice in modo tale che le misure
             vengano prese ogni secondo, la stima fatta ogni n tick e il controllo ogni m tick
     '''
-    def loop(self,environment):
+
+    def loop(self, stop_event):
         global initCore, estimator, controller
-        self.estimator=self.getEstimator()
-        self.controller=self.getController()
-        self.monitor=self.getMonitor()
-        while not self.toStop:
+        self.estimator = self.getEstimator()
+        self.controller = self.getController()
+        self.monitor = self.getMonitor()
+        start_time = time.time()
+        EPSYLON=0.0000001 # Static small value to avoid division by zero
+        while not stop_event.is_set():
             # Ottieni il tempo corrente.
-            t=self.getSimTime(environment=environment)
+            t = time.time() - start_time
             try:
                 self.monitor.tick(t)
                 logger.info("%s ━━━ TICK %d (t=%.2f) ━━━", self.service_prefix, self.ctrlTick, t)
 
                 # Verifica che tutte le liste abbiano almeno un elemento prima di accedervi
                 if (len(self.monitor.rts) > 0 and len(self.monitor.tr) > 0 and len(self.monitor.arrival_rate) > 0 and
-                    len(self.monitor.replica) > 0 and len(self.monitor.ready_replica) > 0 and
-                    len(self.monitor.cores) > 0 and len(self.monitor.users) > 0 and
-                    len(self.monitor.active_users) > 0 and len(self.monitor.util) > 0):
+                        len(self.monitor.replica) > 0 and len(self.monitor.ready_replica) > 0 and
+                        len(self.monitor.cores) > 0 and len(self.monitor.users) > 0 and
+                        len(self.monitor.active_users) > 0 and len(self.monitor.util) > 0):
 
                     # Stampa formattata in più righe con nuovo modello arrival rate
                     logger.info("%s  ├─ Response Time:  %.4f", self.service_prefix, self.monitor.rts[-1])
                     logger.info("%s  ├─ Throughput:     %.4f", self.service_prefix, self.monitor.tr[-1])
                     logger.info("%s  ├─ Arrival Rate:   %.4f", self.service_prefix, self.monitor.arrival_rate[-1])
-                    logger.info("%s  ├─ Arrival (Pred): %.4f", self.service_prefix, self.monitor.predict_arrival_rate(horizon=self.prediction_horizon))
+                    logger.info("%s  ├─ Arrival (Pred): %.4f", self.service_prefix,
+                                self.monitor.predict_arrival_rate(horizon=self.prediction_horizon))
                     logger.info("%s  ├─ Replicas:       %s", self.service_prefix, self.monitor.replica[-1])
                     logger.info("%s  ├─ Ready Replicas: %s", self.service_prefix, self.monitor.ready_replica[-1])
                     logger.info("%s  ├─ Cores:          %.2f", self.service_prefix, self.monitor.cores[-1])
@@ -92,43 +99,44 @@ class ControlLoop():
             except Exception as e:
                 logger.error("%s ❌ Error in control loop: %s", self.service_prefix, str(e))
                 # Continua l'esecuzione per provare nel prossimo ciclo
-            if(self.ctrlTick>self.config["estimation_window"] and
-               len(self.monitor.rts)>=self.config["estimation_window"]):
-                totalcores = np.array(self.monitor.cores[-self.config["estimation_window"]:]) * np.array(self.monitor.replica[-self.config["estimation_window"]:])
-                respnseTimes=np.array(self.monitor.rts[-self.config["estimation_window"]:])
-                wip=self.monitor.predict_users(horizon=self.prediction_horizon)
-                
+            if (self.ctrlTick > self.config["estimation_window"] and
+                    len(self.monitor.rts) >= self.config["estimation_window"]):
+                totalcores = np.array(self.monitor.cores[-self.config["estimation_window"]:]) * np.array(
+                    self.monitor.replica[-self.config["estimation_window"]:])
+                respnseTimes = np.array(self.monitor.rts[-self.config["estimation_window"]:])
+                wip = self.monitor.predict_users(horizon=self.prediction_horizon)
+
                 # Protezione contro divisione per zero
                 if self.monitor.tr[-1] > 0:
                     self.stime = self.monitor.util[-1] / self.monitor.tr[-1]
                 else:
-                    self.stime = 0.0
+                    self.stime = 0.0+EPSYLON
                     logger.warning("%s  ⚠️ Throughput is zero, cannot calculate service time", self.service_prefix)
-                
-                stealth=self.config["stealth"]
-                logger.info("%s  → Service Time: %.4f (stealth=%s)", self.service_prefix, self.stime, stealth)
 
-            if((self.ctrlTick%self.config["control_widow"]==0) and self.stime is not None and self.stime>0):
+
+
+            if ((self.ctrlTick % self.config["control_window"] == 0) and self.stime is not None):
                 # NUOVO: Usa OpenClassCTRL con arrival rate predetto e service time stimato
                 predicted_arrival_rate = self.monitor.predict_arrival_rate(horizon=self.prediction_horizon)
-                
-                if(not self.config["stealth"]):
-                    # Usa nuovo controllore queuing theory con parametri espliciti
-                    replicas = self.controller.calculate_replicas(
-                        arrival_rate=predicted_arrival_rate,
-                        service_time=self.stime,
-                        target_utilization=self.config["target_utilization"]
-                    )
-                    
-                    self.addSuggestion(replicas)
-                    logger.info("%s  → Control Action: %d replicas (λ_pred=%.4f, stime=%.4f, tgt=%.2f)", 
-                              self.service_prefix, replicas, predicted_arrival_rate, self.stime, self.config["target_utilization"])
-                    self.actuate(replicas)
 
-            time.sleep(timeparse(self.config["measurament_period"]))
-            self.ctrlTick+=1
+                # Usa nuovo controllore queuing theory con parametri espliciti
+                replicas = self.controller.calculate_replicas(
+                    arrival_rate=predicted_arrival_rate,
+                    service_time=self.stime,
+                    target_utilization=self.config["target_utilization"]
+                )
 
-    def addSuggestion(self,replica):
+                self.addSuggestion(replicas)
+                logger.info("%s  → Control Action: %d replicas (λ_pred=%.4f, stime=%.4f, tgt=%.2f)",
+                            self.service_prefix, replicas, predicted_arrival_rate, self.stime,
+                            self.config["target_utilization"])
+                self.actuate(replicas)
+
+            time.sleep(timeparse(self.config["measurement_period"]))
+            self.ctrlTick += 1
+        logger.info("Stop requested, exit loop()")
+
+    def addSuggestion(self, replica):
         """
         Aggiunge un nuovo valore all'array circolare delle suggestioni.
         Quando l'array raggiunge la dimensione massima (self.cooldown),
@@ -168,7 +176,8 @@ class ControlLoop():
 
             # It's downscaling if requested replicas are less than current replicas
             is_downscaling = requested_replicas < current_replicas
-            logger.debug("%s Scaling check: requested=%d, current=%d, downscale=%s", self.service_prefix, requested_replicas, current_replicas, is_downscaling)
+            logger.debug("%s Scaling check: requested=%d, current=%d, downscale=%s", self.service_prefix,
+                         requested_replicas, current_replicas, is_downscaling)
 
             return is_downscaling
         except Exception as e:
@@ -185,8 +194,8 @@ class ControlLoop():
         '''
         return OpenClassCTRL(min_replicas=1, max_replicas=16)
 
-    def getSimTime(self,environment):
-         # Ottieni il tempo corrente.
+    def getSimTime(self, environment):
+        # Ottieni il tempo corrente.
         # Se environment.runner non ha start_time, usa il valore salvato in environment.start_time
         if hasattr(environment, "shape_class") and environment.shape_class is not None:
             t = environment.shape_class.get_run_time()
@@ -199,14 +208,14 @@ class ControlLoop():
         '''
             TODO: parse config
         '''
-        return Monitoring(window=self.config["measurament_period"],
-                        sla=0.2,
-                        serviceName=self.config["service_name"],
-                        stack_name=self.config["stack_name"],
-                        promHost=self.config["prometheus"]["host"],
-                        promPort=self.config["prometheus"]["port"],
-                        sysfile=self.config["sysfile"],
-                          remote=self.config["remote"],
+        return Monitoring(window=self.config["measurement_period"],
+                          sla=0.2,
+                          serviceName=self.config["service_name"],
+                          stack_name=self.config["stack_name"],
+                          promHost=self.config["prom_host"],
+                          promPort=self.config["prom_port"],
+                          sysfile=self.config["sysfile"],
+                          remote_docker_host=self.config["remote_docker_host"],
                           remote_docker_port=self.config["remote_docker_port"],
                           disable_prometheus=self.config.get("disable_prometheus", False))
 
@@ -216,7 +225,7 @@ class ControlLoop():
         '''
         return QNEstimaator()
 
-    def actuate(self,replicas):
+    def actuate(self, replicas):
         """
         Aggiorna la configurazione del service monitorato impostando il numero di repliche.
         Implementa una logica differenziata: ritardo nel downscaling, risposta immediata nell'upscaling.
@@ -225,7 +234,8 @@ class ControlLoop():
             # Construct full service name
             full_service_name = f"{self.config['stack_name']}_{self.config['service_name']}"
             logger.debug("%s Scaling '%s' to %d replicas", self.service_prefix, full_service_name, int(replicas))
-            logger.debug("%s Available services: %s", self.service_prefix, [service.name for service in self.client.services.list()])
+            logger.debug("%s Available services: %s", self.service_prefix,
+                         [service.name for service in self.client.services.list()])
 
             service = self.client.services.get(full_service_name)
             logger.debug("%s Found service: %s", self.service_prefix, service.name)
@@ -241,7 +251,8 @@ class ControlLoop():
                     # Calcola il massimo delle suggestioni, ma non scendere sotto il valore minimo
                     max_suggestion = max(self.suggestion)
                     target_replicas = max(1, int(max_suggestion))
-                    logger.info("%s ⬇️  DOWNSCALE: Requested=%d, Max=%d, Target=%d", self.service_prefix, int(replicas), max_suggestion, target_replicas)
+                    logger.info("%s ⬇️  DOWNSCALE: Requested=%d, Max=%d, Target=%d", self.service_prefix, int(replicas),
+                                max_suggestion, target_replicas)
                     service.scale(target_replicas)
                 else:
                     # Se non abbiamo suggestioni, usiamo il valore richiesto
@@ -250,15 +261,22 @@ class ControlLoop():
                 # Per l'upscaling, rispondiamo immediatamente per garantire prestazioni
                 # Converti replicas in int per evitare errori JSON
                 service.scale(max(1, int(replicas)))
-                logger.info("%s ⬆️  UPSCALE: %s scaled to %d replicas", self.service_prefix, full_service_name, int(replicas))
+                logger.info("%s ⬆️  UPSCALE: %s scaled to %d replicas", self.service_prefix, full_service_name,
+                            int(replicas))
         except docker.errors.NotFound:
             logger.error("%s ❌ Service '%s' not found", self.service_prefix, full_service_name)
-            logger.error("%s ❌ Check config: stack='%s', service='%s'", self.service_prefix, self.config['stack_name'], self.config['service_name'])
+            logger.error("%s ❌ Check config: stack='%s', service='%s'", self.service_prefix, self.config['stack_name'],
+                         self.config['service_name'])
         except Exception as e:
             logger.error("%s ❌ Scaling failed: %s", self.service_prefix, str(e))
             logger.error("%s ❌ Error type: %s", self.service_prefix, type(e))
-            logger.error("%s ❌ Config: stack='%s', service='%s'", self.service_prefix, self.config['stack_name'], self.config['service_name'])
+            logger.error("%s ❌ Config: stack='%s', service='%s'", self.service_prefix, self.config['stack_name'],
+                         self.config['service_name'])
 
-    def saveResults(self):
-        self.toStop=True
+
+
+    def saveResults(self,service_name):
+        print("###############################")
+        print(service_name+ " : "+self.config["outfile"])
+        print("###############################")
         self.monitor.save_to_csv(self.config["outfile"])

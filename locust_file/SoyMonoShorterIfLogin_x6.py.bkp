@@ -80,7 +80,7 @@ gateway_conf={ "service_name": "gateway",
            #"remote_docker_port":2375
            "remote":None,
            "remote_docker_port":None
-         } 
+         }
 
 #Qui la logica di avvio del control loop specifica per ogni locus file
 ctrlLoop_ms_exercise=ControlLoop(config=ms_exercise_conf)
@@ -139,7 +139,7 @@ class SoyMonoUser(BaseExp):
                     access_token = cookie.value
                 elif cookie.name == "refresh_token":
                     refresh_token = cookie.value
-            
+
         else:
             # Log debug info for non-200 responses and stop this user iteration
             try:

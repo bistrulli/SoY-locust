@@ -27,13 +27,13 @@ locust_process = None
 def load_config_from_locust_file(locust_file_path):
     """
     Carica la configurazione dal file locust specificato usando regex.
-    
+
     Args:
         locust_file_path (str): Percorso del file locust
-        
+
     Returns:
         tuple: (stack_name, stack_path)
-        
+
     Raises:
         ValueError: Se la configurazione non è valida
         FileNotFoundError: Se il file locust non esiste
@@ -42,38 +42,38 @@ def load_config_from_locust_file(locust_file_path):
         # Verifica che il file esista
         if not Path(locust_file_path).exists():
             raise FileNotFoundError(f"Locust file does not exist: {locust_file_path}")
-        
+
         # Verifica che sia un file e non una directory
         if not Path(locust_file_path).is_file():
             raise ValueError(f"Path must be a file, not a directory: {locust_file_path}")
-        
+
         # Legge il contenuto del file
         with open(locust_file_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        
+
         # Estrae stack_name usando regex
         stack_name_match = re.search(r'"stack_name":\s*"([^"]+)"', content)
         if not stack_name_match:
             raise ValueError(f"Could not find 'stack_name' in locust file: {locust_file_path}")
         stack_name = stack_name_match.group(1)
-        
+
         # Estrae sysfile usando regex - cerca il pattern "sysfile": .../"filename"
         sysfile_match = re.search(r'"sysfile":\s*[^/]*/[^/]*/"([^"]+)"', content)
         if not sysfile_match:
             raise ValueError(f"Could not find 'sysfile' in locust file: {locust_file_path}")
-        
+
         # Estrae direttamente il nome del file (senza virgolette)
         sysfile_name = sysfile_match.group(1)
-        
+
         # Costruisce il path completo usando sys_base_path
         full_sysfile_path = sys_base_path / sysfile_name
-        
+
         # Verifica che il file di sistema esista
         if not full_sysfile_path.exists():
             raise ValueError(f"System file does not exist: {full_sysfile_path}")
-        
+
         return stack_name, full_sysfile_path
-        
+
     except FileNotFoundError as e:
         raise e
     except Exception as e:
@@ -99,8 +99,7 @@ def initSys(args):
         logging.info(f"Deploying Docker Swarm leave")
         cmd = []
         if args.remote:
-            cmd.append("ssh")
-            cmd.append(args.remote)
+            cmd.append("DOCKER_HOST=tcp://"+args.remote_docker_host+":"+str(args.remote_docker_port))
         cmd.append("docker")
         cmd.append("swarm")
         cmd.append("leave")
@@ -114,8 +113,7 @@ def initSys(args):
     logging.info(f"Deploying Docker Swarm init")
     cmd = []
     if args.remote:
-        cmd.append("ssh")
-        cmd.append(args.remote)
+        cmd.append("DOCKER_HOST=tcp://"+args.remote_docker_host+":"+str(args.remote_docker_port))
     cmd.append("docker")
     cmd.append("swarm")
     cmd.append("init")
@@ -131,12 +129,11 @@ def startSys(args):
     if stackName is None or stackPath is None:
         logging.error("Cannot start system: stack name or path not configured")
         return
-        
+
     logging.info(f"Deploying Docker Swarm stack using {stackName}")
     cmd = []
     if args.remote:
-        cmd.append("ssh")
-        cmd.append(args.remote)
+        cmd.append("DOCKER_HOST=tcp://"+args.remote_docker_host+":"+str(args.remote_docker_port))
     cmd.append("docker")
     cmd.append("stack")
     cmd.append("deploy")
@@ -154,12 +151,11 @@ def stopSys(args):
     if stackName is None:
         logging.error("Cannot stop system: stack name not configured")
         return
-        
+
     logging.info(f"Removing Docker Swarm stack {stackName}")
     cmd = []
     if args.remote:
-        cmd.append("ssh")
-        cmd.append(args.remote)
+        cmd.append("DOCKER_HOST=tcp://"+args.remote_docker_host+":"+str(args.remote_docker_port))
     cmd.append("docker")
     cmd.append("stack")
     cmd.append("rm")
@@ -194,7 +190,7 @@ signal.signal(signal.SIGINT, handle_sigint)
 def main():
     global locust_process, stackName, stackPath
     args = parse_args()
-    
+
     # Inizializza il logging centralizzato
     # Puoi cambiare il livello qui: 'DEBUG', 'INFO', 'WARNING', 'ERROR'
     logger = init_logging(level='INFO')
