@@ -38,7 +38,8 @@ The system uses a modern microservices architecture with the following component
 ├── run_load_test.py              # Main script for running individual load tests
 ├── run_locust_files.sh           # Shell script for batch testing
 ├── locust_file/                  # Directory containing Locust test files
-│   └── loadshapes/              # Custom load shape definitions
+│   └── loadshapes/              # Custom load shape definitions (see [LOADSHAPES_GUIDE.md](LOADSHAPES_GUIDE.md))
+├── workloads/                    # CSV waveform files for csv_shape.py
 ├── sou/                         # Docker Swarm configuration files
 │   └── monotloth-v5.yml        # Main Docker Swarm stack configuration (with Traefik)
 ├── prometheus/                  # Prometheus configuration
@@ -106,6 +107,28 @@ Example:
 ```bash
 ./run_locust_files.sh locust_file/loadshapes/cyclical_shape.py
 ```
+
+### Available Loadshapes
+
+The framework includes 6 loadshapes for different testing scenarios:
+
+| Loadshape | Pattern | Description |
+|-----------|---------|-------------|
+| `constant_shape.py` | Flat | Fixed 50 users for 5 minutes |
+| `rampup_shape.py` | Linear | 0 → 100 users over 5 minutes |
+| `peak_shape.py` | Triangle | Ramp up, hold peak, ramp down |
+| `cyclical_shape.py` | Waves | Repeating load cycles |
+| `step_shape.py` | Stairs | Discrete step increases/decreases |
+| `csv_shape.py` | Custom | Load pattern from CSV file |
+
+**CSV-Based Loadshape:** Reproduce real-world traffic patterns from CSV files:
+```bash
+CSV_SHAPE_FILE=workloads/twitter.csv \
+python run_load_test.py \
+    --loadshape-file locust_file/loadshapes/csv_shape.py ...
+```
+
+For detailed documentation, see **[LOADSHAPES_GUIDE.md](LOADSHAPES_GUIDE.md)**.
 
 ## 📊 Enhanced Metrics Collection
 
