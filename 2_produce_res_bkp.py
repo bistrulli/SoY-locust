@@ -46,49 +46,47 @@ def get_from_influxdb(run_id):
 
     if res["start_time"] is not None and res["end_time"] is not None:
         client.switch_database('telegraf')
-        try:
-            q = 'SELECT mean("usage_user"),max("usage_user"),min("usage_user"),stddev("usage_user") FROM "cpu" WHERE ("host"::tag = \'test-ubuntu\' AND "cpu"::tag = \'cpu-total\') AND time >= \'' + \
-                res["start_time"] + '\' AND time <= \'' + res["end_time"] + '\'  ORDER BY time ASC'
-            result = client.query(q)
-            rq = result.get_points().__next__()
-            res["cpu_usage_mean"] = rq["mean"]
-            res["cpu_usage_max"] = rq["max"]
-            res["cpu_usage_min"] = rq["min"]
-            res["cpu_usage_std"] = rq["stddev"]
 
-            q = 'SELECT mean("active"),max("active"),min("active"),stddev("active") FROM "mem" WHERE ("host"::tag = \'test-ubuntu\' ) AND time >= \'' + \
-                res["start_time"] + '\' AND time <= \'' + res["end_time"] + '\'  ORDER BY time ASC'
-            result = client.query(q)
-            rq = result.get_points().__next__()
-            res["mem_active_mean"] = rq["mean"]
-            res["mem_active_max"] = rq["max"]
-            res["mem_active_min"] = rq["min"]
-            res["mem_active_std"] = rq["stddev"]
+        q = 'SELECT mean("usage_user"),max("usage_user"),min("usage_user"),stddev("usage_user") FROM "cpu" WHERE ("host"::tag = \'test-ubuntu\' AND "cpu"::tag = \'cpu-total\') AND time >= \'' + \
+            res["start_time"] + '\' AND time <= \'' + res["end_time"] + '\'  ORDER BY time ASC'
+        result = client.query(q)
+        rq = result.get_points().__next__()
+        res["cpu_usage_mean"] = rq["mean"]
+        res["cpu_usage_max"] = rq["max"]
+        res["cpu_usage_min"] = rq["min"]
+        res["cpu_usage_std"] = rq["stddev"]
 
-            q = 'SELECT mean("ApparentPower"),max("ApparentPower"),min("ApparentPower"),stddev("ApparentPower") FROM "tasmota" WHERE ("topic"::tag = \'tele/tasmota_FA3A6F/SENSOR\' ) AND time >= \'' + \
-                res["start_time"] + '\' AND time <= \'' + res["end_time"] + '\'  ORDER BY time ASC'
-            result = client.query(q)
-            rq = result.get_points().__next__()
-            res["power_apparent_mean"] = rq["mean"]
-            res["power_apparent_max"] = rq["max"]
-            res["power_apparent_min"] = rq["min"]
-            res["power_apparent_std"] = rq["stddev"]
+        q = 'SELECT mean("active"),max("active"),min("active"),stddev("active") FROM "mem" WHERE ("host"::tag = \'test-ubuntu\' ) AND time >= \'' + \
+            res["start_time"] + '\' AND time <= \'' + res["end_time"] + '\'  ORDER BY time ASC'
+        result = client.query(q)
+        rq = result.get_points().__next__()
+        res["mem_active_mean"] = rq["mean"]
+        res["mem_active_max"] = rq["max"]
+        res["mem_active_min"] = rq["min"]
+        res["mem_active_std"] = rq["stddev"]
 
-            q = 'SELECT max("Total"),min("Total") FROM "tasmota" WHERE ("topic"::tag = \'tele/tasmota_FA3A6F/SENSOR\' ) AND time >= \'' + \
-                res["start_time"] + '\' AND time <= \'' + res["end_time"] + '\'  ORDER BY time ASC'
-            result = client.query(q)
-            rq = result.get_points().__next__()
-            res["power_total_max"] = rq["max"]
-            res["power_total_min"] = rq["min"]
-            res["power_total_diff"] = res["power_total_max"] - res["power_total_min"]
-        except Exception as e:
-            print("\tError while fetching metrics from InfluxDB for runID", run_id, ":", e)
-    print("InfluxDB query for runID", run_id)
+        q = 'SELECT mean("ApparentPower"),max("ApparentPower"),min("ApparentPower"),stddev("ApparentPower") FROM "tasmota" WHERE ("topic"::tag = \'tele/tasmota_FA3A6F/SENSOR\' ) AND time >= \'' + \
+            res["start_time"] + '\' AND time <= \'' + res["end_time"] + '\'  ORDER BY time ASC'
+        result = client.query(q)
+        rq = result.get_points().__next__()
+        res["power_apparent_mean"] = rq["mean"]
+        res["power_apparent_max"] = rq["max"]
+        res["power_apparent_min"] = rq["min"]
+        res["power_apparent_std"] = rq["stddev"]
+
+        q = 'SELECT max("Total"),min("Total") FROM "tasmota" WHERE ("topic"::tag = \'tele/tasmota_FA3A6F/SENSOR\' ) AND time >= \'' + \
+            res["start_time"] + '\' AND time <= \'' + res["end_time"] + '\'  ORDER BY time ASC'
+        result = client.query(q)
+        rq = result.get_points().__next__()
+        res["power_total_max"] = rq["max"]
+        res["power_total_min"] = rq["min"]
+        res["power_total_diff"] = res["power_total_max"] - res["power_total_min"]
+
     return res
 
 
 #dirname = "/Users/benoit/_SOU/results/"
-dirname = "/Users/benoit/_SOU/results/"
+dirname = "/Users/benoit/_SOU/tmp/"
 contents = os.listdir(dirname)
 
 results = []

@@ -81,8 +81,8 @@ run_test() {
 
 
 
-#uuid=$(cat /proc/sys/kernel/random/uuid)
-uuid="dsqdsqdsqdqs"
+uuid=$(cat /proc/sys/kernel/random/uuid)
+#uuid="dsqdsqdsqdqs"
 
 
 

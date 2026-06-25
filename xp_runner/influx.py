@@ -24,12 +24,13 @@ def write_bdd_logger(
         vu=200,
         spawn_rate=10,
         run_time=600,
+        local_loadshape="linear",
         iteration=0,
         state="init"
 ):
     tag, url = generate_tags(autoscaler, autoscaler_replicas_e, autoscaler_replicas_g, autoscaler_replicas_o, bdd,
                              bench,
-                             host, iteration, machine, replicas_e, replicas_g, replicas_o, run_id, run_time, spawn_rate,
+                             host, local_loadshape,iteration, machine, replicas_e, replicas_g, replicas_o, run_id, run_time, spawn_rate,
                              vu, state=state)
 
     state_value = 0
@@ -72,7 +73,7 @@ def write_to_influx(url, tag, value):
             continue
 
 
-def generate_tags(autoscaler, autoscaler_replicas_e, autoscaler_replicas_g, autoscaler_replicas_o, bdd, bench, host,
+def generate_tags(autoscaler, autoscaler_replicas_e, autoscaler_replicas_g, autoscaler_replicas_o, bdd, bench, host,local_loadshape,
                   iteration, machine, replicas_e, replicas_g, replicas_o, run_id, run_time, spawn_rate, vu, state):
     url = host + "/write?db=" + bdd
     tag = {
@@ -88,6 +89,7 @@ def generate_tags(autoscaler, autoscaler_replicas_e, autoscaler_replicas_g, auto
         "iteration": iteration,
         "spawn_rate": spawn_rate,
         "run_time": run_time,
+        "loadshape": local_loadshape,
         "autoscaler_replicasG": autoscaler_replicas_g,
         "autoscaler_replicasE": autoscaler_replicas_e,
         "autoscaler_replicasO": autoscaler_replicas_o

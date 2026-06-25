@@ -11,10 +11,14 @@ def execute_locust_test(
         log_level="INFO",
         csv_base="results/SoyMonoShorterIfLogin_x6/SoyMonoShorterIfLogin_x6.csv",
         log_file="results/SoyMonoShorterIfLogin_x6/SoyMonoShorterIfLogin_x6.log",
-        locust_file="test.py"
+#        locust_file="loadshape.py,test.py"
+        locust_file="loadshape-csv.py,test.py"
+#        locust_file="loadshape-real.py,test.py"
+#        locust_file="loadshape-real2.py,test.py"
 ):
     cmd = ["locust", "--headless",
-           "--u", str(users),
+           "-u", str(users),
+           "-r", str(spawn_rate),
            "--spawn-rate", str(spawn_rate),
            "--run-time", str(run_time),
            "--host", host,

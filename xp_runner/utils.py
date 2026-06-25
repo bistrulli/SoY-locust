@@ -145,6 +145,7 @@ def write_config(dirname="results/tmp",
                  local_control_window=20,
                  local_estimation_window=20,
                  local_measurement_period="1s",
+                 local_loadshape="linear",
                  local_iteration=0):
     config_file = dirname.rstrip() + "config.json"
     config = {
@@ -165,6 +166,7 @@ def write_config(dirname="results/tmp",
         "control_window": local_control_window,
         "estimation_window": local_estimation_window,
         "measurement_period": local_measurement_period,
+        "loadshape": local_loadshape,
         "iteration": local_iteration
     }
     print("Writing config file: {}".format(config))
@@ -192,25 +194,37 @@ def run_one_shot(
         run_time=600,
         run_id="00000000",
         bench="SOU",
+        loadshape="linear",
         iteration=0):
-    xp_runner.influx.write_bdd_logger(replicas_o=replicas_o, replicas_e=replicas_e, replicas_g=replicas_g,
-                                      autoscaler=autoscaler,
-                                      autoscaler_replicas_e=autoscaler_replicas_e,
-                                      autoscaler_replicas_g=autoscaler_replicas_g,
-                                      autoscaler_replicas_o=autoscaler_replicas_o,
-                                      vu=vu, spawn_rate=spawn_rate, run_time=run_time, bench=bench, iteration=iteration,
-                                      run_id=run_id, state="init")
-
     dirname = xp_runner.utils.generate_res_folder()
+
     xp_runner.utils.write_config(dirname,
                                  local_replicas_o=replicas_o, local_replicas_e=replicas_e, local_replicas_g=replicas_g,
                                  local_autoscaler=autoscaler,
                                  local_autoscaler_replicas_e=autoscaler_replicas_e,
                                  local_autoscaler_replicas_g=autoscaler_replicas_g,
                                  local_autoscaler_replicas_o=autoscaler_replicas_o,
-                                 local_vu=vu, local_spawn_rate=spawn_rate, local_run_time=run_time, local_bench=bench, local_iteration=iteration,
+                                 local_prediction_horizon=prediction_horizon,
+                                 local_target_utilization=target_utilization,
+                                 local_control_window=control_window,
+                                 local_estimation_window=estimation_window,
+                                 local_measurement_period=measurement_period,
+
+                                 local_vu=vu, local_spawn_rate=spawn_rate, local_run_time=run_time, local_bench=bench,
+                                 local_loadshape=loadshape,
+                                 local_iteration=iteration,
                                  local_run_id=run_id)
     if True:
+        xp_runner.influx.write_bdd_logger(replicas_o=replicas_o, replicas_e=replicas_e, replicas_g=replicas_g,
+                                          autoscaler=autoscaler,
+                                          autoscaler_replicas_e=autoscaler_replicas_e,
+                                          autoscaler_replicas_g=autoscaler_replicas_g,
+                                          autoscaler_replicas_o=autoscaler_replicas_o,
+                                          vu=vu, spawn_rate=spawn_rate, run_time=run_time, bench=bench,
+                                          local_loadshape=loadshape,
+                                          iteration=iteration,
+                                          run_id=run_id, state="init")
+
         xp_runner.docker_sou.deploy_stack(
             stack_name=args.stack_name,
             docker_compose_config=args.docker_compose_config,
@@ -222,7 +236,9 @@ def run_one_shot(
                                           autoscaler_replicas_e=autoscaler_replicas_e,
                                           autoscaler_replicas_g=autoscaler_replicas_g,
                                           autoscaler_replicas_o=autoscaler_replicas_o,
-                                          vu=vu, spawn_rate=spawn_rate, run_time=run_time, bench=bench, iteration=iteration,
+                                          vu=vu, spawn_rate=spawn_rate, run_time=run_time, bench=bench,
+                                          local_loadshape=loadshape,
+                                          iteration=iteration,
                                           run_id=run_id, state="deploy")
 
         scale_services(stack_name=args.stack_name,
@@ -238,7 +254,9 @@ def run_one_shot(
                                           autoscaler_replicas_e=autoscaler_replicas_e,
                                           autoscaler_replicas_g=autoscaler_replicas_g,
                                           autoscaler_replicas_o=autoscaler_replicas_o,
-                                          vu=vu, spawn_rate=spawn_rate, run_time=run_time, bench=bench, iteration=iteration,
+                                          vu=vu, spawn_rate=spawn_rate, run_time=run_time, bench=bench,
+                                          local_loadshape=loadshape,
+                                          iteration=iteration,
                                           run_id=run_id, state="autoscaler_starting")
         configure_autoscaler(prediction_horizon=prediction_horizon,
                              target_utilization=target_utilization,
@@ -257,7 +275,9 @@ def run_one_shot(
                                           autoscaler_replicas_e=autoscaler_replicas_e,
                                           autoscaler_replicas_g=autoscaler_replicas_g,
                                           autoscaler_replicas_o=autoscaler_replicas_o,
-                                          vu=vu, spawn_rate=spawn_rate, run_time=run_time, bench=bench, iteration=iteration,
+                                          vu=vu, spawn_rate=spawn_rate, run_time=run_time, bench=bench,
+                                          local_loadshape=loadshape,
+                                          iteration=iteration,
                                           run_id=run_id, state="start")
 
         time.sleep(20)
@@ -274,9 +294,12 @@ def run_one_shot(
                                           autoscaler_replicas_e=autoscaler_replicas_e,
                                           autoscaler_replicas_g=autoscaler_replicas_g,
                                           autoscaler_replicas_o=autoscaler_replicas_o,
-                                          vu=vu, spawn_rate=spawn_rate, run_time=run_time, bench=bench, iteration=iteration,
+                                          vu=vu, spawn_rate=spawn_rate, run_time=run_time, bench=bench,
+                                          local_loadshape=loadshape,
+                                          iteration=iteration,
                                           run_id=run_id, state="stop")
-        stop_autoscaler(ms_exercice=autoscaler_replicas_e, ms_other=autoscaler_replicas_o, ms_gateway=autoscaler_replicas_g)
+        stop_autoscaler(ms_exercice=autoscaler_replicas_e, ms_other=autoscaler_replicas_o,
+                        ms_gateway=autoscaler_replicas_g)
 
         time.sleep(30)  # wait for logs to be written
 
@@ -291,7 +314,9 @@ def run_one_shot(
                                           autoscaler_replicas_e=autoscaler_replicas_e,
                                           autoscaler_replicas_g=autoscaler_replicas_g,
                                           autoscaler_replicas_o=autoscaler_replicas_o,
-                                          vu=vu, spawn_rate=spawn_rate, run_time=run_time, bench=bench, iteration=iteration,
+                                          vu=vu, spawn_rate=spawn_rate, run_time=run_time, bench=bench,
+                                          local_loadshape=loadshape,
+                                          iteration=iteration,
                                           run_id=run_id, state="autoscaler_stopped")
 
         xp_runner.docker_sou.remove_stack(stack_name=args.stack_name,
@@ -302,10 +327,12 @@ def run_one_shot(
                                           autoscaler_replicas_e=autoscaler_replicas_e,
                                           autoscaler_replicas_g=autoscaler_replicas_g,
                                           autoscaler_replicas_o=autoscaler_replicas_o,
-                                          vu=vu, spawn_rate=spawn_rate, run_time=run_time, bench=bench, iteration=iteration,
+                                          vu=vu, spawn_rate=spawn_rate, run_time=run_time, bench=bench,
+                                          local_loadshape=loadshape,
+                                          iteration=iteration,
                                           run_id=run_id, state="stack_removed")
         logger.info("One-shot run completed.")
-    cmd=["mv", dirname.rstrip(), "results/" + str(run_id)]
+    cmd = ["mv", dirname.rstrip(), "results/" + str(run_id)]
     subprocess.run(cmd)
     print("Moved results to results/" + str(run_id))
     time.sleep(30)  # wait for logs to be written
