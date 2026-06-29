@@ -100,7 +100,7 @@ class Infra:
 INFRA: Dict[str, Infra] = {
     "monolith-v4": Infra(
         name="monolith-v4",
-        backend_kind="compose",
+        backend_kind="swarm",                # swarm stack: overlay net + ingress mesh on :5001
         compose_file="sou/monotloth-v4.yml",
         project="soy_v4",
         scalable_service="node",

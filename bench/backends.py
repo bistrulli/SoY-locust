@@ -225,7 +225,7 @@ class SwarmBackend(Backend):
 
     def deploy(self, wait: bool = True) -> None:
         self._ensure_swarm()
-        _run(["docker", "stack", "deploy", "--detach=true",
+        _run(["docker", "stack", "deploy", "--detach=true", "--with-registry-auth",
               "-c", self.stack_file, self.stack_name], self.cfg)
         logger.info("Swarm stack '%s' deployed.", self.stack_name)
         if wait:
