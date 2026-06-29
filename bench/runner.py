@@ -73,6 +73,7 @@ class ExperimentSpec:
     variant: Optional[str] = None
     web_port: int = 8089
     tag: Optional[str] = None
+    label: Optional[str] = None            # parameter-sweep suffix in the tag (keeps rep)
     repetition: int = 0
     uopt_method: str = "scip"
     hpa_tolerance: float = 0.10
@@ -119,7 +120,8 @@ def _tag(spec: ExperimentSpec, infra) -> str:
         return spec.tag
     shape = Path(spec.loadshape).stem if spec.loadshape else "noshape"
     variant = spec.variant or infra.default_variant
-    return f"{infra.name}__{spec.controller}__{variant}__{shape}__rep{spec.repetition}"
+    lbl = f"{spec.label}__" if spec.label else ""
+    return f"{infra.name}__{spec.controller}__{variant}__{shape}__{lbl}rep{spec.repetition}"
 
 
 def _initial_replicas(spec: ExperimentSpec, infra) -> int:

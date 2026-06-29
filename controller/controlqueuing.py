@@ -50,7 +50,7 @@ class OPTCTRL():
                 #self.model.subject_to(T[0, i] <= C[i] / (e[i]))
                 #self.model.subject_to(T[0, i]<= S[0, i] / e[i])
                 #obj+=(C[i]-(1+tgt[i])*T[0, i])**2+0.000000*S[0, i]
-                obj+=(e[i]*T[0, i]-0.20*S[0, i])**2
+                obj+=(e[i]*T[0, i]-tgt[i]*S[0, i])**2   # tgt = target utilization (was hardcoded 0.20)
         
             self.model.minimize(obj)    
             # self.model.solver('osqp',{'print_time':False,'error_on_fail':False})

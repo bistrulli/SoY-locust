@@ -1,0 +1,180 @@
+# =============================================================================
+# Controller sweep — ALL parameters to test live here (single config file).
+#
+# Per infra (monolith-v4, monolith-v5, microservices-demo / google store):
+#   - manual scaling : 3 options  -> none (frozen) | manual (fixed) | manual-sched
+#   - hpa            : 3 scale targets -> 25% / 50% / 75% CPU
+#   - uopt           : parameter-combination sweep (target_util x min_replicas [x control])
+#   - 3 loadshapes   : cyclical / step / peak  (expanded automatically)
+#   - v4 baseline    : 6 replicas, find the load giving ~25% failure
+#
+# Isolation: every run does `up --renew-anon-volumes` then `down -v` (fresh DB/cache,
+# one stack at a time) -> runs are ISO and comparable.
+#
+# Launch EVERYTHING:        RUN_TAG=sweep ./xp.sh start matrix --file experiments_sweep.yaml
+# Launch ONE stack only:    RUN_TAG=sweep ./xp.sh start matrix --file experiments_sweep.yaml --infra monolith-v4
+# Launch ONE loadshape:     ... --shape cyclical
+# =============================================================================
+defaults:
+  run_time: 600s
+  spawn_rate: 50
+  reps: 2
+  max_replicas: 8
+  control_period_s: 5
+  loadshapes:                      # the 3 loadshapes, applied to every controller config
+    - bench/loadshapes/cyclical.py
+    - bench/loadshapes/step.py
+    - bench/loadshapes/peak.py
+
+experiments:
+
+  # =================================================================== v4 ===
+  - infra: monolith-v4             # manual scaling — 3 options in one entry
+    controllers: [none, manual, manual-sched]
+    users: 200
+    initial_replicas: 4            # none: frozen here
+    fixed_replicas: 6              # manual: fixed at 6
+    schedule: [[0, 1], [120, 3], [300, 6], [480, 3]]   # manual-sched staircase
+  - infra: monolith-v4             # hpa @ 25% / 50% / 75%
+    controllers: [hpa]
+    users: 200
+    target_utilization: 0.25
+    label: hpa-u25
+  - infra: monolith-v4
+    controllers: [hpa]
+    users: 200
+    target_utilization: 0.50
+    label: hpa-u50
+  - infra: monolith-v4
+    controllers: [hpa]
+    users: 200
+    target_utilization: 0.75
+    label: hpa-u75
+  - infra: monolith-v4             # uopt combinations (target_util x min_replicas)
+    controllers: [uopt]
+    users: 200
+    target_utilization: 0.10
+    min_replicas: 1
+    label: uopt-t10-min1
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 200
+    target_utilization: 0.10
+    min_replicas: 4
+    label: uopt-t10-min4
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 200
+    target_utilization: 0.25
+    min_replicas: 4
+    label: uopt-t25-min4
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 200
+    target_utilization: 0.50
+    min_replicas: 1
+    label: uopt-t50-min1
+  - infra: monolith-v4             # BASELINE: 6 replicas, find the load for ~25% failure
+    controllers: [manual]
+    fixed_replicas: 6
+    users: 400                     # ramped by the capacity shape until it breaks
+    run_time: 600s
+    capacity: true
+    fail_threshold: 0.25           # "breaking" = 25% failure rate
+    loadshapes: [bench/loadshapes/capacity.py]
+    reps: 1
+    label: baseline-6repl-25pct
+
+  # =================================================================== v5 ===
+  - infra: monolith-v5             # manual scaling — 3 options
+    controllers: [none, manual, manual-sched]
+    users: 200
+    initial_replicas: 4
+    fixed_replicas: 6
+    schedule: [[0, 1], [120, 3], [300, 6], [480, 3]]
+  - infra: monolith-v5             # hpa @ 25 / 50 / 75
+    controllers: [hpa]
+    users: 200
+    target_utilization: 0.25
+    label: hpa-u25
+  - infra: monolith-v5
+    controllers: [hpa]
+    users: 200
+    target_utilization: 0.50
+    label: hpa-u50
+  - infra: monolith-v5
+    controllers: [hpa]
+    users: 200
+    target_utilization: 0.75
+    label: hpa-u75
+  - infra: monolith-v5             # uopt combinations
+    controllers: [uopt]
+    users: 200
+    target_utilization: 0.10
+    min_replicas: 1
+    label: uopt-t10-min1
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 200
+    target_utilization: 0.10
+    min_replicas: 4
+    label: uopt-t10-min4
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 200
+    target_utilization: 0.25
+    min_replicas: 4
+    label: uopt-t25-min4
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 200
+    target_utilization: 0.50
+    min_replicas: 1
+    label: uopt-t50-min1
+
+  # ====================================== microservices-demo (google store) ===
+  - infra: microservices-demo      # manual scaling — 3 options
+    controllers: [none, manual, manual-sched]
+    users: 300
+    initial_replicas: 4
+    fixed_replicas: 6
+    schedule: [[0, 1], [120, 3], [300, 6], [480, 3]]
+  - infra: microservices-demo      # hpa @ 25 / 50 / 75
+    controllers: [hpa]
+    users: 300
+    target_utilization: 0.25
+    label: hpa-u25
+  - infra: microservices-demo
+    controllers: [hpa]
+    users: 300
+    target_utilization: 0.50
+    label: hpa-u50
+  - infra: microservices-demo
+    controllers: [hpa]
+    users: 300
+    target_utilization: 0.75
+    label: hpa-u75
+  - infra: microservices-demo      # uopt combinations
+    controllers: [uopt]
+    users: 300
+    target_utilization: 0.10
+    min_replicas: 1
+    label: uopt-t10-min1
+  - infra: microservices-demo
+    controllers: [uopt]
+    users: 300
+    target_utilization: 0.10
+    min_replicas: 4
+    label: uopt-t10-min4
+  - infra: microservices-demo
+    controllers: [uopt]
+    users: 300
+    target_utilization: 0.25
+    min_replicas: 4
+    label: uopt-t25-min4
+  - infra: microservices-demo
+    controllers: [uopt]
+    users: 300
+    target_utilization: 0.50
+    min_replicas: 1
+    label: uopt-t50-min1

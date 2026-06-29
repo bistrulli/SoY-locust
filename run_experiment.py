@@ -107,6 +107,8 @@ def cmd_matrix(args) -> int:
     results = []
     for entry in doc.get("experiments", []):
         infra_name = entry["infra"]
+        if args.infra and infra_name != args.infra:
+            continue                       # --infra: run ONE stack instead of all
         infra = get_infra(infra_name)
         controllers = entry.get("controllers", ["none"])
         variants = entry.get("variants", [infra.default_variant])
@@ -115,55 +117,61 @@ def cmd_matrix(args) -> int:
         def g(key, dflt=None):
             return entry.get(key, defaults.get(key, dflt))
 
-        for variant in variants:
-            for controller in controllers:
-                for rep in range(reps):
-                    spec = ExperimentSpec(
-                        infra=infra_name,
-                        controller=controller,
-                        loadshape=g("loadshape"),
-                        locustfile=g("locustfile"),
-                        host=g("host"),
-                        users=int(g("users", 100)),
-                        spawn_rate=int(g("spawn_rate", 50)),
-                        run_time=str(g("run_time", "120s")),
-                        target_utilization=float(g("target_utilization", 0.5)),
-                        min_replicas=g("min_replicas"),
-                        max_replicas=g("max_replicas"),
-                        fixed_replicas=g("fixed_replicas"),
-                        schedule=g("schedule"),
-                        initial_replicas=g("initial_replicas"),
-                        control_period_s=float(g("control_period_s", 5.0)),
-                        variant=variant,
-                        repetition=rep,
-                        uopt_method=str(g("uopt_method", "scip")),
-                        rps_per_user=float(g("rps_per_user", 1.0)),
-                        capacity=bool(g("capacity", False)),
-                        fail_threshold=float(g("fail_threshold", 0.02)),
-                        sla_p95_ms=g("sla_p95_ms"),
-                        break_samples=int(g("break_samples", 3)),
-                        stop_on_break=bool(g("stop_on_break", True)),
-                        dry_run=args.dry_run,
-                    )
-                    n += 1
-                    # --- resume: skip a run whose result.json already exists ---
-                    tag = _tag(spec, infra)
-                    done = cfg.results_path(tag, "result.json")
-                    if done.exists() and not args.force and not args.dry_run:
-                        logging.info("[matrix %d] SKIP (already done): %s", n, tag)
-                        results.append({"tag": tag, "skipped": True})
-                        continue
-                    logging.info("[matrix %d] %s/%s/%s rep%d", n, infra_name,
-                                 controller, variant, rep)
-                    try:
-                        results.append(run_experiment(spec, cfg))
-                    except Exception as e:
-                        # the failure is already explained (e.g. backends prints a
-                        # registry-auth hint); keep the log clean, full trace at DEBUG.
-                        logging.error("[matrix %d] experiment failed: %s", n, e)
-                        logging.debug("experiment traceback:", exc_info=True)
-                        results.append({"infra": infra_name, "controller": controller,
-                                        "variant": variant, "error": str(e)})
+        loadshapes = g("loadshapes") or [g("loadshape")]
+        for shape in loadshapes:
+            if args.shape and (not shape or Path(shape).stem != args.shape):
+                continue                   # --shape: run ONE loadshape
+            for variant in variants:
+                for controller in controllers:
+                    for rep in range(reps):
+                        spec = ExperimentSpec(
+                            infra=infra_name,
+                            controller=controller,
+                            loadshape=shape,
+                            locustfile=g("locustfile"),
+                            host=g("host"),
+                            users=int(g("users", 100)),
+                            spawn_rate=int(g("spawn_rate", 50)),
+                            run_time=str(g("run_time", "120s")),
+                            target_utilization=float(g("target_utilization", 0.5)),
+                            min_replicas=g("min_replicas"),
+                            max_replicas=g("max_replicas"),
+                            fixed_replicas=g("fixed_replicas"),
+                            schedule=g("schedule"),
+                            initial_replicas=g("initial_replicas"),
+                            control_period_s=float(g("control_period_s", 5.0)),
+                            variant=variant,
+                            repetition=rep,
+                            label=g("label"),
+                            uopt_method=str(g("uopt_method", "scip")),
+                            rps_per_user=float(g("rps_per_user", 1.0)),
+                            capacity=bool(g("capacity", False)),
+                            fail_threshold=float(g("fail_threshold", 0.02)),
+                            sla_p95_ms=g("sla_p95_ms"),
+                            break_samples=int(g("break_samples", 3)),
+                            stop_on_break=bool(g("stop_on_break", True)),
+                            dry_run=args.dry_run,
+                        )
+                        n += 1
+                        # --- resume: skip a run whose result.json already exists ---
+                        tag = _tag(spec, infra)
+                        done = cfg.results_path(tag, "result.json")
+                        if done.exists() and not args.force and not args.dry_run:
+                            logging.info("[matrix %d] SKIP (already done): %s", n, tag)
+                            results.append({"tag": tag, "skipped": True})
+                            continue
+                        logging.info("[matrix %d] %s/%s/%s/%s rep%d", n, infra_name,
+                                     controller, variant,
+                                     Path(shape).stem if shape else "noshape", rep)
+                        try:
+                            results.append(run_experiment(spec, cfg))
+                        except Exception as e:
+                            # the failure is already explained (e.g. backends prints a
+                            # registry-auth hint); keep the log clean, full trace at DEBUG.
+                            logging.error("[matrix %d] experiment failed: %s", n, e)
+                            logging.debug("experiment traceback:", exc_info=True)
+                            results.append({"infra": infra_name, "controller": controller,
+                                            "variant": variant, "error": str(e)})
     skipped = sum(1 for r in results if r.get("skipped"))
     logging.info("[matrix] done: %d run(s), %d skipped (already present)",
                  len(results) - skipped, skipped)
@@ -349,6 +357,10 @@ def main() -> int:
 
     pm = sub.add_parser("matrix", help="unroll a YAML matrix")
     pm.add_argument("--file", default="experiments.yaml")
+    pm.add_argument("--infra", default=None,
+                    help="run ONLY this infra's entries (one stack instead of all)")
+    pm.add_argument("--shape", default=None,
+                    help="run ONLY this loadshape (filename stem, e.g. cyclical)")
     pm.add_argument("--dry-run", action="store_true")
     pm.add_argument("--force", action="store_true",
                     help="re-run even runs whose result.json already exists (no resume)")
