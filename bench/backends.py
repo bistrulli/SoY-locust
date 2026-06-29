@@ -256,7 +256,22 @@ class SwarmBackend(Backend):
 
     def teardown(self) -> None:
         _run(["docker", "stack", "rm", self.stack_name], self.cfg, check=False)
-        logger.info("Swarm stack '%s' removed.", self.stack_name)
+        # `stack rm` is ASYNC: it returns before the services and the overlay network
+        # are actually gone. Wait for full removal, otherwise the NEXT `stack deploy`
+        # collides ("network is in use by task" / "already exists") and the run fails.
+        deadline = time.time() + 90
+        while time.time() < deadline:
+            time.sleep(3)
+            ps = _run(["docker", "stack", "ps", self.stack_name, "-q"],
+                      self.cfg, check=False, capture=True)
+            net = _run(["docker", "network", "ls", "--filter",
+                        f"name={self.stack_name}_", "-q"],
+                       self.cfg, check=False, capture=True)
+            tasks_gone = ps.returncode != 0 or not (ps.stdout or "").strip()
+            nets_gone = not (net.stdout or "").strip()
+            if tasks_gone and nets_gone:
+                break
+        logger.info("Swarm stack '%s' removed (fully torn down).", self.stack_name)
 
 
 # =============================================================================
