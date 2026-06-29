@@ -1,0 +1,70 @@
+# Comparison matrix — unrolled by: python run_experiment.py matrix --file experiments.yaml
+#
+# Each entry is multiplied by: controllers × variants × reps.
+# Output tag: results/<infra>__<controller>__<variant>__<loadshape>__rep<N>/
+#
+# Controllers compared on EACH stack (v4, v5, online boutique):
+#   none          : without autoscaler (replicas frozen at initial_replicas)
+#   manual        : manual scaling at FIXED replicas (fixed_replicas)
+#   manual-sched  : SCHEDULED manual scaling (`schedule` staircase, aligned with the loadshape)
+#   uopt          : OPTCTRL optimization model
+#   hpa           : Kubernetes-style autoscaler (CPU vs target_utilization)
+#
+# Variants (microservices-demo): node | go | python | java | csharp
+#   → impact of currencyservice's implementation language on energy/perf.
+
+defaults:
+  run_time: 600s                                    # 10-min runs
+  spawn_rate: 50
+  target_utilization: 0.2
+  control_period_s: 5
+  reps: 3
+  fixed_replicas: 4
+  schedule: [[0, 1], [120, 3], [300, 6], [480, 2]]  # manual-sched, aligned to 600s
+  # cyclical: 5 cycles × (ramp 30 + plateau 60 + pause 30 = 120s) = 600s  (SHAPE_CYCLES in xp.sh)
+  loadshape: bench/loadshapes/cyclical.py
+
+experiments:
+
+  # ===== Controller comparison: none / manual / manual-sched / uopt / hpa =====
+  # v4 needs:  docker login gitlab.polytech.umontpellier.fr:5050  (private `node` image)
+  - infra: monolith-v4
+    controllers: [none, manual, manual-sched, uopt, hpa]
+    users: 200
+
+  - infra: monolith-v5
+    controllers: [none, manual, manual-sched, uopt, hpa]
+    users: 200
+
+  - infra: microservices-demo
+    controllers: [none, manual, manual-sched, uopt, hpa]
+    users: 300
+    target_utilization: 0.5
+
+  # ===== Language impact (currencyservice) under load, HPA active =====
+  - infra: microservices-demo
+    controllers: [hpa]
+    variants: [node, go, python, java, csharp]
+    users: 300
+    target_utilization: 0.5
+    reps: 5
+
+  # ===== CAPACITY tests: find the limit (max throughput before breaking) =====
+  # users = sweep CEILING (offered throughput, req/s); the stepwise ramp climbs
+  # until the failure rate exceeds fail_threshold → break + auto stop.
+  - infra: monolith-v5
+    controllers: [none, manual, uopt, hpa]
+    capacity: true
+    users: 250
+    run_time: 600s
+    fail_threshold: 0.02
+    reps: 2
+
+  - infra: microservices-demo            # limit per currencyservice LANGUAGE
+    controllers: [hpa]
+    variants: [node, go, python, java, csharp]
+    capacity: true
+    users: 400
+    run_time: 600s
+    fail_threshold: 0.02
+    reps: 2

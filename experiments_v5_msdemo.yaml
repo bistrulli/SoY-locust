@@ -1,0 +1,49 @@
+# Focused campaign: monolith-v5 + microservices-demo (v4 excluded, already measured).
+# Launch: RUN_TAG=run4 ./xp.sh start matrix --file experiments_v5_msdemo.yaml
+defaults:
+  run_time: 600s                                    # 10-min runs
+  spawn_rate: 50
+  target_utilization: 0.2
+  control_period_s: 5
+  reps: 3
+  fixed_replicas: 4
+  schedule: [[0, 1], [120, 3], [300, 6], [480, 2]]  # manual-sched, aligned to 600s
+  loadshape: bench/loadshapes/cyclical.py           # cyclical 5x120s = 600s (SHAPE_CYCLES)
+
+experiments:
+
+  # ===== Controller comparison: none / manual / manual-sched / uopt / hpa =====
+  - infra: monolith-v5
+    controllers: [none, manual, manual-sched, uopt, hpa]
+    users: 200
+
+  - infra: microservices-demo
+    controllers: [none, manual, manual-sched, uopt, hpa]
+    users: 300
+    target_utilization: 0.5
+
+  # ===== Language impact (currencyservice), HPA active =====
+  - infra: microservices-demo
+    controllers: [hpa]
+    variants: [node, go, python, java, csharp]
+    users: 300
+    target_utilization: 0.5
+    reps: 5
+
+  # ===== CAPACITY tests (breaking point) =====
+  - infra: monolith-v5
+    controllers: [none, manual, uopt, hpa]
+    capacity: true
+    users: 250
+    run_time: 600s
+    fail_threshold: 0.02
+    reps: 2
+
+  - infra: microservices-demo
+    controllers: [hpa]
+    variants: [node, go, python, java, csharp]
+    capacity: true
+    users: 400
+    run_time: 600s
+    fail_threshold: 0.02
+    reps: 2

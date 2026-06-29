@@ -63,8 +63,10 @@ def on_locust_start(environment, **_kwargs):
     if not hasattr(environment, "start_time"):
         environment.start_time = time.time()
 
-    # Carica gli utenti dal file CSV solo se non sono già stati caricati
-    with open(f'{resourceDir.absolute()}/soymono2/users.csv') as csv_file:
+    # Users CSV: per-infra via SOY_USERS_CSV (e.g. v4 seeded with @yopmail.com),
+    # default = soymono2/users.csv (@yopmail.fr, used by v5).
+    users_csv = os.environ.get("SOY_USERS_CSV") or f'{resourceDir.absolute()}/soymono2/users.csv'
+    with open(users_csv) as csv_file:
         reader = csv.DictReader(csv_file)
         users = [row for row in reader]
 

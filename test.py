@@ -7,9 +7,11 @@ import csv
 import time
 from threading import Lock
 import random
+import os
 
 USER_INDEX = 0
 USER_INDEX_LOCK = Lock()
+random.seed(int(os.getenv("BENCH_SEED", "42")))   # reproducible runs (config.env: BENCH_SEED)
 
 cwd = Path(__file__).parent
 
@@ -24,7 +26,13 @@ class QuickstartUser(SequentialTaskSet):
             reader = csv.DictReader(csv_file)
             self.users = [row for row in reader]
 
-        self.previous_ok = True  # état initial
+        # deterministic per-user index (reproducible: no random user pick)
+        global USER_INDEX
+        with USER_INDEX_LOCK:
+            self.user_index = USER_INDEX
+            USER_INDEX += 1
+
+        self.previous_ok = True  # initial state
         with open(f'resources/soymshttp1/0049_request.json') as json_file:
             self.exercise_data = json.load(json_file)
 
@@ -42,12 +50,9 @@ class QuickstartUser(SequentialTaskSet):
     def request_1_1(self):
         if not self.previous_ok:
             return
-        index=random.randint(0, len(self.users)-1)
-
-
-
-        email = self.users[index ]["email"]
-        password = self.users[index ]["password"]
+        user = self.users[self.user_index % len(self.users)]   # deterministic (reproducible)
+        email = user["email"]
+        password = user["password"]
         response = self.client.post(
             "/api/user/login",
             headers={"Content-Type": "application/json"},
@@ -154,6 +159,6 @@ class QuickstartUser(SequentialTaskSet):
         return response.status_code == 401
 
 
-class WebsiteUser(FastHttpUser):
-    wait_time = constant(0)
+class WebsiteUser(HttpUser):          # HttpUser (requests): response.cookies works.
+    wait_time = constant(0)            # FastHttpUser's FastResponse has no .cookies.
     tasks = [QuickstartUser]

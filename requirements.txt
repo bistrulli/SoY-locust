@@ -13,3 +13,7 @@ pyomo>=6.9.1
 pyscipopt
 prometheus-client
 flask
+psutil
+faker
+requests
+pandas
