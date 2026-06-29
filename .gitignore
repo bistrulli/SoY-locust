@@ -173,4 +173,21 @@ cython_debug/
 .pypirc
 
 .idea
- results/
+
+# --- SoY-locust: generated data, runtime state, backups (do NOT commit) ---
+results/
+results-benoit/
+runtime_data/
+profiled_data*/
+graphify-out/
+explog.txt
+.stderr.log
+.xp*.pid
+*.bak
+*.bkp.*
+*_bkp.py
+
+# microservices-demo is a NESTED git repo (Online Boutique clone). Its variant
+# changes (compose.currency-*.yml, currencyservice-alternatives/, .csproj) live in
+# ITS OWN git history — don't embed the 50 MB clone in the parent repo.
+microservices-demo/
