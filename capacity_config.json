@@ -8,9 +8,17 @@
   "replicas": {
     "monolith-v4": 8,
     "monolith-v5": { "ms-exercise": 8, "gateway": 2, "ms-other": 2 },
-    "microservices-demo": 6
+    "microservices-demo": {
+      "frontend": 1,
+      "productcatalogservice": 4,
+      "currencyservice": 4,
+      "cartservice": 3,
+      "recommendationservice": 2,
+      "adservice": 2,
+      "checkoutservice": 2
+    }
   },
-  "user_levels": [100, 200, 400, 600, 800, 1200, 1600, 2000, 2500, 3000],
+  "user_levels": [500, 1000, 2000, 3000],
   "loadshapes": {
     "constant": "bench/loadshapes/constant.py",
     "step": "bench/loadshapes/step.py",
