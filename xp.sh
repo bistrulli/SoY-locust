@@ -20,6 +20,7 @@
 #   RUN_TAG=run1 ./xp.sh start run --infra microservices-demo --controller hpa --variant go
 #   RUN_TAG=t1   ./xp.sh test      # run ONE configured experiment (TEST_* in config.env)
 #   RUN_TAG=cap  ./xp.sh capacity  # find MAX users per stack (capacity_config.json, fixed replicas)
+#   RUN_TAG=brk  ./xp.sh breaking  # ramp users -> breaking point (<5% fail sustained; 'ramp' config)
 #   RUN_TAG=run1 ./xp.sh watch     # = screen -r soy-xp-run1  (attach to the live executor)
 #   RUN_TAG=run1 ./xp.sh status    # screen state + last run + nb of results
 #   RUN_TAG=run1 ./xp.sh follow    # tail -f results/run1/console.log (read-only)
@@ -148,6 +149,31 @@ case "${1:-}" in
         setsid "$PY" find_capacity.py "$@" >"$LOGFILE" 2>&1 &
       else
         nohup "$PY" find_capacity.py "$@" >"$LOGFILE" 2>&1 &
+      fi
+      echo $! > "$PIDFILE"
+      echo "Started (PID $(cat "$PIDFILE")) → log: $LOGFILE"
+    fi
+    ;;
+
+  breaking)
+    # Ramp the user count up to find each stack's BREAKING POINT (find_breaking.py):
+    # a level is OK only if it sustains < fail_threshold for >= hold_s (config 'ramp').
+    # Scaling (fixed replicas OR autoscaler) is configured up front in capacity_config.json.
+    shift
+    if _running; then echo "Already running (screen '${SCREEN_NAME}' or PID file)."; exit 1; fi
+    mkdir -p "$RESULTS_ROOT"; rm -f "$LOGFILE"
+    echo "Breaking-point ramp → results=$RESULTS_ROOT  screen=$SCREEN_NAME  (config: capacity_config.json)"
+    CMD=$(printf '%q ' "$PY" find_breaking.py "$@")
+    if _have_screen; then
+      screen -dmS "$SCREEN_NAME" bash -c "${CMD} 2>&1 | tee $LOGFILE"
+      rm -f "$PIDFILE"
+      echo "Started in screen '${SCREEN_NAME}' → log: $LOGFILE"
+      echo "Follow:  ./xp.sh watch   |   stop:  ./xp.sh stop"
+    else
+      if command -v setsid >/dev/null 2>&1; then
+        setsid "$PY" find_breaking.py "$@" >"$LOGFILE" 2>&1 &
+      else
+        nohup "$PY" find_breaking.py "$@" >"$LOGFILE" 2>&1 &
       fi
       echo $! > "$PIDFILE"
       echo "Started (PID $(cat "$PIDFILE")) → log: $LOGFILE"

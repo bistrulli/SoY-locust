@@ -23,5 +23,22 @@
     "constant": "bench/loadshapes/constant.py",
     "step": "bench/loadshapes/step.py",
     "peak": "bench/loadshapes/peak.py"
+  },
+  "_ramp_help": "find_breaking.py: ramp users by step; a level is OK only if it sustains < fail_threshold for hold_s. Per-infra {start, step, max}.",
+  "ramp": {
+    "warmup_s": 40,
+    "hold_s": 60,
+    "spawn_rate": 200,
+    "fail_threshold": 0.05,
+    "_scaling_help": "controller=manual => fixed replicas (from 'replicas' above). controller=hpa|uopt => autoscaler with target_utilization + min/max_replicas (secondary tiers from 'replicas' stay fixed).",
+    "controller": "manual",
+    "target_utilization": 0.5,
+    "min_replicas": 1,
+    "max_replicas": 8,
+    "levels": {
+      "monolith-v4": { "start": 25, "step": 25, "max": 600 },
+      "monolith-v5": { "start": 250, "step": 250, "max": 4000 },
+      "microservices-demo": { "start": 500, "step": 500, "max": 8000 }
+    }
   }
 }
