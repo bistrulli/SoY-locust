@@ -1,0 +1,137 @@
+defaults:
+  run_time: 600s
+  spawn_rate: 50
+  reps: 2
+  max_replicas: 8
+  control_period_s: 5
+  loadshapes:
+  - bench/loadshapes/cyclical.py
+  - bench/loadshapes/step.py
+  - bench/loadshapes/peak.py
+experiments:
+- infra: monolith-v5
+  controllers:
+  - none
+  - manual
+  - manual-sched
+  users: 3000
+  initial_replicas: 4
+  fixed_replicas: 6
+  schedule:
+  - - 0
+    - 1
+  - - 120
+    - 3
+  - - 300
+    - 6
+  - - 480
+    - 3
+- infra: monolith-v5
+  controllers:
+  - hpa
+  users: 3000
+  target_utilization: 0.25
+  label: hpa-u25
+- infra: monolith-v5
+  controllers:
+  - hpa
+  users: 3000
+  target_utilization: 0.5
+  label: hpa-u50
+- infra: monolith-v5
+  controllers:
+  - hpa
+  users: 3000
+  target_utilization: 0.75
+  label: hpa-u75
+- infra: monolith-v5
+  controllers:
+  - uopt
+  users: 3000
+  target_utilization: 0.1
+  min_replicas: 1
+  label: uopt-t10-min1
+- infra: monolith-v5
+  controllers:
+  - uopt
+  users: 3000
+  target_utilization: 0.1
+  min_replicas: 4
+  label: uopt-t10-min4
+- infra: monolith-v5
+  controllers:
+  - uopt
+  users: 3000
+  target_utilization: 0.25
+  min_replicas: 4
+  label: uopt-t25-min4
+- infra: monolith-v5
+  controllers:
+  - uopt
+  users: 3000
+  target_utilization: 0.5
+  min_replicas: 1
+  label: uopt-t50-min1
+- infra: monolith-v4
+  controllers:
+  - none
+  - manual
+  - manual-sched
+  users: 3000
+  initial_replicas: 4
+  fixed_replicas: 6
+  schedule:
+  - - 0
+    - 1
+  - - 120
+    - 3
+  - - 300
+    - 6
+  - - 480
+    - 3
+- infra: monolith-v4
+  controllers:
+  - hpa
+  users: 3000
+  target_utilization: 0.25
+  label: hpa-u25
+- infra: monolith-v4
+  controllers:
+  - hpa
+  users: 3000
+  target_utilization: 0.5
+  label: hpa-u50
+- infra: monolith-v4
+  controllers:
+  - hpa
+  users: 3000
+  target_utilization: 0.75
+  label: hpa-u75
+- infra: monolith-v4
+  controllers:
+  - uopt
+  users: 3000
+  target_utilization: 0.1
+  min_replicas: 1
+  label: uopt-t10-min1
+- infra: monolith-v4
+  controllers:
+  - uopt
+  users: 3000
+  target_utilization: 0.1
+  min_replicas: 4
+  label: uopt-t10-min4
+- infra: monolith-v4
+  controllers:
+  - uopt
+  users: 3000
+  target_utilization: 0.25
+  min_replicas: 4
+  label: uopt-t25-min4
+- infra: monolith-v4
+  controllers:
+  - uopt
+  users: 3000
+  target_utilization: 0.5
+  min_replicas: 1
+  label: uopt-t50-min1
