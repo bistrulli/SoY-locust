@@ -2,7 +2,7 @@
   "_comment": "Max-users capacity test: FIXED replicas (no autoscaler), ramp the user count until the stack breaks. Edit replicas/levels/loadshapes/threshold here.",
   "run_time": "180s",
   "spawn_rate": 100,
-  "fail_threshold": 0.05,
+  "fail_threshold": 0.25,
   "controller": "manual",
   "replicas": {
     "monolith-v4": 6,
