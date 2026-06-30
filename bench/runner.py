@@ -69,6 +69,7 @@ class ExperimentSpec:
     fixed_replicas: Optional[int] = None
     schedule: Optional[List[list]] = None  # [[t_s, replicas], ...]
     initial_replicas: Optional[int] = None
+    extra_replicas: Optional[dict] = None  # fixed per-service overrides, e.g. {"gateway":2,"ms-other":2}
     control_period_s: float = 5.0
     variant: Optional[str] = None
     web_port: int = 8089
@@ -196,6 +197,12 @@ def run_experiment(spec: ExperimentSpec, cfg: Optional[BenchConfig] = None) -> d
         initial = _initial_replicas(spec, infra)
         if not spec.dry_run:
             backend.scale(infra.scalable_service, initial)
+            # fixed per-service overrides (e.g. v5: gateway=2, ms-other=2 while
+            # ms-exercise is the scaled service) — applied once, not autoscaled.
+            for svc, n in (spec.extra_replicas or {}).items():
+                if svc != infra.scalable_service:
+                    backend.scale(svc, int(n))
+                    logger.info("Fixed %s -> %d replica(s).", svc, int(n))
             time.sleep(5)
 
         # In dry-run we measure the local machine (psutil); otherwise the resolved source

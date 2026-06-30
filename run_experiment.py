@@ -52,6 +52,20 @@ def _parse_schedule(s: str):
     return out
 
 
+def _parse_scale_extra(s):
+    """'gateway=2,ms-other=2' -> {'gateway':2,'ms-other':2} (None/'' -> None)."""
+    if not s:
+        return None
+    out = {}
+    for part in str(s).split(","):
+        part = part.strip()
+        if not part:
+            continue
+        svc, n = part.split("=")
+        out[svc.strip()] = int(n)
+    return out
+
+
 # =============================================================================
 # run
 # =============================================================================
@@ -72,6 +86,7 @@ def cmd_run(args) -> int:
         fixed_replicas=args.fixed_replicas,
         schedule=_parse_schedule(args.schedule) if args.schedule else None,
         initial_replicas=args.initial_replicas,
+        extra_replicas=_parse_scale_extra(args.scale_extra),
         control_period_s=args.control_period,
         variant=args.variant,
         web_port=args.web_port,
@@ -139,6 +154,7 @@ def cmd_matrix(args) -> int:
                             fixed_replicas=g("fixed_replicas"),
                             schedule=g("schedule"),
                             initial_replicas=g("initial_replicas"),
+                            extra_replicas=g("extra_replicas"),
                             control_period_s=float(g("control_period_s", 5.0)),
                             variant=variant,
                             repetition=rep,
@@ -330,6 +346,8 @@ def main() -> int:
     pr.add_argument("--schedule", default=None,
                     help="manual plan 't:r,...' e.g.: 0:1,60:3,120:2")
     pr.add_argument("--initial-replicas", type=int, default=None)
+    pr.add_argument("--scale-extra", default=None,
+                    help="fixed per-service replicas, e.g. 'gateway=2,ms-other=2'")
     pr.add_argument("--control-period", type=float, default=5.0)
     pr.add_argument("--variant", default=None,
                     help="infra variant (e.g. msdemo: node|go|python|java|csharp)")

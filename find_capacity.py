@@ -40,6 +40,26 @@ REPLICAS = cfg["replicas"]                             # {infra: N}
 LEVELS = sorted(cfg["user_levels"])
 SHAPES = cfg["loadshapes"]                             # {name: path}
 
+# the service the controller scales (the rest of a per-service dict is fixed extra)
+SCALABLE = {"monolith-v4": "node", "monolith-v5": "ms-exercise",
+            "microservices-demo": "frontend"}
+
+
+def split_replicas(infra):
+    """From an int OR a per-service dict, return (fixed_scalable, extra_csv).
+
+    8                                  -> (8, "")                 # scale the scalable svc
+    {"ms-exercise":8,"gateway":2,...}  -> (8, "gateway=2,...")    # + fixed extra services
+    """
+    spec = REPLICAS[infra]
+    if isinstance(spec, dict):
+        scal = SCALABLE.get(infra, "")
+        fixed = int(spec.get(scal, 1))
+        extra = ",".join(f"{k}={v}" for k, v in spec.items() if k != scal)
+        return fixed, extra
+    return int(spec), ""
+
+
 RESULTS_ROOT = os.environ.get("RESULTS_ROOT", "results/capacity")
 os.environ["RESULTS_ROOT"] = RESULTS_ROOT
 Path(RESULTS_ROOT).mkdir(parents=True, exist_ok=True)
@@ -60,15 +80,18 @@ def fail_rate(tag):
 
 
 def run_one(infra, shape_path, users, tag):
+    fixed, extra = split_replicas(infra)
     cmd = [PY, "run_experiment.py", "run",
            "--infra", infra,
            "--controller", CONTROLLER,
-           "--fixed-replicas", str(REPLICAS[infra]),
+           "--fixed-replicas", str(fixed),
            "--loadshape", shape_path,
            "--users", str(users),
            "--spawn-rate", str(SPAWN),
            "--run-time", RUN_TIME,
            "--tag", tag]
+    if extra:
+        cmd += ["--scale-extra", extra]
     subprocess.run(cmd)
     return fail_rate(tag)
 
@@ -79,11 +102,12 @@ def main():
     print(f"Replicas: {REPLICAS}")
     results = {}
     for infra, nrepl in REPLICAS.items():
+        fixed, _ = split_replicas(infra)
         for shape_name, shape_path in SHAPES.items():
             print(f"\n### {infra} / {shape_name}  (replicas={nrepl}) ###")
             max_ok, breaking = None, None
             for u in LEVELS:
-                tag = f"{infra}__{shape_name}__r{nrepl}__u{u}"
+                tag = f"{infra}__{shape_name}__r{fixed}__u{u}"
                 fr = fail_rate(tag)                        # resume: reuse if present
                 cached = fr is not None
                 if fr is None:
