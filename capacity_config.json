@@ -1,0 +1,18 @@
+{
+  "_comment": "Max-users capacity test: FIXED replicas (no autoscaler), ramp the user count until the stack breaks. Edit replicas/levels/loadshapes/threshold here.",
+  "run_time": "180s",
+  "spawn_rate": 100,
+  "fail_threshold": 0.05,
+  "controller": "manual",
+  "replicas": {
+    "monolith-v4": 6,
+    "monolith-v5": 6,
+    "microservices-demo": 6
+  },
+  "user_levels": [100, 200, 400, 600, 800, 1200, 1600, 2000, 2500, 3000],
+  "loadshapes": {
+    "constant": "bench/loadshapes/constant.py",
+    "step": "bench/loadshapes/step.py",
+    "peak": "bench/loadshapes/peak.py"
+  }
+}
