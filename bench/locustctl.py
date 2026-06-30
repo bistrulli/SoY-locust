@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import signal
+import os
 import subprocess
 import sys
 import threading
@@ -34,6 +35,13 @@ def build_locust_cmd(locustfile: str, loadshape: Optional[str], host: str,
     # time series (RPS, percentiles, failures) for the figures.
     cmd = [sys.executable, "-m", "locust", "-f", f_arg, "--host", host,
            "--csv", csv_prefix, "--csv-full-history"]
+    # Distribute the load over several CPU cores (master + N local workers) so the
+    # GENERATOR is not the bottleneck at high user counts (single-process Locust is
+    # ~1 core). The master still aggregates stats on the web API, so the signal /
+    # capacity probe are unaffected. LOCUST_PROCESSES=1 disables it.
+    procs = int(os.environ.get("LOCUST_PROCESSES", "6"))
+    if procs > 1:
+        cmd += ["--processes", str(procs)]
     if headless:
         cmd.append("--headless")
     else:
