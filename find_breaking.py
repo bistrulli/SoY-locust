@@ -113,20 +113,23 @@ def main():
         if not lv:
             print(f"## {infra}: no ramp levels configured — skipped"); continue
         print(f"## {infra}  (controller={CONTROLLER}, replicas {REPLICAS[infra]})")
-        users = lv["start"]; max_ok = None; breaking = None
-        while users <= lv["max"]:
+        # Levels: an explicit non-uniform list ("list": [1000, 5000, ...]) takes
+        # precedence; otherwise an arithmetic ramp from start to max by step.
+        seq = lv.get("list") or list(range(lv["start"], lv["max"] + 1, lv["step"]))
+        max_ok = None; breaking = None
+        for users in seq:
             tag = f"{infra}__ramp__{CONTROLLER}__u{users}"
             fr = sustained_fail_rate(tag)
             cached = fr is not None
             if fr is None:
                 fr = run_level(infra, users, tag)
             if fr is None:
-                print(f"   users={users:>5} : RUN FAILED (no history)"); users += lv["step"]; continue
+                print(f"   users={users:>6} : RUN FAILED (no history)"); continue
             ok = fr <= THRESH
-            print(f"   users={users:>5} : sustained fail={fr*100:5.1f}%  "
+            print(f"   users={users:>6} : sustained fail={fr*100:5.1f}%  "
                   f"[{'OK' if ok else 'BREAK'}]{'  (cached)' if cached else ''}")
             if ok:
-                max_ok = users; users += lv["step"]
+                max_ok = users
             else:
                 breaking = users; break
         results[infra] = {"replicas": REPLICAS[infra], "max_users": max_ok,
