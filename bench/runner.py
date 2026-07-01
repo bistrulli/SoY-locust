@@ -280,13 +280,17 @@ def run_experiment(spec: ExperimentSpec, cfg: Optional[BenchConfig] = None) -> d
         if not spec.dry_run:
             # re-open the seeded DB session window etc. before any load (v4 login)
             _apply_db_fixups(infra, backend, cfg)
-            backend.scale(infra.scalable_service, initial)
-            # fixed per-service overrides (e.g. v5: gateway=2, ms-other=2 while
-            # ms-exercise is the scaled service) — applied once, not autoscaled.
+            # Scale the scalable service AND all fixed per-service overrides in ONE
+            # call: a per-service `up --scale X=n X` reconciles X's depends_on back to
+            # 1, which would silently reset an earlier-scaled dependency (e.g. scaling
+            # checkoutservice resets productcatalog/currency/cart back to 1).
+            scales = {infra.scalable_service: initial}
             for svc, n in (spec.extra_replicas or {}).items():
                 if svc != infra.scalable_service:
-                    backend.scale(svc, int(n))
-                    logger.info("Fixed %s -> %d replica(s).", svc, int(n))
+                    scales[svc] = int(n)
+            backend.scale_many(scales)
+            logger.info("Fixed replicas: %s",
+                        ", ".join(f"{s}={n}" for s, n in scales.items()))
             time.sleep(5)
             # wait for the app to actually listen before the load starts, else the
             # first requests fail with ConnectionRefused (misread as a breaking point)

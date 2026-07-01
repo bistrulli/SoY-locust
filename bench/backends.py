@@ -15,7 +15,7 @@ import json
 import logging
 import subprocess
 import time
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from .config import CFG, BenchConfig
 
@@ -32,6 +32,11 @@ class Backend:
     def replicas(self, service: str) -> int: ...
     def containers(self, service: str) -> List[str]: ...
     def teardown(self) -> None: ...
+
+    def scale_many(self, services: Dict[str, int]) -> None:
+        """Scale several services at once (default: one call each)."""
+        for svc, n in services.items():
+            self.scale(svc, int(n))
 
 
 def _run(cmd: List[str], cfg: BenchConfig, check: bool = True,
@@ -174,6 +179,24 @@ class ComposeBackend(Backend):
                               "--scale", f"{service}={replicas}", service]
         _run(cmd, self.cfg)
         logger.info("Compose: %s scaled to %d replica(s).", service, replicas)
+
+    def scale_many(self, services: Dict[str, int]) -> None:
+        """Scale several services in ONE `up` call so none resets another's replicas.
+
+        A per-service ``up --scale X=n X`` reconciles X's ``depends_on`` services back
+        to their default scale (1); scaling a service whose dependency was already
+        scaled therefore silently resets that dependency. Passing every ``--scale`` in
+        a single ``up`` (no positional service) avoids the reset.
+        """
+        services = {s: max(0, int(n)) for s, n in services.items() if n is not None}
+        if not services:
+            return
+        cmd = self._base() + ["up", "-d", "--no-recreate", "--remove-orphans"]
+        for svc, n in services.items():
+            cmd += ["--scale", f"{svc}={n}"]
+        _run(cmd, self.cfg)
+        logger.info("Compose: scaled %s in one call.",
+                    ", ".join(f"{s}={n}" for s, n in services.items()))
 
     def replicas(self, service: str) -> int:
         return len(self.containers(service))
