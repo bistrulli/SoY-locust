@@ -36,8 +36,9 @@ static_resources:
     connect_timeout: 1s
     type: STRICT_DNS               # resolve ALL replica IPs (LOGICAL_DNS would keep only the first)
     dns_lookup_family: V4_ONLY
-    dns_refresh_rate: 5s           # re-resolve to pick up scale up / down
-    respect_dns_ttl: true
+    dns_refresh_rate: 5s           # re-resolve every 5s to pick up scale up / down
+    respect_dns_ttl: false         # do NOT honor Docker DNS's long TTL, else a replica
+                                   # added AFTER Envoy starts (bench scales post-deploy) is never seen
     lb_policy: ROUND_ROBIN         # <-- the fix: per-request spread across replicas
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
