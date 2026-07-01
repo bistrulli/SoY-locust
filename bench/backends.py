@@ -41,6 +41,14 @@ def _run(cmd: List[str], cfg: BenchConfig, check: bool = True,
                           capture_output=capture, text=True)
 
 
+def exec_in_container(container_id: str, argv: List[str], cfg: BenchConfig,
+                      check: bool = True, capture: bool = False
+                      ) -> subprocess.CompletedProcess:
+    """Run a command inside a running container (honors remote DOCKER_HOST)."""
+    return _run(["docker", "exec", container_id, *argv], cfg,
+                check=check, capture=capture)
+
+
 def _registry_of(image: str) -> str:
     """Registry host of an image ref ('gitlab.x:5050/a/b' -> 'gitlab.x:5050')."""
     host = image.split("/", 1)[0]

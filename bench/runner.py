@@ -20,7 +20,7 @@ from typing import List, Optional
 
 import os
 
-from .backends import StubBackend
+from .backends import StubBackend, exec_in_container
 from .capacity import CapacityProbe
 from .config import CFG, BenchConfig
 from .controllers import make_controller
@@ -135,6 +135,88 @@ def _initial_replicas(spec: ExperimentSpec, infra) -> int:
     return infra.min_replicas
 
 
+def _apply_db_fixups(infra, backend, cfg: BenchConfig,
+                     container_timeout_s: float = 60.0,
+                     ready_timeout_s: float = 60.0) -> None:
+    """Re-apply the infra's DB fixups on the fresh deploy (see infra.DbFixup).
+
+    The DB container is recreated on every run, so seeded data that has gone stale
+    (e.g. v4's expired ``plagesession`` window, which makes every login fail) must
+    be corrected each time, right after deploy and before the load starts. Runs
+    ``psql`` inside the container, so no DB port needs to be exposed. Best-effort:
+    a failure is logged loudly (the run would show all-failures) but does not abort.
+    """
+    for fx in getattr(infra, "db_fixups", None) or []:
+        # 1) wait for the service container to be scheduled (swarm deploys async)
+        deadline = time.time() + container_timeout_s
+        cid = None
+        while time.time() < deadline:
+            ids = backend.containers(fx.service)
+            if ids:
+                cid = ids[0]
+                break
+            time.sleep(2)
+        if not cid:
+            logger.warning("DB fixup skipped: no container for service %r after %.0fs",
+                           fx.service, container_timeout_s)
+            continue
+        # 2) wait for the DB to accept connections
+        deadline = time.time() + ready_timeout_s
+        while time.time() < deadline:
+            res = exec_in_container(cid, ["pg_isready", "-U", fx.user, "-d", fx.db],
+                                    cfg, check=False, capture=True)
+            if res.returncode == 0:
+                break
+            time.sleep(2)
+        else:
+            logger.warning("DB fixup: %s/%s not ready after %.0fs — applying anyway",
+                           fx.service, fx.db, ready_timeout_s)
+        # 3) apply the SQL
+        res = exec_in_container(
+            cid, ["psql", "-U", fx.user, "-d", fx.db, "-v", "ON_ERROR_STOP=1",
+                  "-c", fx.sql], cfg, check=False, capture=True)
+        if res.returncode == 0:
+            logger.info("DB fixup applied on %s/%s: %s", fx.service, fx.db,
+                        (res.stdout or "").strip() or "ok")
+        else:
+            logger.warning("DB fixup FAILED on %s/%s (rc=%d): %s", fx.service, fx.db,
+                           res.returncode, (res.stderr or res.stdout or "").strip())
+
+
+def _wait_for_app_ready(host: str, timeout_s: float = 120.0,
+                        interval_s: float = 2.0) -> bool:
+    """Poll the app entry URL until it accepts connections (any HTTP reply).
+
+    The stack deploys asynchronously and the app (e.g. v4 `node` waiting on its DB)
+    can take longer than the fixed post-deploy sleep to start listening. Without
+    this, Locust hits a not-yet-ready app, every request fails with ConnectionRefused
+    and a capacity run misreads it as an instant breaking point. Any HTTP status
+    (even 404/401/500) means the app is LISTENING → ready. Returns False if the host
+    never answers in time (the run starts anyway, so this is best-effort).
+    """
+    import urllib.error
+    import urllib.request
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    deadline = time.time() + timeout_s
+    attempt = 0
+    while time.time() < deadline:
+        attempt += 1
+        try:
+            opener.open(host, timeout=5)
+            logger.info("App ready at %s (%d probe(s)).", host, attempt)
+            return True
+        except urllib.error.HTTPError:
+            # an HTTP error status still means the listener is up → ready
+            logger.info("App ready at %s (HTTP error but listening, %d probe(s)).",
+                        host, attempt)
+            return True
+        except (urllib.error.URLError, OSError):
+            time.sleep(interval_s)
+    logger.warning("App not ready at %s after %.0fs — starting load anyway.",
+                   host, timeout_s)
+    return False
+
+
 def run_experiment(spec: ExperimentSpec, cfg: Optional[BenchConfig] = None) -> dict:
     cfg = cfg or CFG
     infra = get_infra(spec.infra)
@@ -196,6 +278,8 @@ def run_experiment(spec: ExperimentSpec, cfg: Optional[BenchConfig] = None) -> d
         backend.deploy(wait=not spec.dry_run)
         initial = _initial_replicas(spec, infra)
         if not spec.dry_run:
+            # re-open the seeded DB session window etc. before any load (v4 login)
+            _apply_db_fixups(infra, backend, cfg)
             backend.scale(infra.scalable_service, initial)
             # fixed per-service overrides (e.g. v5: gateway=2, ms-other=2 while
             # ms-exercise is the scaled service) — applied once, not autoscaled.
@@ -204,6 +288,9 @@ def run_experiment(spec: ExperimentSpec, cfg: Optional[BenchConfig] = None) -> d
                     backend.scale(svc, int(n))
                     logger.info("Fixed %s -> %d replica(s).", svc, int(n))
             time.sleep(5)
+            # wait for the app to actually listen before the load starts, else the
+            # first requests fail with ConnectionRefused (misread as a breaking point)
+            _wait_for_app_ready(host)
 
         # In dry-run we measure the local machine (psutil); otherwise the resolved source
         # (docker stats on the remote app) filtered on the infra's project.

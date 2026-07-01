@@ -23,6 +23,23 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 @dataclass
+class DbFixup:
+    """A SQL statement re-applied inside a service's DB container after deploy.
+
+    Seeded images ship fixed data that can go stale: v4's ``plagesession`` window
+    (``end_date``) has expired since the image was built, so every login fails.
+    The DB is recreated on each fresh deploy, so the fix must run every run — this
+    re-applies it without touching the image. ``psql`` is invoked inside the
+    container, so no DB port needs to be exposed.
+    """
+
+    service: str               # service whose container runs the DB (e.g. "postgres")
+    sql: str                   # SQL executed via `psql -c`
+    db: str = "postgres"       # database name (psql -d)
+    user: str = "postgres"     # psql role (-U)
+
+
+@dataclass
 class Infra:
     """Description of a target infrastructure."""
 
@@ -45,6 +62,8 @@ class Infra:
     # Used to show the impact of a reimplementation (e.g. currencyservice by language).
     variants: Dict[str, List[str]] = field(default_factory=dict)
     default_variant: str = "default"
+    # SQL re-applied inside the DB container right after each deploy (see DbFixup).
+    db_fixups: List[DbFixup] = field(default_factory=list)
     notes: str = ""
 
     def path(self, rel: str) -> str:
@@ -111,6 +130,22 @@ INFRA: Dict[str, Infra] = {
         min_replicas=1,
         max_replicas=8,
         signal_kind="docker_stats",
+        # The seeded DB ships a `plagesession` whose window expired (end_date in the
+        # past) → the login flow rejects every user. Re-open it on each fresh deploy.
+        # Mirrors the proven manual runbook `sou/fix.sh` (which the human ran by hand):
+        # bump BOTH plagesession.end_date AND studentstatement.deadline_date, on ALL
+        # rows (no WHERE) — the blocking session is not guaranteed to be ps_id=1, and
+        # the exercise step (request_3) needs an open deadline too. Date pushed far out.
+        db_fixups=[
+            DbFixup(
+                service="postgres", db="plagedb", user="plagedba",
+                sql="UPDATE plagesession SET end_date='2030-12-31';",
+            ),
+            DbFixup(
+                service="postgres", db="plagedb", user="plagedba",
+                sql="UPDATE studentstatement SET deadline_date='2030-12-31';",
+            ),
+        ],
         notes="Single-service `node` monolith. Image from private GitLab registry "
               "(auth required to pull).",
     ),
