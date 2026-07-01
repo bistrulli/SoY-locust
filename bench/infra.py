@@ -190,8 +190,8 @@ INFRA: Dict[str, Infra] = {
             "python": ["microservices-demo/compose.currency-python.yml"],
             "java": ["microservices-demo/compose.currency-java.yml"],
             "csharp": ["microservices-demo/compose.currency-csharp.yml"],
-            "envoy": ["microservices-demo/compose.envoy.yml"],   # per-service Envoy gRPC LB
-            "nginx": ["microservices-demo/compose.nginx.yml"],   # per-service nginx gRPC LB (lighter)
+            "envoy": ["proxy/compose.envoy.yml"],   # per-service Envoy gRPC LB (configs in proxy/)
+            "nginx": ["proxy/compose.nginx.yml"],   # per-service nginx gRPC LB (lighter)
         },
         notes="Online Boutique (internal gRPC). No nginx-vts → λ/RT via the Locust "
               "web API; HPA (CPU via docker stats) fully supported. "

@@ -67,11 +67,11 @@ run --infra microservices-demo --variant envoy --scale-extra productcatalogservi
 run --infra microservices-demo --variant nginx --scale-extra productcatalogservice=4,currencyservice=4
 ```
 
-Raw docker compose (from `microservices-demo/`):
+Raw docker compose (from the repo root):
 
 ```bash
-docker compose -f docker-compose.yml -f compose.envoy.yml up -d
-docker compose -f docker-compose.yml -f compose.envoy.yml up -d --scale productcatalogservice=4
+docker compose -f microservices-demo/docker-compose.yml -f proxy/compose.envoy.yml up -d
+docker compose -f microservices-demo/docker-compose.yml -f proxy/compose.envoy.yml up -d --scale productcatalogservice=4
 ```
 
 > The proxy sidecars only help when you **scale** the backends. `--variant node`
@@ -81,12 +81,13 @@ docker compose -f docker-compose.yml -f compose.envoy.yml up -d --scale productc
 
 ## 4. Regenerating the proxy configs
 
-The sidecar configs and compose overrides are **generated** (and, like the rest
-of `microservices-demo/`, distributed to the hosts via `./xp.sh sync`):
+The sidecar configs and compose overrides are **generated** into `proxy/` (in
+the SoY-locust repo, so they are versioned with the harness) and distributed to
+the hosts via `./xp.sh sync`:
 
 ```bash
-python3 microservices-demo/envoy/gen_envoy.py    # -> envoy/*.yaml    + compose.envoy.yml
-python3 microservices-demo/nginx/gen_nginx.py    # -> nginx/*.conf    + compose.nginx.yml
+python3 proxy/envoy/gen_envoy.py    # -> proxy/envoy/*.yaml + proxy/compose.envoy.yml
+python3 proxy/nginx/gen_nginx.py    # -> proxy/nginx/*.conf + proxy/compose.nginx.yml
 ```
 
 Each generator holds the single source of truth for the service→port map and the
