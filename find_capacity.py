@@ -158,7 +158,7 @@ def main():
     print("=" * 64)
     print(f"{'infra / loadshape':>38} {'replicas':>8} {'max_users':>10} {'breaks_at':>10}")
     for k, v in results.items():
-        print(f"{k:>38} {v['replicas']:>8} "
+        print(f"{k:>38} {str(v['replicas']):>28} "
               f"{str(v['max_users']):>10} {str(v['breaking_users']):>10}")
     out = Path(RESULTS_ROOT) / "max_users.json"
     json.dump(results, open(out, "w"), indent=2)
