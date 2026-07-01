@@ -177,19 +177,26 @@ INFRA: Dict[str, Infra] = {
         min_replicas=1,
         max_replicas=10,
         signal_kind="docker_stats",
-        # Polyglot variants of currencyservice (language impact on energy/perf).
-        # 'default' = official Node image; the others rebuild from sources.
+        # Two variant axes (mutually exclusive here):
+        #  - currencyservice language (energy/perf impact): node|go|python|java|csharp.
+        #  - gRPC load-balancing proxy for real horizontal scaling (default = none):
+        #    'envoy'/'nginx' add a per-service sidecar so scaling actually spreads load
+        #    (plain compose pins each gRPC connection to one replica). Use these to
+        #    compare no-proxy vs Envoy vs nginx (overhead + load spread).
         default_variant="node",
         variants={
-            "node": [],  # official image (server.js)
+            "node": [],  # official image (server.js), NO proxy = baseline
             "go": ["microservices-demo/compose.currency-go.yml"],
             "python": ["microservices-demo/compose.currency-python.yml"],
             "java": ["microservices-demo/compose.currency-java.yml"],
             "csharp": ["microservices-demo/compose.currency-csharp.yml"],
+            "envoy": ["microservices-demo/compose.envoy.yml"],   # per-service Envoy gRPC LB
+            "nginx": ["microservices-demo/compose.nginx.yml"],   # per-service nginx gRPC LB (lighter)
         },
         notes="Online Boutique (internal gRPC). No nginx-vts → λ/RT via the Locust "
               "web API; HPA (CPU via docker stats) fully supported. "
-              "currencyservice variants: node|go|python|java|csharp.",
+              "currencyservice variants: node|go|python|java|csharp. "
+              "gRPC-scaling variants: envoy|nginx (per-service sidecar LB).",
     ),
 }
 
