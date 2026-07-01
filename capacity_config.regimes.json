@@ -1,0 +1,35 @@
+{
+  "_comment": "Characterize each stack at 3 load REGIMES anchored on its measured breaking point: max tenable / rupture / rupture x2 (shop capped at 30k, not 40k, to stay feasible on the load host). Under constant/step/peak. Replicas = exactly those used when the breaking point was measured (v4=8, v5=8+2+2, shop=1/service since gRPC pinning makes multi-replica ineffective). stop_on_break=false: rupture x2 is intentionally beyond the break. Per-infra spawn_rate (shop needs a high spawn to reach 20k-30k).",
+  "run_time": "180s",
+  "fail_threshold": 0.05,
+  "controller": "manual",
+  "stop_on_break": false,
+  "loadshapes": {
+    "constant": "bench/loadshapes/constant.py",
+    "step": "bench/loadshapes/step.py",
+    "peak": "bench/loadshapes/peak.py"
+  },
+  "replicas": {
+    "monolith-v4": 8,
+    "monolith-v5": { "ms-exercise": 8, "gateway": 2, "ms-other": 2 },
+    "microservices-demo": {
+      "frontend": 1,
+      "productcatalogservice": 1,
+      "currencyservice": 1,
+      "cartservice": 1,
+      "recommendationservice": 1,
+      "adservice": 1,
+      "checkoutservice": 1
+    }
+  },
+  "user_levels": {
+    "monolith-v4": [175, 200, 400],
+    "monolith-v5": [250, 500, 1000],
+    "microservices-demo": [10000, 20000, 30000]
+  },
+  "spawn_rate": {
+    "monolith-v4": 200,
+    "monolith-v5": 200,
+    "microservices-demo": 2000
+  }
+}

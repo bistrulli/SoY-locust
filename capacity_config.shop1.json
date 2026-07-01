@@ -1,0 +1,28 @@
+{
+  "_comment": "shop-only (Online Boutique) at 1 replica per service, coarse non-uniform user levels up to 100k. Rationale: the gRPC frontend pins to ONE backend replica under compose (HTTP/2 + DNS round-robin ineffective), so multi-replica scaling did NOT add capacity -> measure the honest single-instance breaking point with a wide coarse scan. spawn_rate raised to 2000/s + warmup 60s so the high levels can actually reach their target (2000*60 = 120k >= 100k) before the 60s sustained-fail window.",
+  "controller": "manual",
+  "replicas": {
+    "microservices-demo": {
+      "frontend": 1,
+      "productcatalogservice": 1,
+      "currencyservice": 1,
+      "cartservice": 1,
+      "recommendationservice": 1,
+      "adservice": 1,
+      "checkoutservice": 1
+    }
+  },
+  "ramp": {
+    "warmup_s": 60,
+    "hold_s": 60,
+    "spawn_rate": 2000,
+    "fail_threshold": 0.05,
+    "controller": "manual",
+    "target_utilization": 0.5,
+    "min_replicas": 1,
+    "max_replicas": 1,
+    "levels": {
+      "microservices-demo": { "list": [1000, 5000, 10000, 20000, 50000, 75000, 100000] }
+    }
+  }
+}

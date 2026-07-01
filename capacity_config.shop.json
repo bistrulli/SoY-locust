@@ -1,0 +1,28 @@
+{
+  "_comment": "shop-only (microservices-demo / Online Boutique) breaking-point ramp. Restricted to microservices-demo so it does NOT also run v4/v5. Mirrors capacity_config.v4.json. Uses the shop's OWN loadgenerator locustfile (no login/plagesession -> no 401 fixup needed).",
+  "controller": "manual",
+  "replicas": {
+    "microservices-demo": {
+      "frontend": 1,
+      "productcatalogservice": 4,
+      "currencyservice": 4,
+      "cartservice": 3,
+      "recommendationservice": 2,
+      "adservice": 2,
+      "checkoutservice": 2
+    }
+  },
+  "ramp": {
+    "warmup_s": 40,
+    "hold_s": 60,
+    "spawn_rate": 200,
+    "fail_threshold": 0.05,
+    "controller": "manual",
+    "target_utilization": 0.5,
+    "min_replicas": 1,
+    "max_replicas": 10,
+    "levels": {
+      "microservices-demo": { "start": 500, "step": 500, "max": 8000 }
+    }
+  }
+}

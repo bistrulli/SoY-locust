@@ -1,0 +1,30 @@
+{
+  "_comment": "v5 + shop breaking-point ramp (run after v4). monolith-v5 first (split services behind gateway-nginx; msa-postgres:1.0.1 seed -> NO plagesession fixup needed, different images from v4), then microservices-demo (Online Boutique, own loadgen). find_breaking runs them sequentially; each level deploys+tears down its own stack, so no overlap on the app host.",
+  "controller": "manual",
+  "replicas": {
+    "monolith-v5": { "ms-exercise": 8, "gateway": 2, "ms-other": 2 },
+    "microservices-demo": {
+      "frontend": 1,
+      "productcatalogservice": 4,
+      "currencyservice": 4,
+      "cartservice": 3,
+      "recommendationservice": 2,
+      "adservice": 2,
+      "checkoutservice": 2
+    }
+  },
+  "ramp": {
+    "warmup_s": 40,
+    "hold_s": 60,
+    "spawn_rate": 200,
+    "fail_threshold": 0.05,
+    "controller": "manual",
+    "target_utilization": 0.5,
+    "min_replicas": 1,
+    "max_replicas": 10,
+    "levels": {
+      "monolith-v5": { "start": 250, "step": 250, "max": 4000 },
+      "microservices-demo": { "start": 500, "step": 500, "max": 8000 }
+    }
+  }
+}

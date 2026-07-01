@@ -1,0 +1,18 @@
+{
+  "_comment": "v4-only breaking-point re-test (after the app-readiness-gate fix). Same v4 settings as capacity_config.json, restricted to monolith-v4 so the ramp does not also run v5/msdemo.",
+  "controller": "manual",
+  "replicas": { "monolith-v4": 8 },
+  "ramp": {
+    "warmup_s": 40,
+    "hold_s": 60,
+    "spawn_rate": 200,
+    "fail_threshold": 0.05,
+    "controller": "manual",
+    "target_utilization": 0.5,
+    "min_replicas": 1,
+    "max_replicas": 8,
+    "levels": {
+      "monolith-v4": { "start": 25, "step": 25, "max": 600 }
+    }
+  }
+}
