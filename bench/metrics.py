@@ -266,12 +266,14 @@ def docker_running_count(cfg: BenchConfig) -> Optional[int]:
     return len([ln for ln in res.stdout.splitlines() if ln.strip()])
 
 
-def read_docker_system_sample(cfg: BenchConfig, name_filter: str = "") -> Optional[dict]:
-    """System sample of the app via ``docker stats`` (REMOTE machine = DOCKER_HOST).
+def read_docker_container_samples(cfg: BenchConfig,
+                                  name_filter: str = "") -> Optional[List[dict]]:
+    """Per-container ``docker stats`` sample (REMOTE app via DOCKER_HOST).
 
-    Sums CPU%, memory, network/block IO over the containers (filtered by ``name_filter``
-    if provided). This is the right source when the harness runs on the load machine
-    but the app runs elsewhere.
+    One ``docker stats`` call; returns one dict per container (filtered by
+    ``name_filter`` if provided) with CPU%, memory, network and block IO. This is
+    the granular source behind BOTH the aggregated system sample and the
+    per-container CSV (e.g. to compare a proxy sidecar's overhead).
     """
     cmd = ["docker", "stats", "--no-stream", "--format", "{{json .}}"]
     try:
@@ -282,8 +284,7 @@ def read_docker_system_sample(cfg: BenchConfig, name_filter: str = "") -> Option
         return None
     if res.returncode != 0:
         return None
-    cpu = mem_used = dr = dw = ns = nr = 0.0
-    n = 0
+    rows: List[dict] = []
     for line in res.stdout.splitlines():
         line = line.strip()
         if not line:
@@ -292,32 +293,71 @@ def read_docker_system_sample(cfg: BenchConfig, name_filter: str = "") -> Option
             d = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if name_filter and name_filter not in d.get("Name", ""):
+        name = d.get("Name", "")
+        if name_filter and name_filter not in name:
             continue
-        n += 1
         try:
-            cpu += float(d.get("CPUPerc", "0%").rstrip("%"))
+            cpu = float(d.get("CPUPerc", "0%").rstrip("%"))
         except ValueError:
-            pass
-        mem_used += _pair(d.get("MemUsage", "0B / 0B"))[0]
+            cpu = 0.0
         r, w = _pair(d.get("BlockIO", "0B / 0B"))
-        dr += r
-        dw += w
         rx, tx = _pair(d.get("NetIO", "0B / 0B"))
-        nr += rx
-        ns += tx
-    if n == 0:
-        return None
-    return {
-        "cpu_pct": round(cpu, 1),
-        "mem_used_mi": round(mem_used / (1024 * 1024), 1),
-        "mem_avail_mi": 0.0,  # unknown via docker stats
-        "disk_read_bytes": dr,
-        "disk_write_bytes": dw,
-        "net_sent_bytes": ns,
-        "net_recv_bytes": nr,
-        "containers": n,
-    }
+        rows.append({
+            "name": name,
+            "cpu_pct": round(cpu, 1),
+            "mem_used_mi": round(_pair(d.get("MemUsage", "0B / 0B"))[0] / (1024 * 1024), 1),
+            "disk_read_bytes": r,
+            "disk_write_bytes": w,
+            "net_recv_bytes": rx,
+            "net_sent_bytes": tx,
+        })
+    return rows or None
+
+
+def _aggregate_container_rows(rows: List[dict]) -> dict:
+    """Sum per-container rows into the aggregated system-sample shape (unchanged fields)."""
+    agg = {"cpu_pct": 0.0, "mem_used_mi": 0.0, "mem_avail_mi": 0.0,
+           "disk_read_bytes": 0.0, "disk_write_bytes": 0.0,
+           "net_sent_bytes": 0.0, "net_recv_bytes": 0.0, "containers": 0}
+    for r in rows:
+        agg["cpu_pct"] += r["cpu_pct"]
+        agg["mem_used_mi"] += r["mem_used_mi"]
+        agg["disk_read_bytes"] += r["disk_read_bytes"]
+        agg["disk_write_bytes"] += r["disk_write_bytes"]
+        agg["net_sent_bytes"] += r["net_sent_bytes"]
+        agg["net_recv_bytes"] += r["net_recv_bytes"]
+        agg["containers"] += 1
+    agg["cpu_pct"] = round(agg["cpu_pct"], 1)
+    agg["mem_used_mi"] = round(agg["mem_used_mi"], 1)
+    return agg
+
+
+def read_docker_system_sample(cfg: BenchConfig, name_filter: str = "") -> Optional[dict]:
+    """Aggregated ``docker stats`` sample (sum over the project's containers)."""
+    rows = read_docker_container_samples(cfg, name_filter)
+    return _aggregate_container_rows(rows) if rows else None
+
+
+def _summarize_containers(samples: List[dict]) -> Dict[str, dict]:
+    """Per-container summary over a phase: mean/peak CPU & memory, and net IO delta
+    (docker net counters are cumulative, so delta = last - first over the phase)."""
+    by: Dict[str, List[dict]] = {}
+    for s in samples:
+        by.setdefault(s["name"], []).append(s)
+    out: Dict[str, dict] = {}
+    for name, rs in by.items():
+        cpu = [r["cpu_pct"] for r in rs]
+        mem = [r["mem_used_mi"] for r in rs]
+        out[name] = {
+            "cpu_mean_pct": round(sum(cpu) / len(cpu), 1),
+            "cpu_peak_pct": round(max(cpu), 1),
+            "mem_mean_mi": round(sum(mem) / len(mem), 1),
+            "mem_peak_mi": round(max(mem), 1),
+            "net_recv_mb": round(max(0.0, rs[-1]["net_recv_bytes"] - rs[0]["net_recv_bytes"]) / 1e6, 2),
+            "net_sent_mb": round(max(0.0, rs[-1]["net_sent_bytes"] - rs[0]["net_sent_bytes"]) / 1e6, 2),
+            "samples": len(rs),
+        }
+    return out
 
 
 def _aggregate_resources(samples: List[dict]) -> dict:
@@ -377,6 +417,9 @@ class Phase:
         self._res_fh = None
         self._pow_csv: Optional[csv.writer] = None
         self._pow_fh = None
+        self._cont_csv: Optional[csv.writer] = None   # per-container docker stats
+        self._cont_fh = None
+        self._cont_samples: List[dict] = []
 
     # --- output paths ---
     @property
@@ -390,6 +433,10 @@ class Phase:
     @property
     def power_csv(self) -> Path:
         return self._dir / f"{self.name}.power.csv"
+
+    @property
+    def containers_csv(self) -> Path:
+        return self._dir / f"{self.name}.containers.csv"
 
     # --- lifecycle ---
     def start(self) -> "Phase":
@@ -417,6 +464,13 @@ class Phase:
                 "ts", "cpu_pct", "mem_used_mi", "mem_avail_mi",
                 "disk_read_bytes", "disk_write_bytes", "net_sent_bytes", "net_recv_bytes",
             ])
+            if self.system_source == "docker":       # per-container breakdown (one row per container)
+                self._cont_fh = open(self.containers_csv, "w", newline="")
+                self._cont_csv = csv.writer(self._cont_fh)
+                self._cont_csv.writerow([
+                    "ts", "container", "cpu_pct", "mem_used_mi",
+                    "net_recv_bytes", "net_sent_bytes", "disk_read_bytes", "disk_write_bytes",
+                ])
             self._spawn(self._sample_system)
         else:
             logger.warning("No system source available (source=%s)", self.system_source)
@@ -447,7 +501,7 @@ class Phase:
         for t in self._threads:
             t.join(timeout=self.cfg.metrics_sample_s * 3 + 2)
         self.t_end = time.time()
-        for fh in (self._res_fh, self._pow_fh):
+        for fh in (self._res_fh, self._pow_fh, self._cont_fh):
             if fh:
                 fh.close()
 
@@ -475,6 +529,7 @@ class Phase:
             "t_end": round(self.t_end, 2),
             "duration_s": round(self.t_end - self.t_start, 2),
             "resources": _aggregate_resources(self._res_samples),
+            "containers": _summarize_containers(self._cont_samples),
             "rapl": rapl,
             "rapl_source": self._rapl_source,
             "wattmeter": wattmeter,
@@ -500,20 +555,42 @@ class Phase:
 
     def _sample_system(self) -> None:
         while not self._stop.is_set():
-            s = self._sys_sampler() if self._sys_sampler else None
-            if s is not None:
-                ts = time.time()
-                s["ts"] = ts
-                self._res_samples.append(s)
-                if self._res_csv:
-                    self._res_csv.writerow([
-                        round(ts, 3), s["cpu_pct"], s["mem_used_mi"], s["mem_avail_mi"],
-                        s["disk_read_bytes"], s["disk_write_bytes"],
-                        s["net_sent_bytes"], s["net_recv_bytes"],
-                    ])
-                    if self._res_fh:
-                        self._res_fh.flush()
+            ts = time.time()
+            if self.system_source == "docker":
+                rows = read_docker_container_samples(self.cfg, self.name_filter)
+                if rows:
+                    for r in rows:                       # per-container detail
+                        r["ts"] = ts
+                        self._cont_samples.append(r)
+                        if self._cont_csv:
+                            self._cont_csv.writerow([
+                                round(ts, 3), r["name"], r["cpu_pct"], r["mem_used_mi"],
+                                r["net_recv_bytes"], r["net_sent_bytes"],
+                                r["disk_read_bytes"], r["disk_write_bytes"],
+                            ])
+                    if self._cont_fh:
+                        self._cont_fh.flush()
+                    s = _aggregate_container_rows(rows)  # aggregate → resources.csv (unchanged)
+                    s["ts"] = ts
+                    self._res_samples.append(s)
+                    self._write_res_row(ts, s)
+            else:
+                s = self._sys_sampler() if self._sys_sampler else None
+                if s is not None:
+                    s["ts"] = ts
+                    self._res_samples.append(s)
+                    self._write_res_row(ts, s)
             self._stop.wait(self.cfg.metrics_sample_s)
+
+    def _write_res_row(self, ts: float, s: dict) -> None:
+        if self._res_csv:
+            self._res_csv.writerow([
+                round(ts, 3), s["cpu_pct"], s["mem_used_mi"], s["mem_avail_mi"],
+                s["disk_read_bytes"], s["disk_write_bytes"],
+                s["net_sent_bytes"], s["net_recv_bytes"],
+            ])
+            if self._res_fh:
+                self._res_fh.flush()
 
     def _sample_power(self) -> None:
         while not self._stop.is_set():
