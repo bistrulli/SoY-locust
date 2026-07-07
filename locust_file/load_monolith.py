@@ -26,30 +26,30 @@ class SoyMonoUser(BaseExp):
     wait_time = constant_throughput(float(os.getenv("BENCH_RPS_PER_USER", "1.0")))
 
     def request(self, method, url, **kwargs):
-        kwargs.setdefault("timeout", 1)
+        kwargs.setdefault("timeout", 15)
         return super().request(method, url, **kwargs)
 
     def userLogic(self):
         email = self.user_data["email"]
         password = self.user_data["password"]
 
-        self.client.request("OPTIONS", "/api/user/login", timeout=1)
+        self.client.request("OPTIONS", "/api/user/login", timeout=15)
         login_response = self.client.post(
             "/api/user/login",
             headers={"Content-Type": "application/json"},
             json={"email": email, "password": password},
-            timeout=1,
+            timeout=15,
         )
         if login_response.status_code == 200:
             access_token = login_response.cookies.get("access_token")
             if access_token:
-                self.client.request("OPTIONS", "/api/auth/verify", timeout=1)
+                self.client.request("OPTIONS", "/api/auth/verify", timeout=15)
                 self.client.get(
                     "/api/auth/verify",
                     headers={"Authorization": f"Bearer {access_token}"},
-                    timeout=1,
+                    timeout=15,
                 )
-                self.client.request("OPTIONS", "/api/exercise-production", timeout=1)
+                self.client.request("OPTIONS", "/api/exercise-production", timeout=15)
                 with open(f"{resourceDir.absolute()}/soymono2/0046_request.json") as f:
                     exercise_data = json.load(f)
                 self.client.post(
@@ -59,11 +59,11 @@ class SoyMonoUser(BaseExp):
                         "Content-Type": "application/json",
                     },
                     json=exercise_data,
-                    timeout=1,
+                    timeout=15,
                 )
-                self.client.request("OPTIONS", "/api/user/logout", timeout=1)
+                self.client.request("OPTIONS", "/api/user/logout", timeout=15)
                 self.client.delete(
                     "/api/user/logout",
                     headers={"Authorization": f"Bearer {access_token}"},
-                    timeout=1,
+                    timeout=15,
                 )

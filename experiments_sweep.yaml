@@ -8,6 +8,14 @@
 #   - 3 loadshapes   : cyclical / step / peak  (expanded automatically)
 #   - v4 baseline    : 6 replicas, find the load giving ~25% failure
 #
+# LOAD CALIBRATION (users) = 2x the breaking point measured in the cap/brake tests
+#   (results/results-cap, results/results-brk, at max_replicas=8):
+#     monolith-v4: breaking ~200 users  -> users: 400
+#     monolith-v5: breaking ~500 users  -> users: 1000
+#     shop        : breaking ~20000     -> users: 6000 (knee-level; raise for true 2x)
+#   Rationale: load must exceed a single config's capacity so scaling actually matters;
+#   the previous flat users:200 left v5 ~2.5x under-loaded (0% fail, sat at the knee).
+#
 # Isolation: every run does `up --renew-anon-volumes` then `down -v` (fresh DB/cache,
 # one stack at a time) -> runs are ISO and comparable.
 #
@@ -31,46 +39,46 @@ experiments:
   # =================================================================== v4 ===
   - infra: monolith-v4             # manual scaling — 3 options in one entry
     controllers: [none, manual, manual-sched]
-    users: 200
+    users: 400
     initial_replicas: 4            # none: frozen here
     fixed_replicas: 6              # manual: fixed at 6
     schedule: [[0, 1], [120, 3], [300, 6], [480, 3]]   # manual-sched staircase
   - infra: monolith-v4             # hpa @ 25% / 50% / 75%
     controllers: [hpa]
-    users: 200
+    users: 400
     target_utilization: 0.25
     label: hpa-u25
   - infra: monolith-v4
     controllers: [hpa]
-    users: 200
+    users: 400
     target_utilization: 0.50
     label: hpa-u50
   - infra: monolith-v4
     controllers: [hpa]
-    users: 200
+    users: 400
     target_utilization: 0.75
     label: hpa-u75
   - infra: monolith-v4             # uopt combinations (target_util x min_replicas)
     controllers: [uopt]
-    users: 200
+    users: 400
     target_utilization: 0.10
     min_replicas: 1
     label: uopt-t10-min1
   - infra: monolith-v4
     controllers: [uopt]
-    users: 200
+    users: 400
     target_utilization: 0.10
     min_replicas: 4
     label: uopt-t10-min4
   - infra: monolith-v4
     controllers: [uopt]
-    users: 200
+    users: 400
     target_utilization: 0.25
     min_replicas: 4
     label: uopt-t25-min4
   - infra: monolith-v4
     controllers: [uopt]
-    users: 200
+    users: 400
     target_utilization: 0.50
     min_replicas: 1
     label: uopt-t50-min1
@@ -88,93 +96,105 @@ experiments:
   # =================================================================== v5 ===
   - infra: monolith-v5             # manual scaling — 3 options
     controllers: [none, manual, manual-sched]
-    users: 200
+    users: 1000
     initial_replicas: 4
     fixed_replicas: 6
     schedule: [[0, 1], [120, 3], [300, 6], [480, 3]]
   - infra: monolith-v5             # hpa @ 25 / 50 / 75
     controllers: [hpa]
-    users: 200
+    users: 1000
     target_utilization: 0.25
     label: hpa-u25
   - infra: monolith-v5
     controllers: [hpa]
-    users: 200
+    users: 1000
     target_utilization: 0.50
     label: hpa-u50
   - infra: monolith-v5
     controllers: [hpa]
-    users: 200
+    users: 1000
     target_utilization: 0.75
     label: hpa-u75
   - infra: monolith-v5             # uopt combinations
     controllers: [uopt]
-    users: 200
+    users: 1000
     target_utilization: 0.10
     min_replicas: 1
     label: uopt-t10-min1
   - infra: monolith-v5
     controllers: [uopt]
-    users: 200
+    users: 1000
     target_utilization: 0.10
     min_replicas: 4
     label: uopt-t10-min4
   - infra: monolith-v5
     controllers: [uopt]
-    users: 200
+    users: 1000
     target_utilization: 0.25
     min_replicas: 4
     label: uopt-t25-min4
   - infra: monolith-v5
     controllers: [uopt]
-    users: 200
+    users: 1000
     target_utilization: 0.50
     min_replicas: 1
     label: uopt-t50-min1
 
-  # ====================================== microservices-demo (google store) ===
-  - infra: microservices-demo      # manual scaling — 3 options
+  # ============ microservices-demo (Online Boutique) — AUTOSCALING ============
+  # The controller scales recommendationservice (top-CPU gRPC backend) BEHIND Envoy
+  # (default variant of microservices-demo-scale); the other backends are fixed via
+  # extra_replicas so recommendationservice is the bottleneck the autoscaler relieves.
+  # users=6000 with spawn 500 (default spawn 50 is far too slow for the shop).
+  - infra: microservices-demo-scale   # manual scaling — 3 options (on recommendationservice)
     controllers: [none, manual, manual-sched]
-    users: 300
+    users: 6000
+    spawn_rate: 500
+    extra_replicas: {productcatalogservice: 4, currencyservice: 4, cartservice: 3, adservice: 2, checkoutservice: 2, shippingservice: 2, paymentservice: 2, emailservice: 2}
     initial_replicas: 4
-    fixed_replicas: 6
+    fixed_replicas: 4
     schedule: [[0, 1], [120, 3], [300, 6], [480, 3]]
-  - infra: microservices-demo      # hpa @ 25 / 50 / 75
+  - infra: microservices-demo-scale   # hpa @ 25 / 50 / 75
     controllers: [hpa]
-    users: 300
+    users: 6000
+    spawn_rate: 500
+    extra_replicas: {productcatalogservice: 4, currencyservice: 4, cartservice: 3, adservice: 2, checkoutservice: 2, shippingservice: 2, paymentservice: 2, emailservice: 2}
     target_utilization: 0.25
     label: hpa-u25
-  - infra: microservices-demo
+  - infra: microservices-demo-scale
     controllers: [hpa]
-    users: 300
+    users: 6000
+    spawn_rate: 500
+    extra_replicas: {productcatalogservice: 4, currencyservice: 4, cartservice: 3, adservice: 2, checkoutservice: 2, shippingservice: 2, paymentservice: 2, emailservice: 2}
     target_utilization: 0.50
     label: hpa-u50
-  - infra: microservices-demo
+  - infra: microservices-demo-scale
     controllers: [hpa]
-    users: 300
+    users: 6000
+    spawn_rate: 500
+    extra_replicas: {productcatalogservice: 4, currencyservice: 4, cartservice: 3, adservice: 2, checkoutservice: 2, shippingservice: 2, paymentservice: 2, emailservice: 2}
     target_utilization: 0.75
     label: hpa-u75
-  - infra: microservices-demo      # uopt combinations
+  - infra: microservices-demo-scale   # uopt combinations
     controllers: [uopt]
-    users: 300
+    users: 6000
+    spawn_rate: 500
+    extra_replicas: {productcatalogservice: 4, currencyservice: 4, cartservice: 3, adservice: 2, checkoutservice: 2, shippingservice: 2, paymentservice: 2, emailservice: 2}
     target_utilization: 0.10
     min_replicas: 1
     label: uopt-t10-min1
-  - infra: microservices-demo
+  - infra: microservices-demo-scale
     controllers: [uopt]
-    users: 300
-    target_utilization: 0.10
-    min_replicas: 4
-    label: uopt-t10-min4
-  - infra: microservices-demo
-    controllers: [uopt]
-    users: 300
+    users: 6000
+    spawn_rate: 500
+    extra_replicas: {productcatalogservice: 4, currencyservice: 4, cartservice: 3, adservice: 2, checkoutservice: 2, shippingservice: 2, paymentservice: 2, emailservice: 2}
     target_utilization: 0.25
     min_replicas: 4
     label: uopt-t25-min4
-  - infra: microservices-demo
+  - infra: microservices-demo-scale
     controllers: [uopt]
-    users: 300
+    users: 6000
+    spawn_rate: 500
+    extra_replicas: {productcatalogservice: 4, currencyservice: 4, cartservice: 3, adservice: 2, checkoutservice: 2, shippingservice: 2, paymentservice: 2, emailservice: 2}
     target_utilization: 0.50
     min_replicas: 1
     label: uopt-t50-min1
