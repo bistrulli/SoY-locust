@@ -155,13 +155,20 @@ INFRA: Dict[str, Infra] = {
         compose_file="sou/monotloth-v5.yml",
         project="soy_v5",
         scalable_service="ms-exercise",
-        host_port=80,
+        # 8090, NOT 80: a separate k3s cluster on the app host claims external :80
+        # via its own Traefik ingress (iptables DNAT keyed to the host's real IP),
+        # which silently swallows any traffic to :80 arriving from ANOTHER host
+        # (the load generator) even though gateway-nginx's own "80:80" publish
+        # looks correct and answers fine from inside the docker network / localhost
+        # on the app host. See sou/monotloth-v5.yml's gateway-nginx `ports:` comment.
+        host_port=8090,
         default_locustfile="test.py",   # v5's own scenario (login→exercise flow, FastHttpUser)
         cpu_limit_cores=1.0,
         min_replicas=1,
         max_replicas=8,
         signal_kind="docker_stats",
-        notes="Split services behind gateway-nginx (port 80). nginx-vts + "
+        notes="Split services behind gateway-nginx (host port 8090 — NOT 80, which a "
+              "separate k3s/Traefik ingress on the app host claims). nginx-vts + "
               "cAdvisor + Prometheus available (signal_kind='prometheus' possible).",
     ),
     "microservices-demo": Infra(

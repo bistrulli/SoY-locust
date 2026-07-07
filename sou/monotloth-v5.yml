@@ -50,7 +50,13 @@ services:
     volumes:
       - ./nginx-config/gateway.conf:/etc/nginx/nginx.conf:ro
     ports:
-      - "80:80"
+      # Host port 8090, NOT 80: a separate k3s cluster on this host has claimed
+      # external :80 via its Traefik ingress (iptables DNAT keyed to the host's
+      # real IP), silently shadowing this container's own "80:80" publish for any
+      # traffic arriving from OTHER hosts (e.g. the load generator on 101) — it
+      # still worked from inside the docker network or from localhost on THIS
+      # host, which is what made it so confusing to diagnose. Not a v5/nginx bug.
+      - "8090:80"
     networks:
       - backend
       - monitoring
