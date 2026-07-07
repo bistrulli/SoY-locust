@@ -303,11 +303,41 @@ class ComposeBackend(Backend):
                 return []
         return out
 
+    def _overlay_networks(self) -> str:
+        res = _run(["docker", "network", "ls", "--filter", f"name={self.project}_",
+                   "--filter", "driver=overlay", "-q"], self.cfg, check=False, capture=True)
+        return (res.stdout or "").strip()
+
     def teardown(self) -> None:
+        had_overlay = bool(self._overlay_networks())
         cmd = self._base() + ["down", "--remove-orphans"]
         if self.remove_volumes:
             cmd.append("-v")
         _run(cmd, self.cfg, check=False)
+        # `compose down` is ASYNC for OVERLAY networks (e.g. monotloth-v5.yml's
+        # `driver: overlay, attachable: true`): the Swarm control-plane can still be
+        # finishing internal cleanup (VXLAN/routing mesh teardown) even after the network
+        # is gone from `docker network ls` — so the NEXT `compose up`, issued right after,
+        # can race that and fail ("not a swarm manager" on network-create, a misleading
+        # error for what's really a control-plane settle race — confirmed a genuine
+        # manager throughout). Same class of bug as the v4 Swarm ghost-network wedge
+        # (SwarmBackend.teardown), just with a settle-timing flavor instead of a stuck
+        # listing. Plain bridge-network projects don't have this and skip the wait.
+        if had_overlay:
+            deadline = time.time() + 90
+            while time.time() < deadline:
+                time.sleep(3)
+                if not self._overlay_networks():
+                    break
+            else:
+                logger.warning("Compose '%s': overlay network(s) still listed after "
+                               "90s wait — the next deploy may race a ghost network.",
+                               self.project)
+            # Even once gone from `network ls`, empirically the control-plane needs a
+            # few more seconds before it reliably accepts a same-name overlay re-create
+            # (a plain 2s post-teardown pause, as runner.py used, was NOT enough and hit
+            # this ~100% of the time in testing). Settle before returning.
+            time.sleep(8)
         logger.info("Compose '%s' stopped.", self.project)
 
 
