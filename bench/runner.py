@@ -20,7 +20,7 @@ from typing import List, Optional
 
 import os
 
-from .backends import StubBackend, exec_in_container
+from .backends import StubBackend, exec_in_container, _heal_enabled
 from .capacity import CapacityProbe
 from .config import CFG, BenchConfig
 from .controllers import make_controller
@@ -132,6 +132,12 @@ def _initial_replicas(spec: ExperimentSpec, infra) -> int:
         return spec.fixed_replicas
     if spec.controller in ("manual-sched", "schedule", "sched") and spec.schedule:
         return int(spec.schedule[0][1])
+    # Honour an explicit min_replicas floor for the INITIAL deploy: a controller
+    # asked to never run below N must not be deployed at 1 (on v4/Swarm a single
+    # `node` replica never becomes reachable, so uopt reads util=0 -> service_time=0
+    # -> never scales -> 100% ConnectionRefused). Falls back to the infra floor.
+    if spec.min_replicas is not None:
+        return max(int(spec.min_replicas), infra.min_replicas)
     return infra.min_replicas
 
 
@@ -181,6 +187,82 @@ def _apply_db_fixups(infra, backend, cfg: BenchConfig,
         else:
             logger.warning("DB fixup FAILED on %s/%s (rc=%d): %s", fx.service, fx.db,
                            res.returncode, (res.stderr or res.stdout or "").strip())
+
+
+def _ensure_service_scheduled(infra, backend, scales: dict, cfg: BenchConfig,
+                              settle_timeout_s: float = 120.0,
+                              max_heals: int = 2) -> dict:
+    """Guarantee the scalable service actually has RUNNING containers after deploy.
+
+    On the v4 remote Swarm the dispatcher can wedge (tasks stuck ``New``, 0 running):
+    ``stack deploy`` "succeeds" but no ``node`` container starts, so the whole run is
+    100 % ConnectionRefused — and, unattended, every subsequent run too (this is exactly
+    what killed the overnight ``v4uopt`` campaign: 43 consecutive 0-node runs). This
+    detects the wedge (0 running containers for the scalable service after
+    ``settle_timeout_s``) and self-heals by restarting docker on the app host, then
+    re-deploying and re-scaling — up to ``max_heals`` times.
+
+    Requires the FULL desired replica count (``want``, from ``scales``) to be running
+    before declaring victory — not just "at least 1". A partial recovery (e.g. 2 of 6
+    replicas up) used to be accepted as "healed", starting the load against an
+    under-provisioned deploy and inflating its failure rate; now it keeps healing (up to
+    ``max_heals``) until the full count is reached or gives up.
+
+    Returns an event record (``{heals, healed, running_after}``) for ``result.json`` so
+    a healed run is traceable. No-op for backends without a ``heal`` capability (compose
+    infras never wedge this way) or when disabled via ``SOY_SWARM_HEAL=0``.
+    """
+    svc = infra.scalable_service
+    want = int(scales.get(svc, 1)) or 1
+    events = {"heals": 0, "healed": False, "running_after": None, "want": want, "ok": False}
+    can_heal = callable(getattr(backend, "heal", None)) and _heal_enabled()
+
+    if hasattr(backend, "wait_running"):
+        running = backend.wait_running(svc, min_count=want, timeout_s=settle_timeout_s)
+    else:
+        running = want  # backend can't report (dry-run/compose) → assume fine
+    events["running_after"] = running
+
+    if running >= want or not can_heal:
+        events["ok"] = running >= want
+        if running < want:
+            logger.error("Service %r has only %d/%d running containers and healing is "
+                         "unavailable/disabled — this run will likely fail or be "
+                         "under-provisioned.", svc, running, want)
+        return events
+
+    # fewer than wanted running => wedged/degraded dispatcher: heal loop
+    for attempt in range(1, max_heals + 1):
+        logger.error("⚠️  Swarm wedge detected: %r has %d/%d running containers after "
+                     "%.0fs. Self-heal attempt %d/%d…",
+                     svc, running, want, settle_timeout_s, attempt, max_heals)
+        if not backend.heal():
+            logger.error("Swarm heal attempt %d/%d could not restore docker.",
+                         attempt, max_heals)
+            continue
+        events["heals"] = attempt
+        # re-apply DB fixups and re-scale on the fresh daemon, then re-check
+        try:
+            _apply_db_fixups(infra, backend, cfg)
+        except Exception as e:
+            logger.warning("post-heal DB fixup: %s", e)
+        try:
+            backend.scale_many(scales)
+        except Exception as e:
+            logger.warning("post-heal scale: %s", e)
+        running = backend.wait_running(svc, min_count=want, timeout_s=settle_timeout_s)
+        events["running_after"] = running
+        if running >= want:
+            logger.warning("✅ Swarm healed: %r now has %d/%d running container(s) after "
+                           "%d restart(s).", svc, running, want, attempt)
+            events["healed"] = True
+            events["ok"] = True
+            return events
+
+    logger.error("❌ Swarm still wedged after %d heal attempt(s): %r has %d/%d running "
+                 "containers. Proceeding — this run will likely fail or be "
+                 "under-provisioned.", max_heals, svc, running, want)
+    return events
 
 
 def _wait_for_app_ready(host: str, timeout_s: float = 120.0,
@@ -291,6 +373,13 @@ def run_experiment(spec: ExperimentSpec, cfg: Optional[BenchConfig] = None) -> d
             backend.scale_many(scales)
             logger.info("Fixed replicas: %s",
                         ", ".join(f"{s}={n}" for s, n in scales.items()))
+            # Guard against a wedged remote Swarm dispatcher (v4): if the scalable
+            # service scheduled 0 containers, restart docker on the app host and retry
+            # (self-heal) so a stuck daemon does not silently turn the run — and every
+            # subsequent run — into 100 % ConnectionRefused. Best-effort; recorded below.
+            heal_events = _ensure_service_scheduled(infra, backend, scales, cfg)
+            if heal_events.get("heals") or not heal_events.get("ok"):
+                summary["swarm_heal"] = heal_events
             time.sleep(5)
             # wait for the app to actually listen before the load starts, else the
             # first requests fail with ConnectionRefused (misread as a breaking point)

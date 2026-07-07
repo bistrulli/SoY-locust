@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 import time
 from typing import Dict, List, Optional
@@ -20,6 +21,68 @@ from typing import Dict, List, Optional
 from .config import CFG, BenchConfig
 
 logger = logging.getLogger(__name__)
+
+
+def _heal_enabled() -> bool:
+    """Whether the Swarm self-heal (remote docker restart) is allowed. On by default."""
+    v = os.environ.get("SOY_SWARM_HEAL", "1").strip().lower()
+    return v not in ("0", "false", "no", "off", "")
+
+
+def restart_remote_docker(cfg: BenchConfig, settle_s: float = 45.0,
+                          ready_timeout_s: float = 180.0) -> bool:
+    """Restart the Docker daemon on the app host to un-wedge a stuck Swarm dispatcher.
+
+    The v4 stack runs on a REMOTE Swarm (``DOCKER_HOST=tcp://<app>:2375``). That
+    dispatcher intermittently wedges: service tasks stay in state ``New`` (0 running)
+    indefinitely, so ``stack deploy`` "succeeds" but no container ever starts and every
+    request is ConnectionRefused — and, unattended, so does every subsequent run. The
+    only known remedy is a daemon restart on the app host (passwordless
+    ``sudo systemctl restart docker`` is provisioned there). This SSHes in, restarts it,
+    and waits for the daemon + Swarm manager to come back active.
+
+    Overridable via env:
+      ``SOY_APP_SSH``            ssh target (default: ``cfg.app_host``)
+      ``SOY_DOCKER_RESTART_CMD`` remote command (default: ``sudo systemctl restart docker``)
+      ``SOY_SWARM_HEAL=0``       disable healing entirely (checked by callers)
+
+    Returns True if the daemon came back with an active Swarm node, else False.
+    """
+    ssh_target = os.environ.get("SOY_APP_SSH") or cfg.app_host
+    if not ssh_target or ssh_target in ("localhost", "127.0.0.1"):
+        logger.error("Swarm heal: no remote app host to SSH into (app_host=%r) — cannot "
+                     "restart docker. Set SOY_APP_SSH or a remote DOCKER_HOST.",
+                     cfg.app_host)
+        return False
+    remote_cmd = os.environ.get("SOY_DOCKER_RESTART_CMD", "sudo systemctl restart docker")
+    ssh_cmd = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+               ssh_target, remote_cmd]
+    logger.warning("Swarm heal: restarting docker on %s (`%s`)…", ssh_target, remote_cmd)
+    try:
+        res = subprocess.run(ssh_cmd, check=False, capture_output=True,
+                             text=True, timeout=120)
+    except Exception as e:
+        logger.error("Swarm heal: ssh restart failed to launch: %s", e)
+        return False
+    if res.returncode != 0:
+        # The daemon may still be bouncing (ssh can drop as docker restarts); log and
+        # still wait below to see if it recovers.
+        logger.error("Swarm heal: remote restart returned %d: %s", res.returncode,
+                     (res.stderr or res.stdout or "").strip())
+    time.sleep(settle_s)   # let the daemon socket + swarm reconciler come back up
+    deadline = time.time() + ready_timeout_s
+    while time.time() < deadline:
+        info = subprocess.run(
+            ["docker", "info", "--format", "{{.Swarm.LocalNodeState}}"],
+            env=cfg.docker_env(), check=False, capture_output=True, text=True)
+        if info.returncode == 0 and "active" in (info.stdout or ""):
+            logger.warning("Swarm heal: docker on %s is back (Swarm active).", ssh_target)
+            time.sleep(5)   # small grace for the dispatcher to resume scheduling
+            return True
+        time.sleep(3)
+    logger.error("Swarm heal: docker on %s did not become Swarm-active within %.0fs.",
+                 ssh_target, ready_timeout_s)
+    return False
 
 
 class Backend:
@@ -122,6 +185,19 @@ class ComposeBackend(Backend):
         if err is not None and wait:
             # --wait may fail if a service has no healthcheck: retry without it
             logger.warning("compose up --wait failed, retrying without --wait")
+            err = self._try_up(False)
+        # OVERLAY-network projects (e.g. monotloth-v5.yml's `driver: overlay`) can hit a
+        # brief Swarm control-plane race right after teardown recreates the network:
+        # `compose up` fails fast with a transient "not a swarm manager" / network-create
+        # error even though the daemon genuinely is a manager (confirmed via `docker node
+        # ls` during this exact failure) — a settle-timing hiccup, not a real auth/config
+        # problem. A few seconds' backoff + retry clears it every time observed.
+        retry = 0
+        while err is not None and retry < 3:
+            retry += 1
+            logger.warning("compose up failed (attempt %d) — retrying in 5s "
+                           "(possible overlay-network settle race)…", retry)
+            time.sleep(5)
             err = self._try_up(False)
         if err is not None:
             self._explain_and_raise(err)
@@ -284,6 +360,43 @@ class SwarmBackend(Backend):
         if res.returncode != 0:
             return []
         return [x.strip() for x in res.stdout.splitlines() if x.strip()]
+
+    def wait_running(self, service: str, min_count: int = 1,
+                     timeout_s: float = 120.0, interval_s: float = 3.0) -> int:
+        """Poll until at least ``min_count`` of the service's containers are RUNNING.
+
+        Uses ``containers()`` (real running containers via ``docker ps``), NOT
+        ``replicas()`` — the latter counts *desired-state* tasks and so stays > 0 even
+        when the dispatcher is wedged and nothing actually runs. Returns the running
+        count reached (may be < ``min_count`` on timeout).
+        """
+        deadline = time.time() + timeout_s
+        n = len(self.containers(service))
+        while n < min_count and time.time() < deadline:
+            time.sleep(interval_s)
+            n = len(self.containers(service))
+        return n
+
+    def heal(self, settle_s: float = 45.0) -> bool:
+        """Un-wedge the remote Swarm: restart the app-host daemon, re-init swarm, re-deploy.
+
+        Called by the runner when the scalable service scheduled 0 containers (the wedge
+        signature). Returns True once the stack has been re-deployed on a recovered
+        daemon; the caller then re-scales and re-checks. No-op-safe: returns False if
+        healing is disabled (``SOY_SWARM_HEAL=0``) or the restart failed.
+        """
+        if not _heal_enabled():
+            logger.warning("Swarm heal requested but disabled (SOY_SWARM_HEAL=0).")
+            return False
+        if not restart_remote_docker(self.cfg, settle_s=settle_s):
+            return False
+        try:
+            self._ensure_swarm()
+            self.deploy(wait=True)   # idempotent re-reconcile of the stack
+        except Exception as e:
+            logger.error("Swarm heal: re-deploy after restart failed: %s", e)
+            return False
+        return True
 
     def teardown(self) -> None:
         _run(["docker", "stack", "rm", self.stack_name], self.cfg, check=False)
