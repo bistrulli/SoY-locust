@@ -1,0 +1,143 @@
+# =============================================================================
+# monolith-v5 — uopt campaign, PRIMARY level (users=450, max_replicas=8)
+#
+# Mirrors the v4 two-level design (experiments_v4_uopt.yaml / _u400.yaml) applied to
+# v5, calibrated on FRESH capacity probes (not the stale historical results-cap/-brk
+# data, which was measured under a now-fixed nginx load-balancing bug — see below).
+#
+# TWO PRE-REQUISITE FIXES applied before this campaign could run at all (2026-07-06):
+#   1. `sou/nginx-config/ms-exercise.conf` had a STATIC nginx upstream (resolves
+#      Docker DNS once at boot, caches forever) — scaling `ms-exercise` never spread
+#      traffic to the new replicas (same bug as the Envoy sidecars, commit 11fc8f8).
+#      Fixed: Docker resolver + proxy_pass variable, re-resolves every 5s. Verified
+#      live: both replicas of a 2-replica test received real traffic.
+#   2. A SEPARATE k3s cluster on the app host (102) claims external port 80 via its
+#      own Traefik ingress (iptables DNAT keyed to the host's real IP) — silently
+#      shadowed v5's own gateway-nginx "80:80" publish for ANY traffic arriving from
+#      another host (i.e. exactly how Locust reaches it, from 101). Looked identical
+#      to a real 404 from the app, only reproduced over the network (not from
+#      localhost/docker-network access) — very confusing to diagnose. Fixed: v5 now
+#      publishes on host port 8090 instead (`sou/monotloth-v5.yml`, `bench/infra.py`
+#      host_port=8090). NOT a v5/nginx bug — a port collision with unrelated
+#      infrastructure sharing the app host.
+#
+# FRESH CAPACITY CALIBRATION (2026-07-06, post-fixes, 8 real ms-exercise replicas +
+# gateway=2/ms-other=2 fixed — matching the historical capacity_config.json's own
+# baseline scaling): breaks at ~500-600 users, max throughput ~1000-1075 rps,
+# REGARDLESS of ms-exercise/ms-other replica count — confirmed on 2 independent probes
+# (with and without gateway/ms-other scaled). The real bottleneck is the SINGLE shared
+# Postgres instance (seen at 100% mean / up to 268% peak CPU), not ms-exercise. This is
+# an architectural fact of v5 (split microservices sharing one DB), not a bug — scaling
+# ms-exercise (the `scalable_service` the harness/controllers manage) has a real ceiling
+# imposed by a component the harness does NOT scale. Worth noting honestly in analysis:
+# v5's autoscalers may show a LOWER ceiling on QoS-holding than v4's, not because they
+# are worse controllers, but because the app itself has a non-scaled bottleneck upstream.
+#
+# TWO-LEVEL DESIGN (mirrors v4):
+#   - 450 (THIS file, max_replicas=8) = efficiency/Pareto: comfortably below the ~500-600
+#     break, baselines should mostly hold, uopt should still show replica-seconds gains.
+#   - 900 (experiments_v5_uopt_u900.yaml, autoscalers max_replicas=16) = overload:
+#     baselines (frozen/fixed) fail hard; autoscalers get room to scale ms-exercise, but
+#     may still be capped by the Postgres ceiling — expect graceful-degradation story,
+#     not perfect QoS-holding (same honest caveat as v4's overload level).
+#
+# gateway/ms-other fixed at 2 replicas each (extra_replicas) on EVERY cell, matching the
+# historical capacity_config.json baseline and the fresh calibration probes.
+#
+# Launch (ON HOST 101, which drives the app on 102):
+#   RUN_TAG=v5uopt ./xp.sh start matrix --file experiments_v5_uopt.yaml --infra monolith-v5
+# =============================================================================
+defaults:
+  run_time: 600s
+  spawn_rate: 50
+  reps: 2
+  max_replicas: 8
+  control_period_s: 5
+  loadshapes:
+    - bench/loadshapes/cyclical.py
+    - bench/loadshapes/step.py
+    - bench/loadshapes/peak.py
+
+experiments:
+
+  # ---- baselines (reference) ------------------------------------------------
+  - infra: monolith-v5
+    controllers: [none, manual, manual-sched]
+    users: 450
+    initial_replicas: 4             # none: frozen at 4
+    fixed_replicas: 6               # manual: fixed at 6
+    schedule: [[0, 1], [120, 3], [300, 6], [480, 3]]   # manual-sched staircase
+    extra_replicas: {gateway: 2, ms-other: 2}
+
+  # ---- hpa @ 25 / 50 / 75 % ---------------------------------------------------
+  - infra: monolith-v5
+    controllers: [hpa]
+    users: 450
+    initial_replicas: 4
+    target_utilization: 0.25
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: hpa-u25
+  - infra: monolith-v5
+    controllers: [hpa]
+    users: 450
+    initial_replicas: 4
+    target_utilization: 0.50
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: hpa-u50
+  - infra: monolith-v5
+    controllers: [hpa]
+    users: 450
+    initial_replicas: 4
+    target_utilization: 0.75
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: hpa-u75
+
+  # ---- uopt — EXPANDED grid (target_util x min_replicas) --------------------
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 450
+    initial_replicas: 4
+    target_utilization: 0.25
+    min_replicas: 2
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: uopt-t25-min2
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 450
+    initial_replicas: 4
+    target_utilization: 0.25
+    min_replicas: 4
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: uopt-t25-min4
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 450
+    initial_replicas: 4
+    target_utilization: 0.50
+    min_replicas: 2
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: uopt-t50-min2
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 450
+    initial_replicas: 4
+    target_utilization: 0.50
+    min_replicas: 4
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: uopt-t50-min4
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 450
+    initial_replicas: 4
+    target_utilization: 0.70
+    min_replicas: 2
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: uopt-t70-min2
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 450
+    initial_replicas: 4
+    target_utilization: 0.70
+    min_replicas: 4
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: uopt-t70-min4

@@ -1,0 +1,126 @@
+# =============================================================================
+# monolith-v5 — uopt campaign, OVERLOAD level (users=900, autoscalers max_replicas=16)
+#
+# Second level of the v5 two-level design (see experiments_v5_uopt.yaml for the
+# PRIMARY level, users=450, max_replicas=8, and the full rationale / pre-requisite
+# fixes: nginx LB static-upstream bug + k3s port-80 collision, both fixed 2026-07-06).
+#
+# FRESH CALIBRATION (see experiments_v5_uopt.yaml header): v5 breaks at ~500-600 users
+# / ~1000-1075 rps regardless of ms-exercise/ms-other replica count — the real ceiling
+# is the single shared Postgres instance (not scaled by this harness). 900 users = ~1.5x
+# the break point (mirrors v4's overload-level ratio). Because the true bottleneck is
+# NOT the scaled service, autoscalers here may NOT fully hold QoS the way v4's did at
+# its 400/600 levels — expect a graceful-degradation story (who fails least / recovers
+# fastest), not a clean "uopt holds perfectly". This is an honest architectural limit of
+# v5, not a controller weakness — worth stating explicitly in analysis.
+#
+# max_replicas=16 for hpa/uopt (double the primary level's 8, mirroring v4's ceiling
+# escalation pattern) — gives room to scale even though Postgres likely caps benefit
+# before reaching it. gateway/ms-other fixed at 2 each (same as primary level).
+#
+# Launch (ON HOST 101, which drives the app on 102):
+#   RUN_TAG=v5uopt900 ./xp.sh start matrix --file experiments_v5_uopt_u900.yaml --infra monolith-v5
+# =============================================================================
+defaults:
+  run_time: 600s
+  spawn_rate: 50
+  reps: 2
+  max_replicas: 8                   # fallback (baselines don't scale); AUTOSCALERS override to 16 below
+  control_period_s: 5
+  loadshapes:
+    - bench/loadshapes/cyclical.py
+    - bench/loadshapes/step.py
+    - bench/loadshapes/peak.py
+
+experiments:
+
+  # ---- baselines (reference — EXPECTED TO FAIL at 900; they can't scale) -----
+  - infra: monolith-v5
+    controllers: [none, manual, manual-sched]
+    users: 900
+    initial_replicas: 4             # none: frozen at 4  → fails hard at 900
+    fixed_replicas: 6               # manual: fixed at 6
+    schedule: [[0, 1], [120, 3], [300, 6], [480, 3]]   # manual-sched staircase
+    extra_replicas: {gateway: 2, ms-other: 2}
+
+  # ---- hpa @ 25 / 50 / 75 % — max_replicas=16 (SAME ceiling as uopt: fair) ---
+  - infra: monolith-v5
+    controllers: [hpa]
+    users: 900
+    initial_replicas: 4
+    max_replicas: 16
+    target_utilization: 0.25
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: hpa-u25
+  - infra: monolith-v5
+    controllers: [hpa]
+    users: 900
+    initial_replicas: 4
+    max_replicas: 16
+    target_utilization: 0.50
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: hpa-u50
+  - infra: monolith-v5
+    controllers: [hpa]
+    users: 900
+    initial_replicas: 4
+    max_replicas: 16
+    target_utilization: 0.75
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: hpa-u75
+
+  # ---- uopt — EXPANDED grid, max_replicas=16 (room to hold 900 by scaling out) -
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 900
+    initial_replicas: 4
+    max_replicas: 16
+    target_utilization: 0.25
+    min_replicas: 2
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: uopt-t25-min2
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 900
+    initial_replicas: 4
+    max_replicas: 16
+    target_utilization: 0.25
+    min_replicas: 4
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: uopt-t25-min4
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 900
+    initial_replicas: 4
+    max_replicas: 16
+    target_utilization: 0.50
+    min_replicas: 2
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: uopt-t50-min2
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 900
+    initial_replicas: 4
+    max_replicas: 16
+    target_utilization: 0.50
+    min_replicas: 4
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: uopt-t50-min4
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 900
+    initial_replicas: 4
+    max_replicas: 16
+    target_utilization: 0.70
+    min_replicas: 2
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: uopt-t70-min2
+  - infra: monolith-v5
+    controllers: [uopt]
+    users: 900
+    initial_replicas: 4
+    max_replicas: 16
+    target_utilization: 0.70
+    min_replicas: 4
+    extra_replicas: {gateway: 2, ms-other: 2}
+    label: uopt-t70-min4
