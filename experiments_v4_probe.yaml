@@ -1,0 +1,20 @@
+# Quick validation probe: 1 uopt/v4 cell, 1 rep, short run.
+# Goal: confirm the cold-start fix works — node deploys at 4, uopt reads util>0,
+# holds a healthy replica count, fail ~0 (was 100% ConnectionRefused before).
+defaults:
+  run_time: 300s
+  spawn_rate: 50
+  reps: 1
+  max_replicas: 8
+  control_period_s: 5
+  loadshapes:
+    - bench/loadshapes/step.py
+
+experiments:
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 300
+    initial_replicas: 4       # WARM START
+    target_utilization: 0.50
+    min_replicas: 4           # FLOOR >=2: node=1 is unreachable on v4/Swarm (100% ConnRefused)
+    label: uopt-t50-min4

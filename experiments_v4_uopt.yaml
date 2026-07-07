@@ -1,0 +1,119 @@
+# =============================================================================
+# monolith-v4 — uopt-focused campaign
+#
+# Purpose: get a clean, favourable comparison for the `uopt` (MPC) controller on
+# v4 (the honest LB: Docker Swarm ingress mesh on :5001 spreads traffic across
+# `node` replicas, so scaling genuinely moves throughput).
+#
+# LOAD CALIBRATION (v4, measured at max_replicas=8, spawn 200 — results-brk/brk):
+#     break (failures begin)   ~150 users   (breaking_users=150, ~824 rps)
+#     knee  (max throughput)   ~175 users   (~1317 rps, knee 1366)
+#     rupture (throughput drop) ~200 users   (drops to 987 rps, 8.2% fail)
+#   => target the load ABOVE a single config's capacity so scaling MATTERS:
+#     x1.5 break = 225 | x2 break = 300 | x1.5 rupture = 300 | x2 rupture = 400
+#     => user levels {225, 300, 400}.  PRIMARY = 300 (=2x break = 1.5x rupture, the
+#     sweet spot: 8 replicas are just saturated at the peak, so the controller that
+#     right-sizes fastest wins). 225 (milder) and 400 (overload) bracket it.
+#
+# NOTE: this file is set to the PRIMARY level (users: 300) for the FULL grid.
+#   To run the 225 / 400 sensitivity levels, change every `users:` (or run this
+#   file 3x with a sed) — see RUN_v4_uopt_plan.md.
+#
+# Isolation: every run does `up --renew-anon-volumes` then `down -v` -> ISO runs.
+#
+# Launch (ON HOST 101, which drives the app on 102):
+#   RUN_TAG=v4uopt ./xp.sh start matrix --file experiments_v4_uopt.yaml --infra monolith-v4
+# =============================================================================
+defaults:
+  run_time: 600s
+  spawn_rate: 50
+  reps: 2                           # 2 to keep the campaign ~one night; bump to 3 for tighter CIs
+  max_replicas: 8                   # v4 capacity ceiling (cap/brk were measured at r8)
+  control_period_s: 5
+  loadshapes:                       # applied to every controller config
+    - bench/loadshapes/cyclical.py
+    - bench/loadshapes/step.py
+    - bench/loadshapes/peak.py
+
+experiments:
+
+  # ---- baselines (reference) ------------------------------------------------
+  - infra: monolith-v4              # manual scaling — 3 references in one entry
+    controllers: [none, manual, manual-sched]
+    users: 300
+    initial_replicas: 4             # none: frozen at 4
+    fixed_replicas: 6               # manual: fixed at 6 (baseline for replica-seconds)
+    schedule: [[0, 1], [120, 3], [300, 6], [480, 3]]   # manual-sched staircase
+
+  # ---- hpa @ 25 / 50 / 75 % (reactive threshold baseline for uopt) ----------
+  # initial_replicas: 4 = WARM START. On v4/Swarm a single `node` replica never
+  # becomes reachable, so any controller must be deployed at a healthy floor
+  # (see RUN_v4_uopt_plan.md §5.1 for the root cause).
+  - infra: monolith-v4
+    controllers: [hpa]
+    users: 300
+    initial_replicas: 4
+    target_utilization: 0.25
+    label: hpa-u25
+  - infra: monolith-v4
+    controllers: [hpa]
+    users: 300
+    initial_replicas: 4
+    target_utilization: 0.50
+    label: hpa-u50
+  - infra: monolith-v4
+    controllers: [hpa]
+    users: 300
+    initial_replicas: 4
+    target_utilization: 0.75
+    label: hpa-u75
+
+  # ---- uopt — EXPANDED grid (target_util x min_replicas) --------------------
+  # Goal: find the uopt operating point that holds QoS at the fewest replica-secs
+  # (its Pareto edge) and anticipates on cyclical/peak. Higher target_util => runs
+  # replicas hotter => fewer of them; min_replicas => warm floor for bursts.
+  # initial_replicas: 4 = WARM START (see hpa note above / plan §5.1). uopt may
+  # then scale DOWN to min_replicas if the load allows — that is exactly the
+  # down-sizing efficiency we want to measure.
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 300
+    initial_replicas: 4
+    target_utilization: 0.25
+    min_replicas: 2         # floor >=2: node=1 may be unreachable via the v4 ingress mesh
+    label: uopt-t25-min2
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 300
+    initial_replicas: 4
+    target_utilization: 0.25
+    min_replicas: 4
+    label: uopt-t25-min4
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 300
+    initial_replicas: 4
+    target_utilization: 0.50
+    min_replicas: 2         # floor >=2: node=1 may be unreachable via the v4 ingress mesh
+    label: uopt-t50-min2
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 300
+    initial_replicas: 4
+    target_utilization: 0.50
+    min_replicas: 4
+    label: uopt-t50-min4
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 300
+    initial_replicas: 4
+    target_utilization: 0.70
+    min_replicas: 2         # floor >=2: node=1 may be unreachable via the v4 ingress mesh
+    label: uopt-t70-min2
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 300
+    initial_replicas: 4
+    target_utilization: 0.70
+    min_replicas: 4
+    label: uopt-t70-min4

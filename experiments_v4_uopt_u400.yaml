@@ -1,0 +1,136 @@
+# =============================================================================
+# monolith-v4 — uopt campaign, OVERLOAD level (users=400, autoscalers max_replicas=20)
+#
+# Second level of the two-level v4 design (see experiments_v4_uopt.yaml for the
+# PRIMARY level, users=300, max_replicas=8). Same 12-config grid; here users=400 AND
+# the AUTOSCALERS (hpa + uopt) get max_replicas=20.
+#
+# CORES: host 102 (lscpu) = 10 PHYSICAL cores / 20 LOGICAL (2 threads/core, 1 socket).
+# The "x2 headroom" is taken on PHYSICAL cores → 10 x2 = 20 replicas (= 2x
+# oversubscription of the physical cores; == the logical thread count, sane).
+#
+#   - 300 (experiments_v4_uopt.yaml, max 8) = EFFICIENCY / Pareto: 8 replicas are just
+#     saturated at the peak, so the controller that right-sizes fastest wins; uopt wins
+#     on replica-seconds at equal ~0% QoS. Recovers the lost uopt data.
+#   - 400 (THIS file, autoscalers max 20) = OVERLOAD, but with ROOM to scale out:
+#       * STATIC baselines FAIL — none(frozen 4) / manual(fixed 6) can't grow, so at 400
+#         they hit the reference failure envelope (ref results/REF_fail_baselines.*: fixed
+#         r8 @ 400 already fails 8-15%; 4-6 replicas fail harder).
+#       * hpa AND uopt share max_replicas=20 (FAIR comparison — same ceiling), so both can
+#         scale into the overload. The winner is the SMARTER one: fewer replica-seconds at
+#         equal QoS, and ANTICIPATION on cyclical/peak (scaling up before the peak → fewer
+#         transient fails during the ramp), NOT the one with more headroom. Honest test.
+#
+# Why 20 for the autoscalers: serving 400 users comfortably needs ~16-18 replicas
+# (~22 users/replica at the knee); 20 (= 10 physical x2) gives real room at exactly 2x
+# physical oversubscription. The node monolith is login/DB-bound (not purely CPU-bound),
+# so replicas beyond the physical core count still add throughput.
+#
+# The wedge self-heal (bench/runner.py::_ensure_service_scheduled) protects this run:
+# if the Swarm dispatcher on 102 wedges, docker is auto-restarted and the run retried,
+# so the campaign survives unattended (cause of the 43 dead runs on 2026-07-03).
+#
+# Isolation: every run does `up --renew-anon-volumes` then `down -v` -> ISO runs.
+#
+# Launch (ON HOST 101, which drives the app on 102):
+#   RUN_TAG=v4uopt400 ./xp.sh start matrix --file experiments_v4_uopt_u400.yaml --infra monolith-v4
+# =============================================================================
+defaults:
+  run_time: 600s
+  spawn_rate: 50
+  reps: 2                           # 2 to keep the campaign ~one night; bump to 3 for tighter CIs
+  max_replicas: 8                   # fallback (baselines don't scale); AUTOSCALERS override to 20 below
+  control_period_s: 5
+  loadshapes:                       # applied to every controller config
+    - bench/loadshapes/cyclical.py
+    - bench/loadshapes/step.py
+    - bench/loadshapes/peak.py
+
+experiments:
+
+  # ---- baselines (reference — EXPECTED TO FAIL at 400; they can't scale) -----
+  - infra: monolith-v4              # manual scaling — 3 references in one entry
+    controllers: [none, manual, manual-sched]
+    users: 400
+    initial_replicas: 4             # none: frozen at 4  → fails hard at 400
+    fixed_replicas: 6               # manual: fixed at 6 (baseline for replica-seconds)
+    schedule: [[0, 1], [120, 3], [300, 6], [480, 3]]   # manual-sched staircase
+
+  # ---- hpa @ 25 / 50 / 75 % — max_replicas=20 (SAME ceiling as uopt: fair) ---
+  # initial_replicas: 4 = WARM START (a single v4/Swarm `node` replica never becomes
+  # reachable, so any controller must deploy at a healthy floor).
+  - infra: monolith-v4
+    controllers: [hpa]
+    users: 400
+    initial_replicas: 4
+    max_replicas: 20
+    target_utilization: 0.25
+    label: hpa-u25
+  - infra: monolith-v4
+    controllers: [hpa]
+    users: 400
+    initial_replicas: 4
+    max_replicas: 20
+    target_utilization: 0.50
+    label: hpa-u50
+  - infra: monolith-v4
+    controllers: [hpa]
+    users: 400
+    initial_replicas: 4
+    max_replicas: 20
+    target_utilization: 0.75
+    label: hpa-u75
+
+  # ---- uopt — EXPANDED grid, max_replicas=20 (room to hold 400 by scaling out) -
+  # Goal at 400: with the same 20 ceiling as hpa, does uopt hold QoS at FEWER
+  # replica-seconds and ANTICIPATE the peak (fewer transient fails on the ramp) than the
+  # reactive hpa — while the static baselines simply fail? initial_replicas: 4 = WARM
+  # START; uopt may scale down to min_replicas when the load allows.
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 400
+    initial_replicas: 4
+    max_replicas: 20
+    target_utilization: 0.25
+    min_replicas: 2         # floor >=2: node=1 may be unreachable via the v4 ingress mesh
+    label: uopt-t25-min2
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 400
+    initial_replicas: 4
+    max_replicas: 20
+    target_utilization: 0.25
+    min_replicas: 4
+    label: uopt-t25-min4
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 400
+    initial_replicas: 4
+    max_replicas: 20
+    target_utilization: 0.50
+    min_replicas: 2         # floor >=2: node=1 may be unreachable via the v4 ingress mesh
+    label: uopt-t50-min2
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 400
+    initial_replicas: 4
+    max_replicas: 20
+    target_utilization: 0.50
+    min_replicas: 4
+    label: uopt-t50-min4
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 400
+    initial_replicas: 4
+    max_replicas: 20
+    target_utilization: 0.70
+    min_replicas: 2         # floor >=2: node=1 may be unreachable via the v4 ingress mesh
+    label: uopt-t70-min2
+  - infra: monolith-v4
+    controllers: [uopt]
+    users: 400
+    initial_replicas: 4
+    max_replicas: 20
+    target_utilization: 0.70
+    min_replicas: 4
+    label: uopt-t70-min4
